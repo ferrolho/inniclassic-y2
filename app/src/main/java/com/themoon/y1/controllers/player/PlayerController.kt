@@ -310,14 +310,7 @@ class PlayerController(
                     updateRatingScrubStars()
                 }
             }
-            LYRICS_STATE -> {
-                // Synced lyrics follow playback by themselves, so the wheel stays as volume
-                if (lyricsOverlayController.isSynced) {
-                    onAdjustVolume(up)
-                } else {
-                    lyricsOverlayController.scrollLines(if (up) 1 else -1)
-                }
-            }
+            LYRICS_STATE -> lyricsOverlayController.scrollLines(if (up) 1 else -1)
             else -> onAdjustVolume(up)
         }
         clickFeedback()
