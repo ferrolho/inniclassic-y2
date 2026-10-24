@@ -483,6 +483,7 @@ class PlayerController(
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {
                 if (event.repeatCount == 0) {
+                    MainActivity.instance?.isMediaLongPressConsumed = false
                     event.startTracking()
                 }
                 return true
@@ -552,6 +553,16 @@ class PlayerController(
                 doubleClickHandler.removeCallbacks(singleClickRunnable)
                 lastCenterUpTime = 0
                 showContextMenu()
+                return true
+            }
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85 || keyCode == 86 || keyCode == 126 || keyCode == 127) {
+            val main = MainActivity.instance
+            if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
+                clickFeedback()
+                main.isMediaLongPressConsumed = true
+                // Hold Play/Pause = Stop (the button is printed play/pause/stop)
+                AudioPlayerManager.getInstance().stopMusic()
                 return true
             }
         }
