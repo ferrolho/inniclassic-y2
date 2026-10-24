@@ -69,7 +69,6 @@ class PlayerController(
     private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
     private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
     private var visualizerApplied = false
-    private var visualizerShowsLyrics = false
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
     private val ivPlayerRepeatStatus: ImageView? = rootView.findViewById(R.id.iv_player_repeat_status)
@@ -201,7 +200,6 @@ class PlayerController(
                 pendingSeekChanged = false
                 nowPlayingBottomState = 0
                 updateNowPlayingBottomBarState()
-                refreshVisualizerState()
             }
 
             val totalCount = playlist.size
@@ -275,6 +273,8 @@ class PlayerController(
             2 -> updateShuffleRepeatScrubLabels()
             3 -> updateRatingScrubStars()
         }
+        // A bottom state may have shown or hidden the lyrics overlay in the album art slot
+        refreshVisualizerState()
     }
 
     fun handleNowPlayingWheelInput(up: Boolean): Boolean {
@@ -426,27 +426,30 @@ class PlayerController(
             onAddToPlaylist = onAddToPlaylist,
             onBrowseAlbum = onBrowseAlbum,
             onBrowseArtist = onBrowseArtist,
+            isSpectrumShowing = main.isVisualizerShowing,
             onToggleVisualizer = onToggleVisualizer,
             localize = localize
         )
     }
 
     /**
-     * Visualizer on: album art is replaced by lyrics if the track has any, else by the spectrum.
-     * Visualizer off: album art. Called on toggle, on track change and on entering Now Playing.
+     * Spectrum on: the spectrum replaces the album art. Spectrum off: album art.
+     * While the lyrics overlay is showing it owns the album art slot, so the spectrum hides
+     * and comes back when the lyrics are hidden. Runs on toggle, on entering Now Playing and with
+     * every bottom state update (which also covers track changes and showing or hiding lyrics).
      */
     fun refreshVisualizerState() {
         val main = MainActivity.instance ?: return
         val isOn = main.isVisualizerShowing
-        val showLyrics = isOn && lyricsOverlayController.hasLyrics
-        val showSpectrum = isOn && !showLyrics
+        val lyricsShowing = lyricsOverlayController.isShowing()
+        val showSpectrum = isOn && !lyricsShowing
 
-        // Only undo what this mode changed, so other users of the lyrics overlay are not affected
-        if (showLyrics) lyricsOverlayController.show() else if (visualizerShowsLyrics) lyricsOverlayController.hide()
-        if (isOn) frameAlbumArt?.visibility = View.GONE else if (visualizerApplied) frameAlbumArt?.visibility = View.VISIBLE
+        // Only undo what this mode changed; the lyrics overlay manages the album art while it shows
+        if (!lyricsShowing) {
+            if (isOn) frameAlbumArt?.visibility = View.GONE else if (visualizerApplied) frameAlbumArt?.visibility = View.VISIBLE
+        }
         visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
         visualizerApplied = isOn
-        visualizerShowsLyrics = showLyrics
         try {
             main.audioVisualizer?.setEnabled(showSpectrum)
         } catch (_: Exception) {}
@@ -556,12 +559,6 @@ class PlayerController(
     }
 
     override fun onBackPressed(): Boolean {
-        // In visualizer mode lyrics or the spectrum replace the album art, so Back leaves the screen
-        if (MainActivity.instance?.isVisualizerShowing == true) {
-            clickFeedback()
-            onNavigateBack()
-            return true
-        }
         clickFeedback()
         if (lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
             lyricsOverlayController.hide()

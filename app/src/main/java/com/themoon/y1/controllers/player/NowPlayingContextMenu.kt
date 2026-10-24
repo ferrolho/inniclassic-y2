@@ -12,7 +12,7 @@ import java.io.File
  * - Add to On-The-Go playlist
  * - Add to Playlist
  * - Browse Album / Browse Artist
- * - Toggle Audio Visualizer
+ * - Show/Hide Spectrum
  */
 object NowPlayingContextMenu {
 
@@ -26,6 +26,7 @@ object NowPlayingContextMenu {
         onAddToPlaylist: (file: File) -> Unit,
         onBrowseAlbum: (albumName: String) -> Unit,
         onBrowseArtist: (artistName: String) -> Unit,
+        isSpectrumShowing: Boolean,
         onToggleVisualizer: () -> Unit,
         localize: (String) -> String
     ) {
@@ -75,7 +76,7 @@ object NowPlayingContextMenu {
             }
 
             addButton(
-                text = localize("Toggle Visualizer"),
+                text = if (isSpectrumShowing) localize("Hide Spectrum") else localize("Show Spectrum"),
                 icon = null
             ) {
                 onToggleVisualizer()
