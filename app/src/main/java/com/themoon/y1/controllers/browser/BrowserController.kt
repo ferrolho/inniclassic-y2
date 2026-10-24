@@ -34,6 +34,7 @@ import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.AudiobookManager
 import com.themoon.y1.managers.RecentlyPlayedManager
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
@@ -98,6 +99,8 @@ class BrowserController(
     var currentFolder: File = StoragePaths.getPrimaryRoot()
     var virtualQueryType: String = "ALL"
     var virtualQueryValue: String = ""
+    /** Album artist of the album that virtualQueryValue names; empty matches any artist. */
+    var virtualQueryAlbumArtist: String = ""
     var categoryArtistFilter: String = ""
     var categoryArtistFilterIsTrackArtist: Boolean = false
     var categoryGenreFilter: String = ""
@@ -537,6 +540,7 @@ class BrowserController(
 
         val activeLibrary = if (isAudiobookLibraryMode) MainActivity.audiobookLibrary else MainActivity.customLibrary
         val uniqueCategories = HashSet<String>()
+        val albumSongs = ArrayList<SongItem>()
 
         for (song in activeLibrary) {
             if (type == "ALBUM" && categoryArtistFilter.isNotEmpty()) {
@@ -552,10 +556,13 @@ class BrowserController(
                 }
             }
 
+            if (type == "ALBUM" || type == "GENRE_ALBUM") {
+                albumSongs.add(song)
+                continue
+            }
             val v = when (type) {
                 "ARTIST" -> song.albumArtist
                 "TRACK_ARTIST", "GENRE_ARTIST" -> song.artist
-                "ALBUM", "GENRE_ALBUM" -> song.album
                 "YEAR" -> song.year
                 "GENRE" -> song.genre
                 "COMPOSER" -> song.composer
@@ -566,18 +573,32 @@ class BrowserController(
 
         val categories = ArrayList(uniqueCategories)
         Collections.sort(categories, java.lang.String.CASE_INSENSITIVE_ORDER)
+        // One row per album as Group Albums tells (AlbumKey): title, or title + album artist.
+        var albumArtists: ArrayList<String>? = null
+        if (type == "ALBUM" || type == "GENRE_ALBUM") {
+            val albums = AlbumKey.firstSongPerAlbum(albumSongs).sortedWith(
+                compareBy<SongItem, String>(java.lang.String.CASE_INSENSITIVE_ORDER) { it.album }
+                    .thenBy(java.lang.String.CASE_INSENSITIVE_ORDER) { AlbumKey.artistOf(it) }
+            )
+            albums.mapTo(categories) { it.album }
+            albumArtists = albums.mapTo(ArrayList()) { AlbumKey.artistOf(it) }
+        }
 
         if (!isAudiobookLibraryMode && ((type == "ALBUM" && categoryArtistFilter.isNotEmpty()) || type == "GENRE_ARTIST" || type == "GENRE_ALBUM")) {
             categories.add(0, ALL_SONGS_SENTINEL)
+            albumArtists?.add(0, "")
         }
 
         currentScrollIndexList.clear()
         currentScrollIndexList.addAll(categories)
 
-        val adapter = CategoryListAdapter(categories, type, isAudiobookLibraryMode)
+        val adapter = CategoryListAdapter(categories, type, isAudiobookLibraryMode, albumArtists = albumArtists)
         listVirtualSongs?.adapter = adapter
 
-        val targetIndex = categories.indexOf(virtualQueryValue)
+        val albumIndex = categories.indices.firstOrNull {
+            categories[it] == virtualQueryValue && albumArtists?.get(it).equals(virtualQueryAlbumArtist, ignoreCase = true)
+        }
+        val targetIndex = albumIndex ?: categories.indexOf(virtualQueryValue)
         virtualListSelectedIndex = if (targetIndex >= 0) targetIndex else 0
         listVirtualSongs?.post {
             navigateVirtualListTo(virtualListSelectedIndex)
@@ -648,7 +669,7 @@ class BrowserController(
                     virtualQueryType == "ALL" || virtualQueryType == "RECENT" -> isMatch = true
                     virtualQueryType == "ARTIST" && song.artist == virtualQueryValue -> isMatch = true
                     virtualQueryType == "ARTIST_ALL_ALBUMS" && song.albumArtist == virtualQueryValue -> isMatch = true
-                    (virtualQueryType == "ALBUM" || virtualQueryType == "RECENTLY_PLAYED_ALBUM") && song.album == virtualQueryValue -> {
+                    (virtualQueryType == "ALBUM" || virtualQueryType == "RECENTLY_PLAYED_ALBUM") && AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) -> {
                         if (categoryArtistFilter.isNotEmpty()) {
                             val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
                             isMatch = categoryArtistFilter.equals(matchField, ignoreCase = true) || categoryArtistFilter.equals(song.artist, ignoreCase = true)
@@ -656,7 +677,7 @@ class BrowserController(
                             isMatch = true
                         }
                     }
-                    virtualQueryType == "COVER_FLOW_ALBUM" && song.album == virtualQueryValue -> isMatch = true
+                    virtualQueryType == "COVER_FLOW_ALBUM" && AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) -> isMatch = true
                     virtualQueryType == "YEAR" && song.year == virtualQueryValue -> isMatch = true
                     virtualQueryType == "GENRE" && song.genre.equals(virtualQueryValue, ignoreCase = true) -> isMatch = true
                     virtualQueryType == "GENRE_ARTIST_SONGS" -> {
@@ -666,7 +687,7 @@ class BrowserController(
                     }
                     virtualQueryType == "GENRE_ALBUM_SONGS" -> {
                         val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
-                        isMatch = song.album.equals(virtualQueryValue, ignoreCase = true) &&
+                        isMatch = AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) &&
                             song.genre.equals(categoryGenreFilter, ignoreCase = true) &&
                             (categoryArtistFilter.isEmpty() || categoryArtistFilter.equals(matchField, ignoreCase = true))
                     }
