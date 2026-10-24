@@ -124,6 +124,8 @@ class PlayerController(
         tvScrubStars[3] = rootView.findViewById(R.id.tv_scrub_star_4)
         tvScrubStars[4] = rootView.findViewById(R.id.tv_scrub_star_5)
 
+        // Smooth tilted edges: the reflection is cut and faded in its bitmap, not by a software layer
+        (ivAlbumReflection as? com.themoon.y1.views.SmoothEdgeImageView)?.useAsReflection()
         applyAlbumTiltSetting()
     }
 
