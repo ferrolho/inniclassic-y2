@@ -369,6 +369,7 @@ polish_dict = {
   "Album Art & Info Updated!": "Okładka albumu i informacje zostały zaktualizowane!",
   "Auto Fetch Album Art": "Pobieraj okładki albumów",
   "Album Cover Tilt": "Przechylenie okładki albumu",
+  "iPod Classic Layout": "Układ iPoda Classic",
   "Clear": "Wyczyść",
   "Clear Cache": "Wyczyść pamięć podręczną",
   "Cache cleared.": "Pamięć podręczna wyczyszczona.",
