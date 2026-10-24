@@ -419,6 +419,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }, "y1-ums-init-check").start()
 
         registerReceivers()
+        if (BuildConfig.TEST_HOOKS) com.themoon.y1.testhooks.TestHooks.register(this)
 
         try {
             val initBattery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -1259,6 +1260,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         try {
             unregisterReceiver(systemStatusReceiver)
         } catch (_: Exception) {}
+        com.themoon.y1.testhooks.TestHooks.unregister(this)
         externalSdMountMonitor?.stop()
         audioVisualizer?.release()
         audioVisualizer = null
