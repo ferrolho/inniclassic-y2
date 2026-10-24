@@ -111,7 +111,7 @@ class MainMenuController(
     fun buildDynamicMainMenuUI() {
         val safeMenuIndex = lastMainMenuFocusIndex
         val mainMenu = layoutMainMenu
-        val statusBarHeightDp = 26
+        val statusBarHeightDp = ClassicMenuStyle.STATUS_HEIGHT_DP
         val density = activity.resources.displayMetrics.density
         val safeTopPadding = (statusBarHeightDp * density).toInt()
 

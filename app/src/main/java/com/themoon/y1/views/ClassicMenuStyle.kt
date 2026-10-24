@@ -13,7 +13,8 @@ import com.themoon.y1.ThemeManager
  */
 object ClassicMenuStyle {
     const val ROW_HEIGHT_DP: Int = 33
-    const val STATUS_HEIGHT_DP: Int = 26
+    val STATUS_HEIGHT_DP: Int
+        get() = if (IpodClassicLayout.isActive) IpodClassicMetrics.STATUS_BAR_HEIGHT else 26
     const val PANE_WIDTH_DP: Int = 242
     fun apply(row: LinearLayout, title: TextView, arrow: TextView?, heightDp: Int) {
         if (!ThemeManager.isClassicTheme()) return
