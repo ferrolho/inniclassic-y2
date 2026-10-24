@@ -15,6 +15,7 @@ class InniClassicApplication : MultiDexApplication() {
     override fun onCreate() {
         super.onCreate()
         installConscrypt()
+        if (BuildConfig.TEST_HOOKS) com.themoon.y1.eventlog.EventLog.start(this)
     }
 
     companion object {
