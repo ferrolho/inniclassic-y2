@@ -230,7 +230,7 @@ class PlayerController(
         val dur = am.getDuration()
 
         tvPlayerTimeCurrent.text = formatTime(pos)
-        tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
+        tvPlayerTimeTotal.text = rightTimeText(pos, dur)
 
         if (dur > 0) {
             playerProgress.progress = (pos * 100) / dur
@@ -260,11 +260,11 @@ class PlayerController(
 
         if (nowPlayingBottomState == 1 && !pendingSeekChanged) {
             tvPlayerSeekCurrent?.text = formatTime(pos)
-            tvPlayerSeekTotal?.text = "-${formatTime(Math.max(0, dur - pos))}"
+            tvPlayerSeekTotal?.text = rightTimeText(pos, dur)
             seekPlayerScrub?.progress = pos
         } else if (nowPlayingBottomState == 0) {
             tvPlayerTimeCurrent.text = formatTime(pos)
-            tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
+            tvPlayerTimeTotal.text = rightTimeText(pos, dur)
             if (dur > 0) {
                 playerProgress.progress = (pos * 100) / dur
             }
@@ -285,7 +285,7 @@ class PlayerController(
                 val current = if (pendingSeekChanged) pendingSeekPosition else am.getCurrentPosition()
                 val duration = am.getDuration()
                 tvPlayerSeekCurrent?.text = formatTime(current)
-                tvPlayerSeekTotal?.text = "-${formatTime(Math.max(0, duration - current))}"
+                tvPlayerSeekTotal?.text = rightTimeText(current, duration)
                 seekPlayerScrub?.max = if (duration > 0) duration else 1000
                 seekPlayerScrub?.progress = current
             }
@@ -447,6 +447,8 @@ class PlayerController(
             onBrowseArtist = onBrowseArtist,
             isSpectrumShowing = main.isVisualizerShowing,
             onToggleVisualizer = onToggleVisualizer,
+            isTotalTimeShown = isTotalTimeShown(),
+            onToggleTotalTime = { toggleTotalTime() },
             localize = localize
         )
     }
@@ -520,6 +522,20 @@ class PlayerController(
             if (spectrumArt === art) spectrumCoverColor = color
         }
     }
+
+    private fun isTotalTimeShown(): Boolean =
+        activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE).getBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false)
+
+    private fun toggleTotalTime() {
+        activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE).edit()
+            .putBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, !isTotalTimeShown()).commit()
+        updatePlayerUI()
+        updateNowPlayingBottomBarState()
+    }
+
+    /** Right-hand time of the progress and scrub rows; AudioPlayerManager uses it too. */
+    fun rightTimeText(positionMs: Int, durationMs: Int): String =
+        NowPlayingTime.rightText(positionMs, durationMs, isTotalTimeShown(), ::formatTime)
 
     private fun formatTime(ms: Int): String {
         val s = (ms / 1000) % 60

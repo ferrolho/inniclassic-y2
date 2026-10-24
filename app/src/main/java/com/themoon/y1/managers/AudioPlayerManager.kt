@@ -213,10 +213,7 @@ class AudioPlayerManager private constructor() {
                                     main.setupVisualizer()
 
                                     val duration = getDuration()
-                                    val remaining = (duration - getCurrentPosition()).coerceAtLeast(0)
-                                    val s = (remaining / 1000) % 60
-                                    val m = remaining / (1000 * 60)
-                                    main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
+                                    main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(getCurrentPosition().toInt(), duration.toInt())
                                     if (playWhenReady) {
                                         LastFmScrobbler.getInstance(main).onTrackStart(
                                             pendingScrobbleArtist,
@@ -747,19 +744,16 @@ class AudioPlayerManager private constructor() {
             val curM = effectiveSeekMs / (1000 * 60)
             main.tvPlayerTimeCurrent.text = String.format(Locale.US, "%02d:%02d", curM, curS)
             if (effectiveDurMs > 0) {
-                val remaining = (effectiveDurMs - effectiveSeekMs).coerceAtLeast(0)
-                val remS = (remaining / 1000) % 60
-                val remM = remaining / (1000 * 60)
-                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
+                main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(effectiveSeekMs.toInt(), effectiveDurMs.toInt())
                 main.playerProgress.progress = ((effectiveSeekMs * 100) / effectiveDurMs).toInt()
             } else {
-                main.tvPlayerTimeTotal.text = "00:00"
+                main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(0, 0)
                 main.playerProgress.progress = 0
             }
         } else {
             main.playerProgress.progress = 0
             main.tvPlayerTimeCurrent.text = "00:00"
-            main.tvPlayerTimeTotal.text = "00:00"
+            main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(0, 0)
         }
 
         val ext = track.name.lowercase(Locale.US)
@@ -1001,10 +995,7 @@ class AudioPlayerManager private constructor() {
                 main.setupVisualizer()
 
                 val duration = player.duration
-                val remaining = (duration - player.currentPosition).coerceAtLeast(0)
-                val s = (remaining / 1000) % 60
-                val m = remaining / (1000 * 60)
-                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
+                main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(player.currentPosition, duration)
                 if (!main.isPausedByHand) {
                     LastFmScrobbler.getInstance(main).onTrackStart(
                         pendingScrobbleArtist,
