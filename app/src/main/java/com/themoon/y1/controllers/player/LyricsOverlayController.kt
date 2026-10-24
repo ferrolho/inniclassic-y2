@@ -1,6 +1,7 @@
 package com.themoon.y1.controllers.player
 
 import android.content.Context
+import android.graphics.drawable.ColorDrawable
 import android.os.SystemClock
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -13,6 +14,7 @@ import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.themoon.y1.MainActivity
+import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.M4bChapterParser
@@ -138,12 +140,34 @@ class LyricsOverlayController(
 
     /** Same text colours as Now Playing; the line being sung uses the focus colour of list rows. */
     private fun applyThemeColors() {
-        val classic = ThemeManager.isClassicTheme()
+        // The iPod colours on the white Classic screen; the theme colours on a dark Now Playing screen
+        val classic = ThemeManager.isClassicTheme() && !isPlayerBackgroundDark()
         setColors(
             if (classic) 0xFF000000.toInt() else ThemeManager.getTextColorPrimary(),
             if (classic) 0xFF3C3C43.toInt() else ThemeManager.getTextColorSecondary(),
             if (classic) 0xFF2588DC.toInt() else ThemeManager.getListButtonFocusedBg()
         )
+    }
+
+    /** The theme changed while the app runs: take its font and colours, also in the text that shows now. */
+    fun onThemeChanged() {
+        tvLyrics.typeface = ThemeManager.getCustomFontBold()
+        if (!colorsOverridden) applyThemeColors()
+        if (!isShowing()) return
+        if (isSynced) {
+            // The spans hold the old highlight colour; the next frame marks the sung line again
+            buildSyncedText()
+            scheduleFrame()
+        } else {
+            tvLyrics.setTextColor(plainColor)
+        }
+    }
+
+    private fun isPlayerBackgroundDark(): Boolean {
+        val bg = MainActivity.instance?.findViewById<View>(R.id.layout_player_mode)?.background as? ColorDrawable
+            ?: return false
+        val c = bg.color
+        return 0.299 * ((c shr 16) and 0xFF) + 0.587 * ((c shr 8) and 0xFF) + 0.114 * (c and 0xFF) < 128
     }
 
     private fun setColors(primary: Int, secondary: Int, highlight: Int) {

@@ -183,6 +183,7 @@ class PlayerController(
             tvPlayerTimeTotal.setTextColor(ThemeManager.getTextColorPrimary())
         }
         applyAlbumTiltSetting()
+        lyricsOverlayController.onThemeChanged()
     }
 
     fun updatePlayerUI() {
