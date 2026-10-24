@@ -624,6 +624,44 @@ class AudioPlayerManager private constructor() {
         MainActivity.instance?.updatePlayerUI()
     }
 
+    /**
+     * Stop: pause and go back to the start of the current track. The queue is kept.
+     * Audiobooks and podcasts keep their position (bookmark), so for them Stop only pauses.
+     */
+    fun stopMusic() {
+        val main = MainActivity.instance
+        val keepPosition = main != null && main.currentIndex in main.currentPlaylist.indices &&
+            tracksBookmark(main.currentPlaylist[main.currentIndex].absolutePath, main)
+        try {
+            if (isUsingLegacyPlayer && legacyPlayer != null) {
+                val player = legacyPlayer ?: return
+                if (player.isPlaying) {
+                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
+                    saveAudiobookBookmarkIfNeeded()
+                    player.pause()
+                }
+                if (!keepPosition) player.seekTo(0)
+            } else if (exoPlayer != null) {
+                val player = exoPlayer ?: return
+                if (player.playWhenReady) {
+                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
+                    saveAudiobookBookmarkIfNeeded()
+                    player.playWhenReady = false
+                }
+                if (!keepPosition) player.seekTo(0)
+            } else {
+                return
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AudioPlayerManager", "Failed to stop: ${e.message}")
+        }
+        isPlayingActive = false
+        stopPeriodicPositionSaver()
+        main?.isPausedByHand = true
+        savePlaybackState(sync = true)
+        main?.updatePlayerUI()
+    }
+
     fun nextTrack() {
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return
@@ -1091,14 +1129,21 @@ class AudioPlayerManager private constructor() {
         }
     }
 
+    private fun isAudiobookPath(filePath: String, main: MainActivity): Boolean =
+        StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Audiobooks", ignoreCase = true) || main.isAudiobookLibraryMode
+
+    /** Audiobooks and podcasts keep a bookmark of their position. */
+    private fun tracksBookmark(filePath: String, main: MainActivity): Boolean =
+        isAudiobookPath(filePath, main) || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM")
+
     private fun saveAudiobookBookmarkIfNeeded() {
         try {
             val main = MainActivity.instance
             if (main != null && main.currentPlaylist.isNotEmpty()) {
                 if (main.currentIndex in 0 until main.currentPlaylist.size) {
                     val filePath = main.currentPlaylist[main.currentIndex].absolutePath
-                    val isAudiobook = StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Audiobooks", ignoreCase = true) || main.isAudiobookLibraryMode
-                    if (isAudiobook || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM")) {
+                    val isAudiobook = isAudiobookPath(filePath, main)
+                    if (tracksBookmark(filePath, main)) {
                         AudiobookManager.getInstance(main).saveBookmark(filePath, getCurrentPosition(), main.currentIndex)
                         val editor = main.prefs.edit()
                             .putInt("book_pos_$filePath", getCurrentPosition())
