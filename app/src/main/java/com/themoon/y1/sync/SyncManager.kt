@@ -617,7 +617,7 @@ class SyncManager internal constructor(context: Context? = null) {
                     }
                 }
 
-            } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true)) {
+            } else if (com.themoon.y1.VideoFeature.enabled && ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true))) {
                 val recResult = MetadataReconciler.reconcileVideos(remoteItems, ledger)
                 val toDownload = recResult.itemsToDownload
                 val totalToDownload = toDownload.size

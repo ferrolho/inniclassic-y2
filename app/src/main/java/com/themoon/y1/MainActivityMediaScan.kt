@@ -114,6 +114,7 @@ internal fun MainActivity.rebuildUniqueAlbumListInternal() {
 }
 
 internal fun MainActivity.scanVideosInternal() {
+    if (!VideoFeature.enabled) return
     var anyMigrated = false
     for (root in StoragePaths.getAllRoots()) {
         val v1 = File(root, "Videos")
