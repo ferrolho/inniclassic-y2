@@ -639,6 +639,19 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
             changeScreen(MainActivity.STATE_BROWSER)
             browserController.buildFileBrowserUI()
         }
+        "SHUFFLE_SONGS" -> {
+            val tracks = MainActivity.customLibrary.map { it.file }
+            if (tracks.isEmpty()) {
+                android.widget.Toast.makeText(this@handleMainMenuAction, t("No playable audio files found."), android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                browserController.isAudiobookLibraryMode = false
+                this.isAudiobookLibraryMode = false
+                isShuffleMode = true
+                prefs.edit().putBoolean("shuffle", true).apply()
+                AudioPlayerManager.getInstance().playTrackList(tracks, tracks.indices.random())
+                changeScreen(MainActivity.STATE_PLAYER)
+            }
+        }
         "OPEN_VIDEOS", "VIDEOS" -> {
             changeScreen(ScreenState.Videos(VideoMode.Root))
         }
