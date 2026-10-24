@@ -28,7 +28,7 @@ import java.util.Locale
  * Controller for Now Playing view:
  * - Album art rendering with 3D tilt and reflection effect
  * - Track metadata, playback timing, and progress bar updates
- * - Bottom widget 4-state cycling: Progress -> Scrub -> Shuffle/Repeat -> Rating
+ * - Bottom widget state cycling: Progress -> Scrub -> Shuffle/Repeat -> Rating -> Lyrics (if any)
  * - Inline volume pill overlay and wheel navigation routing
  * - Integration with LyricsOverlayController and NowPlayingContextMenu
  */
@@ -86,7 +86,11 @@ class PlayerController(
     private val tvScrubStars = arrayOfNulls<TextView>(5)
 
     val lyricsOverlayController: LyricsOverlayController by lazy {
-        LyricsOverlayController(activity, layoutPlayerMode as ViewGroup)
+        LyricsOverlayController(
+            activity,
+            frameAlbumArt?.parent as? ViewGroup ?: layoutPlayerMode as ViewGroup,
+            listOfNotNull(frameAlbumArt, frameAlbumReflection)
+        )
     }
 
     var nowPlayingBottomState: Int = 0
@@ -138,6 +142,10 @@ class PlayerController(
         progressHandler.removeCallbacks(updateProgressTask)
         layoutPlayerMode.visibility = View.GONE
         lyricsOverlayController.hide()
+        if (nowPlayingBottomState == LYRICS_STATE) {
+            nowPlayingBottomState = 0
+            updateNowPlayingBottomBarState()
+        }
     }
 
     override fun onRefreshUI() {
@@ -183,10 +191,12 @@ class PlayerController(
 
             if (path != displayedPlayerPath) {
                 displayedPlayerPath = path
+                val wasShowingLyrics = nowPlayingBottomState == LYRICS_STATE
                 lyricsOverlayController.loadLyrics(file)
                 updateRatingDisplay()
                 pendingSeekChanged = false
-                nowPlayingBottomState = 0
+                nowPlayingBottomState = if (wasShowingLyrics && lyricsOverlayController.hasLyrics) LYRICS_STATE else 0
+                if (wasShowingLyrics) setLyricsShowing(nowPlayingBottomState == LYRICS_STATE)
                 updateNowPlayingBottomBarState()
             }
 
@@ -231,7 +241,7 @@ class PlayerController(
             tvPlayerSeekCurrent?.text = formatTime(pos)
             tvPlayerSeekTotal?.text = "-${formatTime(Math.max(0, dur - pos))}"
             seekPlayerScrub?.progress = pos
-        } else if (nowPlayingBottomState == 0) {
+        } else if (nowPlayingBottomState == 0 || nowPlayingBottomState == LYRICS_STATE) {
             tvPlayerTimeCurrent.text = formatTime(pos)
             tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
             if (dur > 0) {
@@ -243,7 +253,7 @@ class PlayerController(
 
     fun updateNowPlayingBottomBarState() {
         rowPlayerVolume?.visibility = View.GONE
-        rowPlayerProgress?.visibility = if (nowPlayingBottomState == 0) View.VISIBLE else View.GONE
+        rowPlayerProgress?.visibility = if (nowPlayingBottomState == 0 || nowPlayingBottomState == LYRICS_STATE) View.VISIBLE else View.GONE
         rowPlayerSeek?.visibility = if (nowPlayingBottomState == 1) View.VISIBLE else View.GONE
         rowPlayerShuffleRepeat?.visibility = if (nowPlayingBottomState == 2) View.VISIBLE else View.GONE
         rowPlayerRatingScrub?.visibility = if (nowPlayingBottomState == 3) View.VISIBLE else View.GONE
@@ -293,6 +303,14 @@ class PlayerController(
                     updateRatingScrubStars()
                 }
             }
+            LYRICS_STATE -> {
+                // Synced lyrics follow playback by themselves, so the wheel stays as volume
+                if (lyricsOverlayController.isSynced) {
+                    onAdjustVolume(up)
+                } else {
+                    lyricsOverlayController.scrollLines(if (up) 1 else -1)
+                }
+            }
             else -> onAdjustVolume(up)
         }
         clickFeedback()
@@ -305,13 +323,30 @@ class PlayerController(
             am.seekRelative(pendingSeekPosition - am.getCurrentPosition())
             pendingSeekChanged = false
         }
-        nowPlayingBottomState = (nowPlayingBottomState + 1) % 4
+        val previousState = nowPlayingBottomState
+        nowPlayingBottomState = nextBottomState(nowPlayingBottomState, lyricsOverlayController.hasLyrics)
         if (nowPlayingBottomState == 1) {
             pendingSeekPosition = am.getCurrentPosition()
             pendingSeekChanged = false
         }
+        if (nowPlayingBottomState == LYRICS_STATE) {
+            setLyricsShowing(true)
+        } else if (previousState == LYRICS_STATE) {
+            setLyricsShowing(false)
+        }
         updateNowPlayingBottomBarState()
         clickFeedback()
+    }
+
+    private fun setLyricsShowing(showing: Boolean) {
+        if (showing) {
+            lyricsOverlayController.applyColors(tvPlayerTitle.currentTextColor, tvPlayerArtist.currentTextColor)
+            lyricsOverlayController.show()
+            val am = AudioPlayerManager.getInstance()
+            lyricsOverlayController.updateProgress(am.getCurrentPosition(), am.getDuration())
+        } else {
+            lyricsOverlayController.hide()
+        }
     }
 
     private fun updateShuffleRepeatScrubLabels() {
@@ -507,11 +542,28 @@ class PlayerController(
 
     override fun onBackPressed(): Boolean {
         clickFeedback()
+        if (nowPlayingBottomState == LYRICS_STATE) {
+            nowPlayingBottomState = 0
+            setLyricsShowing(false)
+            updateNowPlayingBottomBarState()
+            return true
+        }
         if (lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
             lyricsOverlayController.hide()
             return true
         }
         onNavigateBack()
         return true
+    }
+
+    companion object {
+        const val LYRICS_STATE = 4
+
+        /** Centre press order: Progress -> Scrub -> Shuffle/Repeat -> Rating -> Lyrics (only if the track has lyrics). */
+        fun nextBottomState(current: Int, hasLyrics: Boolean): Int = when {
+            current < 3 -> current + 1
+            current == 3 && hasLyrics -> LYRICS_STATE
+            else -> 0
+        }
     }
 }

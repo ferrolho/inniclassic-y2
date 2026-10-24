@@ -17,6 +17,7 @@ import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.io.RandomAccessFile
 import java.util.ArrayList
+import java.util.Locale
 import java.util.TreeMap
 import java.util.regex.Pattern
 
@@ -26,7 +27,8 @@ import java.util.regex.Pattern
  */
 class LyricsOverlayController(
     private val context: Context,
-    private val playerInnerLayout: ViewGroup
+    private val playerInnerLayout: ViewGroup,
+    private val albumViews: List<View> = emptyList()
 ) {
 
     val lyricScrollView: ScrollView = ScrollView(context).apply {
@@ -47,14 +49,23 @@ class LyricsOverlayController(
     private var lyricTimestamps = ArrayList<Int>()
     private var plainLyrics: String? = null
     private var lastLyricIndex = -1
+    private var autoScrollPaused = false
+    private var activeLineColor = 0xFF00FF00.toInt()
+    private var otherLineColor = 0x77FFFFFF
 
     val hasLyrics: Boolean
         get() = currentLyrics.isNotEmpty() || plainLyrics != null
 
+    /** Synced LRC lyrics and M4B chapters follow playback; plain lyrics do not. */
+    val isSynced: Boolean
+        get() = currentLyrics.isNotEmpty()
+
     init {
-        val visLp = FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
+        // Take the place and size of the album art (and its reflection) when shown
+        val visLp = ViewGroup.MarginLayoutParams(
+            albumViews.firstOrNull()?.layoutParams?.width ?: ViewGroup.LayoutParams.MATCH_PARENT,
+            if (albumViews.isEmpty()) ViewGroup.LayoutParams.MATCH_PARENT
+            else albumViews.sumOf { it.layoutParams.height + ((it.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0) }
         )
         lyricScrollView.addView(
             tvLyrics,
@@ -68,7 +79,9 @@ class LyricsOverlayController(
 
     fun show() {
         if (!hasLyrics) return
+        albumViews.forEach { it.visibility = View.GONE }
         lyricScrollView.visibility = View.VISIBLE
+        autoScrollPaused = false
         if (plainLyrics != null && currentLyrics.isEmpty()) {
             lyricScrollView.post { lyricScrollView.scrollTo(0, 0) }
         }
@@ -76,6 +89,22 @@ class LyricsOverlayController(
 
     fun hide() {
         lyricScrollView.visibility = View.GONE
+        albumViews.forEach { it.visibility = View.VISIBLE }
+    }
+
+    /** Match the player text colours so lyrics stay readable on light themes. */
+    fun applyColors(primary: Int, secondary: Int) {
+        tvLyrics.setTextColor(primary)
+        activeLineColor = primary
+        otherLineColor = secondary
+        lastLyricIndex = -1
+    }
+
+    /** Wheel scrolling for plain lyrics; stops the autoscroll until the overlay shows again. */
+    fun scrollLines(lines: Int) {
+        if (!isShowing()) return
+        autoScrollPaused = true
+        lyricScrollView.smoothScrollBy(0, lines * tvLyrics.lineHeight)
     }
 
     fun isShowing(): Boolean = lyricScrollView.visibility == View.VISIBLE
@@ -264,6 +293,7 @@ class LyricsOverlayController(
 
         // 1. Plain text unsynced lyrics: autoscroll proportionally
         if (plainLyrics != null && currentLyrics.isEmpty()) {
+            if (autoScrollPaused) return
             val maxScroll = tvLyrics.height - lyricScrollView.height
             if (maxScroll > 0 && duration > 0) {
                 val progressRatio = currentPos.toFloat() / duration.toFloat()
@@ -298,9 +328,9 @@ class LyricsOverlayController(
                     for (i in startLine..endLine) {
                         val lyricText = currentLyrics[lyricTimestamps[i]]
                         if (i == activeIndex) {
-                            sb.append("<font color='#00FF00'><b>").append(lyricText).append("</b></font><br><br>")
+                            sb.append("<font color='").append(htmlColor(activeLineColor)).append("'><b>").append(lyricText).append("</b></font><br><br>")
                         } else {
-                            sb.append("<font color='#77FFFFFF'>").append(lyricText).append("</font><br><br>")
+                            sb.append("<font color='").append(htmlColor(otherLineColor)).append("'>").append(lyricText).append("</font><br><br>")
                         }
                     }
 
@@ -311,4 +341,6 @@ class LyricsOverlayController(
             }
         }
     }
+
+    private fun htmlColor(color: Int): String = String.format(Locale.US, "#%06X", color and 0xFFFFFF)
 }
