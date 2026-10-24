@@ -38,8 +38,6 @@ class PlayerController(
     private val clickFeedback: () -> Unit,
     private val onAdjustVolume: (up: Boolean) -> Unit,
     private val onTogglePlayback: () -> Unit,
-    private val onNextTrack: () -> Unit,
-    private val onPreviousTrack: () -> Unit,
     private val onNavigateBack: () -> Unit,
     private val onBrowseAlbum: (albumName: String) -> Unit,
     private val onBrowseArtist: (artistName: String) -> Unit,
@@ -439,18 +437,6 @@ class PlayerController(
                 if (event.repeatCount == 0) {
                     event.startTracking()
                 }
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> {
-                clickFeedback()
-                onNextTrack()
-                updatePlayerUI()
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> {
-                clickFeedback()
-                onPreviousTrack()
-                updatePlayerUI()
                 return true
             }
             KeyEvent.KEYCODE_BACK, 4 -> {
