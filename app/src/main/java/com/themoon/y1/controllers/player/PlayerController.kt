@@ -1,10 +1,13 @@
 package com.themoon.y1.controllers.player
 
 import android.app.Activity
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.util.LruCache
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -21,7 +24,9 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
+import androidx.palette.graphics.Palette
 import com.themoon.y1.views.AudioVisualizerView
+import com.themoon.y1.views.SpectrumColors
 import java.io.File
 import java.util.Locale
 
@@ -69,6 +74,11 @@ class PlayerController(
     private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
     private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
     private var visualizerApplied = false
+    // Spectrum colour: main colour of the cover (Palette), cached per track path
+    private var spectrumArt: Bitmap? = null
+    private var spectrumCoverColor: Int? = null
+    private val spectrumColorCache = LruCache<String, Int>(64)
+    private val noCoverColor = 0 // cache value for "cover has no usable colour" (swatch colours are opaque)
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
     private val ivPlayerRepeatStatus: ImageView? = rootView.findViewById(R.id.iv_player_repeat_status)
@@ -460,9 +470,46 @@ class PlayerController(
         } catch (_: Exception) {}
     }
 
-    fun updateVisualizer(fft: ByteArray?, color: Int) {
+    fun updateVisualizer(fft: ByteArray?) {
         if (visualizerView.visibility == View.VISIBLE) {
-            visualizerView.updateVisualizer(fft, color)
+            visualizerView.updateVisualizer(fft, spectrumColor())
+        }
+    }
+
+    /** Cover colour with enough contrast for the Now Playing background, or the theme accent. */
+    private fun spectrumColor(): Int {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            val art = (ivAlbumArt.drawable as? BitmapDrawable)?.bitmap
+            if (art !== spectrumArt) {
+                spectrumArt = art
+                if (art != null && !art.isRecycled) pickCoverColor(art)
+            }
+        }
+        val background = if (ThemeManager.isClassicTheme()) 0xFFFFFFFF.toInt() else ThemeManager.getOverlayBackgroundColor()
+        val accent = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+        return SpectrumColors.spectrumColor(spectrumCoverColor, background, accent)
+    }
+
+    private fun pickCoverColor(art: Bitmap) {
+        val main = MainActivity.instance ?: return
+        val path = main.currentPlaylist.getOrNull(main.currentIndex)?.absolutePath ?: return
+        val cached = spectrumColorCache.get(path)
+        if (cached != null) {
+            spectrumCoverColor = if (cached == noCoverColor) null else cached
+            return
+        }
+        // Palette works on a small copy, off the main thread
+        val small = try {
+            Bitmap.createScaledBitmap(art, 48, 48, true)
+        } catch (_: Exception) {
+            return
+        }
+        Palette.from(small).maximumColorCount(16).generate { palette ->
+            val swatch = palette?.vibrantSwatch ?: palette?.darkVibrantSwatch
+                ?: palette?.lightVibrantSwatch ?: palette?.dominantSwatch
+            val color = swatch?.rgb
+            spectrumColorCache.put(path, color ?: noCoverColor)
+            if (spectrumArt === art) spectrumCoverColor = color
         }
     }
 
