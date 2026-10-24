@@ -63,4 +63,27 @@ class ListEdgesTest {
         assertEquals(0, ListEdges.solidColor(listOf(0, 0)))
         assertEquals(0, ListEdges.solidColor(emptyList()))
     }
+
+    @Test
+    fun edgeStrength_isFullWheneverMoreContentIsPastTheEdge() {
+        assertEquals(1f, ListEdges.edgeStrength(true), 0f)
+        assertEquals(0f, ListEdges.edgeStrength(false), 0f)
+    }
+
+    @Test
+    fun listHasMoreBelow_alsoWhenTheLastRowIsCutByOnePixelOrRowsAreNotAttached() {
+        // Row boundary on the edge, more rows not attached yet.
+        assertEquals(true, ListEdges.listHasMoreBelow(8, 20, 330, 330))
+        // The last row is cut by 1 px.
+        assertEquals(true, ListEdges.listHasMoreBelow(19, 20, 331, 330))
+        // The last row ends on the edge: the list ends here.
+        assertEquals(false, ListEdges.listHasMoreBelow(19, 20, 330, 330))
+    }
+
+    @Test
+    fun listHasMoreAbove_alsoWhenTheFirstRowIsCutByOnePixel() {
+        assertEquals(true, ListEdges.listHasMoreAbove(3, 0, 0))
+        assertEquals(true, ListEdges.listHasMoreAbove(0, -1, 0))
+        assertEquals(false, ListEdges.listHasMoreAbove(0, 0, 0))
+    }
 }

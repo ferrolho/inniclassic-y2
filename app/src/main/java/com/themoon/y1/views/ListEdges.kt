@@ -51,15 +51,34 @@ object ListEdges {
     /** Lets the plain ScrollViews under [root] fade too (lists that code builds, such as dialog items). */
     fun install(root: View) {
         if (root is ScrollView) {
-            if (root !is EdgeFadeScrollView) {
-                register(root)
-                root.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> updateLength(v) }
-            }
+            if (root !is EdgeFadeScrollView) replaceScrollView(root)
             return
         }
         if (root is ViewGroup) {
             for (i in 0 until root.childCount) install(root.getChildAt(i))
         }
+    }
+
+    /**
+     * Puts an [EdgeFadeScrollView] in place of [old], with the same content, before the first layout.
+     * Code that still holds [old] gets a ScrollView with no content: its scrollTo() then does nothing,
+     * and focus changes scroll the new view.
+     */
+    private fun replaceScrollView(old: ScrollView) {
+        val parent = old.parent as? ViewGroup ?: return
+        val content = old.getChildAt(0) ?: return
+        val index = parent.indexOfChild(old)
+        val replacement = EdgeFadeScrollView(old.context).apply {
+            id = old.id
+            isFocusable = old.isFocusable
+            isVerticalScrollBarEnabled = old.isVerticalScrollBarEnabled
+            isFillViewport = old.isFillViewport
+            visibility = old.visibility
+        }
+        old.removeView(content)
+        replacement.addView(content, content.layoutParams)
+        parent.removeViewAt(index)
+        parent.addView(replacement, index, old.layoutParams)
     }
 
     internal fun register(v: View) {
@@ -162,6 +181,20 @@ object ListEdges {
         return solidColor(layers)
     }
 
+    /**
+     * Fade strength of one edge: a full fade when more content is past that edge, else none.
+     * Android's own strength is (hidden pixels / fade length) when less than one fade length is hidden,
+     * so a row that the edge cuts by only a few pixels got a fade only a few pixels tall: almost no fade.
+     */
+    fun edgeStrength(moreContent: Boolean): Float = if (moreContent) 1f else 0f
+
+    /** For a ListView: true when rows are above the top edge (first child at adapter position [firstPos]). */
+    fun listHasMoreAbove(firstPos: Int, firstTop: Int, viewTop: Int): Boolean = firstPos > 0 || firstTop < viewTop
+
+    /** For a ListView: true when rows are below the bottom edge (last child at adapter position [lastPos]). */
+    fun listHasMoreBelow(lastPos: Int, count: Int, lastBottom: Int, viewBottom: Int): Boolean =
+        lastPos < count - 1 || lastBottom > viewBottom
+
     /** Fade length for rows of these heights: 2/3 of the smallest row, so the fade covers only the edge row. */
     fun fadeLength(rowHeights: List<Int>, fallbackRowHeight: Int): Int {
         val row = rowHeights.filter { it > 0 }.minOrNull() ?: fallbackRowHeight
@@ -225,6 +258,12 @@ open class EdgeFadeScrollView @JvmOverloads constructor(
 
     override fun getSolidColor(): Int = ListEdges.solidColorBehind(this)
 
+    override fun getTopFadingEdgeStrength(): Float = ListEdges.edgeStrength(childCount > 0 && scrollY > 0)
+
+    override fun getBottomFadingEdgeStrength(): Float = ListEdges.edgeStrength(
+        childCount > 0 && getChildAt(0).bottom - scrollY > height - paddingBottom
+    )
+
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         // The rows are measured. ScrollView keeps the focused row this far from a fading edge.
         ListEdges.updateLength(this)
@@ -273,6 +312,16 @@ open class EdgeFadeListView(context: Context) : ListView(context) {
     }
 
     override fun getSolidColor(): Int = ListEdges.solidColorBehind(this)
+
+    override fun getTopFadingEdgeStrength(): Float = ListEdges.edgeStrength(
+        childCount > 0 && ListEdges.listHasMoreAbove(firstVisiblePosition, getChildAt(0).top, paddingTop)
+    )
+
+    override fun getBottomFadingEdgeStrength(): Float = ListEdges.edgeStrength(
+        childCount > 0 && ListEdges.listHasMoreBelow(
+            firstVisiblePosition + childCount - 1, count, getChildAt(childCount - 1).bottom, height - paddingBottom
+        )
+    )
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         super.onLayout(changed, l, t, r, b)
