@@ -443,6 +443,7 @@ class MainMenuController(
         val createdButtons = ArrayList<LinearLayout>()
         val visibleButtonElements = ArrayList<ThemeManager.MenuElement>()
         for (el in buttonElements) {
+            if (!com.themoon.y1.FeatureVisibility.isBuilt(el.action)) continue
             if (!prefs.getBoolean("hide_btn_" + el.id, false)) {
                 visibleButtonElements.add(el)
             }
