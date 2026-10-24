@@ -493,7 +493,9 @@ class PlayerController(
                 if (art != null && !art.isRecycled) pickCoverColor(art)
             }
         }
-        val background = if (ThemeManager.isClassicTheme()) 0xFFFFFFFF.toInt() else ThemeManager.getOverlayBackgroundColor()
+        // The colour that Now Playing really shows (applyThemeColors), also after a theme change without a restart
+        val background = (layoutPlayerMode.background as? android.graphics.drawable.ColorDrawable)?.color
+            ?: if (ThemeManager.isClassicTheme()) 0xFFFFFFFF.toInt() else ThemeManager.getOverlayBackgroundColor()
         val accent = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
         return SpectrumColors.spectrumColor(spectrumCoverColor, background, accent)
     }
