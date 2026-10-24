@@ -3,6 +3,7 @@ package com.themoon.y1.testhooks
 import android.content.Context
 import android.media.AudioManager
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
@@ -39,6 +40,7 @@ internal class TestState(private val main: MainActivity, private val options: Op
         section(out, "player") { player() }
         section(out, "audio") { audio() }
         section(out, "power") { power() }
+        section(out, "theme") { theme() }
         section(out, "settings") { settings() }
         section(out, "library") { library() }
         return out
@@ -57,6 +59,31 @@ internal class TestState(private val main: MainActivity, private val options: Op
         .put("versionName", BuildConfig.VERSION_NAME)
         .put("versionCode", BuildConfig.VERSION_CODE)
         .put("buildType", BuildConfig.BUILD_TYPE)
+        // Same activity id and start time before and after a change = no activity restart
+        .put("activityId", System.identityHashCode(main))
+        .put("activityCreatedUptimeMs", TestHooks.activityCreatedUptimeMs)
+        .put("activityStarts", TestHooks.activityStarts)
+        .put("uptimeMs", SystemClock.uptimeMillis())
+
+    /** Theme state. generation, lastApplyMs and applyCount only in builds with the live theme change. */
+    private fun theme(): JSONObject {
+        val out = JSONObject()
+        out.put("name", ThemeManager.getCurrentTheme().name)
+        out.put("index", ThemeManager.getCurrentThemeIndex())
+        Reflect.getStaticField(ThemeManager::class.java, "themeGeneration")?.let { out.put("generation", it) }
+        val live = try { Class.forName("com.themoon.y1.LiveTheme") } catch (_: Throwable) { null }
+        out.put("liveChange", live != null)
+        if (live != null) {
+            Reflect.getStaticField(live, "lastApplyMs")?.let { out.put("lastApplyMs", it) }
+            Reflect.getStaticField(live, "applyCount")?.let { out.put("applyCount", it) }
+        }
+        val auto = try { Class.forName("com.themoon.y1.managers.AutoThemeManager") } catch (_: Throwable) { null }
+        if (auto != null) {
+            out.put("auto", main.prefs.getBoolean("auto_theme_enabled", false))
+            Reflect.getStaticField(auto, "nextSwitchMs")?.let { out.put("autoNextSwitchMs", it) }
+        }
+        return out
+    }
 
     private fun screen(): JSONObject {
         val nav = NavigationManager.getInstance()

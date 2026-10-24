@@ -29,6 +29,8 @@ import java.io.File
  * - `seek --ei ms <position>`
  * - `bottom --ei state <n>`: Now Playing centre-cycle state.
  * - `key --ei code <keycode> [--ez long true] [--ei hold <ms>] [--ei count <n>] [--ei gap <ms>]`
+ * - `theme --es name <theme>`: the live theme change of Settings → Theme, without the Theme list
+ *   (builds with the live theme change only).
  */
 internal class TestCommands(private val main: MainActivity, private val handler: Handler) {
 
@@ -55,7 +57,8 @@ internal class TestCommands(private val main: MainActivity, private val handler:
                     done = done
                 )
             }
-            else -> done("unknown cmd '$cmd'; use state|open|browse|play|seek|bottom|key")
+            "theme" -> done(theme(intent.getStringExtra("name")))
+            else -> done("unknown cmd '$cmd'; use state|open|browse|play|seek|bottom|key|theme")
         }
     }
 
@@ -273,6 +276,20 @@ internal class TestCommands(private val main: MainActivity, private val handler:
             presses++
         }
         return if (pc.nowPlayingBottomState == target) null else "bottom state $target is not in the cycle (no lyrics?)"
+    }
+
+    // --- theme ---
+
+    /** MainActivity.changeTheme(name) (MainActivityTheme.kt): selects the theme and applies it after this event. */
+    private fun theme(name: String?): String? {
+        if (name.isNullOrBlank()) return "theme needs --es name <theme>"
+        val change = try {
+            Class.forName("com.themoon.y1.MainActivityThemeKt").getMethod("changeTheme", MainActivity::class.java, String::class.java)
+        } catch (_: Throwable) {
+            return "this build has no live theme change"
+        }
+        val ok = change.invoke(null, main, name.trim()) as? Boolean ?: false
+        return if (ok) null else "theme '$name' is not installed"
     }
 
     // --- key ---

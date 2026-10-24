@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import com.themoon.y1.BuildConfig
 import com.themoon.y1.MainActivity
 import java.io.File
@@ -29,8 +30,17 @@ object TestHooks {
 
     private var receiver: TestHookReceiver? = null
 
+    /** Activity starts since the process started, and the time of the last one: a restart changes both. */
+    var activityStarts = 0
+        private set
+    var activityCreatedUptimeMs = -1L
+        private set
+
     fun register(activity: MainActivity) {
         if (!BuildConfig.TEST_HOOKS) return
+        // register() runs in MainActivity.onCreate
+        activityStarts++
+        activityCreatedUptimeMs = SystemClock.uptimeMillis()
         receiver?.let { unregister(it.main) }
         val r = TestHookReceiver(activity)
         activity.registerReceiver(r, IntentFilter(ACTION), SENDER_PERMISSION, null)
