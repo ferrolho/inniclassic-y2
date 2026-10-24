@@ -14,14 +14,16 @@ class PlayerBottomStateTest {
     }
 
     @Test
-    fun cycleWithLyricsAddsLyricsAfterRating() {
-        assertEquals(1, PlayerController.nextBottomState(0, hasLyrics = true))
-        assertEquals(PlayerController.LYRICS_STATE, PlayerController.nextBottomState(3, hasLyrics = true))
-        assertEquals(0, PlayerController.nextBottomState(PlayerController.LYRICS_STATE, hasLyrics = true))
+    fun cycleWithLyricsShowsLyricsAfterProgress() {
+        assertEquals(PlayerController.LYRICS_STATE, PlayerController.nextBottomState(0, hasLyrics = true))
+        assertEquals(1, PlayerController.nextBottomState(PlayerController.LYRICS_STATE, hasLyrics = true))
+        assertEquals(2, PlayerController.nextBottomState(1, hasLyrics = true))
+        assertEquals(3, PlayerController.nextBottomState(2, hasLyrics = true))
+        assertEquals(0, PlayerController.nextBottomState(3, hasLyrics = true))
     }
 
     @Test
-    fun lyricsStateLeavesWhenLyricsAreGone() {
-        assertEquals(0, PlayerController.nextBottomState(PlayerController.LYRICS_STATE, hasLyrics = false))
+    fun lyricsStateMovesOnWhenLyricsAreGone() {
+        assertEquals(1, PlayerController.nextBottomState(PlayerController.LYRICS_STATE, hasLyrics = false))
     }
 }

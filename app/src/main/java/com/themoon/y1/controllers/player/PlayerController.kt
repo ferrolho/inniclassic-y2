@@ -28,7 +28,7 @@ import java.util.Locale
  * Controller for Now Playing view:
  * - Album art rendering with 3D tilt and reflection effect
  * - Track metadata, playback timing, and progress bar updates
- * - Bottom widget state cycling: Progress -> Scrub -> Shuffle/Repeat -> Rating -> Lyrics (if any)
+ * - Bottom widget state cycling: Progress -> Lyrics (if any) -> Scrub -> Shuffle/Repeat -> Rating
  * - Inline volume pill overlay and wheel navigation routing
  * - Integration with LyricsOverlayController and NowPlayingContextMenu
  */
@@ -566,11 +566,12 @@ class PlayerController(
     companion object {
         const val LYRICS_STATE = 4
 
-        /** Centre press order: Progress -> Scrub -> Shuffle/Repeat -> Rating -> Lyrics (only if the track has lyrics). */
-        fun nextBottomState(current: Int, hasLyrics: Boolean): Int = when {
-            current < 3 -> current + 1
-            current == 3 && hasLyrics -> LYRICS_STATE
-            else -> 0
+        /** Centre press order: Progress -> Lyrics (only if the track has lyrics) -> Scrub -> Shuffle/Repeat -> Rating. */
+        fun nextBottomState(current: Int, hasLyrics: Boolean): Int = when (current) {
+            0 -> if (hasLyrics) LYRICS_STATE else 1
+            LYRICS_STATE -> 1
+            3 -> 0
+            else -> current + 1
         }
     }
 }
