@@ -24,6 +24,15 @@ class InputRouter private constructor() {
     var backDebounceUntil: Long = 0L
         private set
 
+    // Set when Next/Previous auto-repeats, so the release does not skip the track
+    @Volatile
+    var isSkipKeyHeld: Boolean = false
+        private set
+
+    // Hold time of the last seek step and its size, to pace and speed up the seek while the key is held
+    private var lastSeekHeldMs: Long = -SEEK_INTERVAL_MS
+    private var lastSeekStepMs: Int = 0
+
     fun suppressBackUntilRelease(debounceMs: Long = 350L) {
         isBackSuppressed = true
         backDebounceUntil = System.currentTimeMillis() + debounceMs
@@ -99,12 +108,15 @@ class InputRouter private constructor() {
                     keyCode == 88
 
             if (isMediaKey) {
-                if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                    when (keyCode) {
-                        KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack()
-                        KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack()
-                        else -> com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
+                if (isSkipKey(keyCode)) {
+                    // Same press/hold behaviour as with the screen on
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        onSkipKeyDown(keyCode, event.repeatCount, event.eventTime - event.downTime)
+                    } else if (action == KeyEvent.ACTION_UP) {
+                        onSkipKeyUp(keyCode, event.eventTime - event.downTime)
                     }
+                } else if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
                 }
                 return true
             }
@@ -194,12 +206,8 @@ class InputRouter private constructor() {
             AudioPlayerManager.getInstance().playOrPauseMusic()
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-            AudioPlayerManager.getInstance().nextTrack()
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-            AudioPlayerManager.getInstance().prevTrack()
+        if (isSkipKey(keyCode)) {
+            onSkipKeyDown(keyCode, event.repeatCount, event.eventTime - event.downTime)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -222,6 +230,10 @@ class InputRouter private constructor() {
         }
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
             isBackSuppressed = false
+            return true
+        }
+        if (isSkipKey(keyCode)) {
+            onSkipKeyUp(keyCode, event.eventTime - event.downTime)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -249,7 +261,89 @@ class InputRouter private constructor() {
         return activeController?.onKeyLongPress(keyCode, event) == true
     }
 
+    private fun isSkipKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87 ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88
+    }
+
+    /**
+     * Next/Previous key down. Holding the button seeks in steps that grow the longer it is held
+     * (see [seekStepMs]); a short press changes the track on release (see [onSkipKeyUp]).
+     * Returns the offset of the seek in ms, or 0 if it did not seek.
+     */
+    internal fun onSkipKeyDown(keyCode: Int, repeatCount: Int, heldMs: Long): Int {
+        if (repeatCount == 0 || heldMs < lastSeekHeldMs) {
+            isSkipKeyHeld = false
+            lastSeekHeldMs = -SEEK_INTERVAL_MS
+            lastSeekStepMs = 0
+            if (repeatCount == 0) return 0
+        }
+        isSkipKeyHeld = true
+        if (heldMs - lastSeekHeldMs < SEEK_INTERVAL_MS) {
+            return 0
+        }
+        lastSeekHeldMs = heldMs
+        val stepMs = seekStepMs(heldMs)
+        val player = AudioPlayerManager.getInstance()
+        val isNext = keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87
+        val offsetMs = if (isNext) {
+            forwardSeekMs(player.getCurrentPosition(), player.getDuration(), stepMs)
+        } else {
+            -stepMs
+        }
+        if (offsetMs != 0) {
+            player.seekRelative(offsetMs)
+        }
+        // Click on the first step and when the seek speeds up, not on every step
+        if (stepMs != lastSeekStepMs) {
+            lastSeekStepMs = stepMs
+            MainActivity.instance?.clickFeedback()
+        }
+        return offsetMs
+    }
+
+    /**
+     * Next/Previous key up. Changes the track only after a short press. A long press counts as a hold
+     * even if a controller (e.g. FM radio station seek) consumed the key repeats. Returns true if it skipped.
+     */
+    internal fun onSkipKeyUp(keyCode: Int, heldMs: Long): Boolean {
+        if (isSkipKeyHeld || heldMs >= SKIP_KEY_HOLD_MS) {
+            return false
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+            AudioPlayerManager.getInstance().nextTrack()
+        } else {
+            AudioPlayerManager.getInstance().prevTrack()
+        }
+        MainActivity.instance?.clickFeedback()
+        return true
+    }
+
     companion object {
+        // Android's default long-press / key-repeat timeout
+        private const val SKIP_KEY_HOLD_MS = 500L
+
+        // Hold-to-seek speeds up like the iPod's fast-forward: one step every 200 ms, of 2 s until the
+        // button has been held for 2 s (10x), then 5 s until 5 s (25x), then 15 s until 8 s (75x), then
+        // 30 s (150x). Short holds stay precise; a long hold crosses a song in ~7 s and an hour in ~30 s.
+        private const val SEEK_INTERVAL_MS = 200L
+        private val SEEK_STEPS_BY_HOLD_MS = listOf(2_000L to 2_000, 5_000L to 5_000, 8_000L to 15_000)
+        private const val SEEK_MAX_STEP_MS = 30_000
+
+        // Forward seeks stop this far before the end, so seeking alone never skips to the next track
+        private const val SEEK_END_MARGIN_MS = 1_000
+
+        /** Seek step size for a key held for [heldMs]. */
+        internal fun seekStepMs(heldMs: Long): Int {
+            return SEEK_STEPS_BY_HOLD_MS.firstOrNull { heldMs < it.first }?.second ?: SEEK_MAX_STEP_MS
+        }
+
+        /** Forward seek offset of up to [stepMs], clamped to stop [SEEK_END_MARGIN_MS] before the end. */
+        internal fun forwardSeekMs(positionMs: Int, durationMs: Int, stepMs: Int): Int {
+            if (durationMs <= 0) return stepMs
+            return (durationMs - SEEK_END_MARGIN_MS - positionMs).coerceIn(0, stepMs)
+        }
+
         @Volatile
         private var instance: InputRouter? = null
 
