@@ -36,6 +36,7 @@ import com.themoon.y1.managers.AudiobookManager
 import com.themoon.y1.managers.RecentlyPlayedManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
+import com.themoon.y1.navigation.LetterJump
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.ClassicMenuStyle
@@ -106,6 +107,12 @@ class BrowserController(
     private val currentScrollIndexList = ArrayList<String>()
     private var browserCoverPaneSetUp: Boolean = false
     private val uiHandler = Handler(Looper.getMainLooper())
+
+    private val wheelSpeed = LetterJump.WheelSpeed()
+    private var rowLettersKey: Any? = null
+    private var rowLetters: List<String?>? = null
+    /** The letter of the current letter jump (fast wheel turn); null when the wheel steps row by row. */
+    var jumpLetter: String? = null
 
     companion object {
         private const val FOLDER_ROW_CHUNK_SIZE = 25
@@ -193,6 +200,7 @@ class BrowserController(
 
     override fun onExit() {
         hideBrowserCoverPane()
+        jumpLetter = null
         hzIndexScroll?.visibility = View.GONE
         isAudiobookLibraryMode = false
     }
@@ -1455,6 +1463,51 @@ class BrowserController(
         }
     }
 
+    /**
+     * Speed scrolling. On a fast wheel turn in an alphabetical list, focuses the first row of the next or
+     * previous letter with [focusRow], shows the letter box and returns true. Else returns false, and the
+     * wheel steps one row. [listKey] changes when the rows change; [rowTexts] gives the text of each row.
+     */
+    private fun letterJump(delta: Int, event: KeyEvent, from: Int, listKey: Any, rowTexts: () -> List<String?>, focusRow: (Int) -> Unit): Boolean {
+        if (!wheelSpeed.onStep(delta, event.eventTime)) {
+            if (jumpLetter != null) MainActivity.instance?.hideFastScrollLetter()
+            return false
+        }
+        if (listKey != rowLettersKey) {
+            rowLetters = LetterJump.lettersFor(rowTexts())
+            rowLettersKey = listKey
+        }
+        val letters = rowLetters ?: return false
+        val target = LetterJump.target(letters, from, delta)
+        val letter = letters[if (target >= 0) target else from] ?: return true
+        jumpLetter = letter // before the focus moves: the focused row shows the letter box
+        if (target >= 0) {
+            focusRow(target)
+            clickFeedback()
+        }
+        MainActivity.instance?.showFastScrollLetter(letter)
+        return true
+    }
+
+    /** The text of a ListView row: a category name or a song title; null for "All Songs" and other special rows. */
+    private fun listRowText(item: Any?): String? = when (item) {
+        is SongItem -> item.title
+        is String -> item.takeUnless { it.startsWith("__") }
+        else -> null
+    }
+
+    /** The text of a row of the browser LinearLayout: its first text with a letter or a digit (not the icon). */
+    private fun containerRowText(row: View?): String? {
+        if (row == null || row.visibility != View.VISIBLE || !row.isFocusable) return null
+        if (row is TextView) return row.text?.toString()
+        val group = row as? ViewGroup ?: return null
+        for (i in 0 until group.childCount) {
+            val text = (group.getChildAt(i) as? TextView)?.text?.toString() ?: continue
+            if (text.any { it.isLetterOrDigit() }) return text
+        }
+        return null
+    }
+
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
         val list = listVirtualSongs
         if (list != null && list.visibility == View.VISIBLE) {
@@ -1472,6 +1525,11 @@ class BrowserController(
             }
             if (virtualListSelectedIndex < 0) virtualListSelectedIndex = 0
             if (virtualListSelectedIndex >= totalCount) virtualListSelectedIndex = totalCount - 1
+            val adapter = list.adapter
+            if (adapter != null && letterJump(delta, event, virtualListSelectedIndex, adapter,
+                    { (0 until totalCount).map { listRowText(adapter.getItem(it)) } }, { navigateVirtualListTo(it) })) {
+                return true
+            }
 
             var targetPos = virtualListSelectedIndex
             if (delta < 0) {
@@ -1499,6 +1557,12 @@ class BrowserController(
                 .getBoolean("loop_scroll_on", true)
             val curFocus = containerBrowserItems.findFocus()
             val currentIndex = if (curFocus != null) containerBrowserItems.indexOfChild(curFocus) else -1
+            val rowCount = containerBrowserItems.childCount
+            if (currentIndex >= 0 && letterJump(delta, event, currentIndex, listOf(containerBrowserItems.getChildAt(0), rowCount),
+                    { (0 until rowCount).map { containerRowText(containerBrowserItems.getChildAt(it)) } },
+                    { containerBrowserItems.getChildAt(it)?.requestFocus() })) {
+                return true
+            }
 
             if (delta < 0) {
                 if (currentIndex > 0) {
