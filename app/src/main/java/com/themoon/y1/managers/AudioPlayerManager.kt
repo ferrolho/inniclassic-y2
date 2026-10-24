@@ -751,7 +751,7 @@ class AudioPlayerManager private constructor() {
                 val remS = (remaining / 1000) % 60
                 val remM = remaining / (1000 * 60)
                 main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
-                main.playerProgress.progress = ((effectiveSeekMs * 100) / effectiveDurMs).toInt()
+                main.playerProgress.progress = ((effectiveSeekMs * 1000) / effectiveDurMs).toInt()
             } else {
                 main.tvPlayerTimeTotal.text = "00:00"
                 main.playerProgress.progress = 0

@@ -200,7 +200,7 @@ class PlayerController(
         tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
 
         if (dur > 0) {
-            playerProgress.progress = (pos * 100) / dur
+            playerProgress.progress = (pos.toLong() * 1000 / dur).toInt()
         } else {
             playerProgress.progress = 0
         }
@@ -233,7 +233,7 @@ class PlayerController(
             tvPlayerTimeCurrent.text = formatTime(pos)
             tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
             if (dur > 0) {
-                playerProgress.progress = (pos * 100) / dur
+                playerProgress.progress = (pos.toLong() * 1000 / dur).toInt()
             }
         }
         lyricsOverlayController.updateProgress(pos, dur)
