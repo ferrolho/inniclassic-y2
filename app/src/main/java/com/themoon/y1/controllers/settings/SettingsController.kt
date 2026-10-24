@@ -1591,6 +1591,7 @@ class SettingsController(
                 .remove("video_stretch_fill")
                 .remove(com.themoon.y1.views.IpodClassicLayout.PREF_KEY)
                 .remove("album_tilt_enabled")
+                .remove("show_total_time")
                 .remove("backlight_timer_index")
                 .remove("screen_off_control")
                 .remove("double_click_favorite")
