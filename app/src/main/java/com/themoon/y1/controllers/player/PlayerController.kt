@@ -220,7 +220,7 @@ class PlayerController(
         updateShuffleRepeatStatusIcons()
     }
 
-    private fun updatePlaybackProgress() {
+    fun updatePlaybackProgress() {
         val am = AudioPlayerManager.getInstance()
         val pos = am.getCurrentPosition()
         val dur = am.getDuration()

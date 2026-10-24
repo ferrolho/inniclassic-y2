@@ -667,7 +667,7 @@ class AudioPlayerManager private constructor() {
         main.updatePlayerUI()
     }
 
-    fun seekRelative(offsetMs: Int) {
+    fun seekRelative(offsetMs: Int, savePosition: Boolean = true) {
         val currentPos = getCurrentPosition().toLong()
         val duration = getDuration().toLong()
         var targetPos = currentPos + offsetMs
@@ -679,7 +679,7 @@ class AudioPlayerManager private constructor() {
         } else if (exoPlayer != null) {
             exoPlayer?.seekTo(targetPos)
         }
-        savePlaybackPositionOnly(sync = true)
+        if (savePosition) savePlaybackPositionOnly(sync = true)
     }
 
     fun prepareMusicTrack(index: Int, initialSeekMs: Long = 0L, initialDurationMs: Long = 0L) {

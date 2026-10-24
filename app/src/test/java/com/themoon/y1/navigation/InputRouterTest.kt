@@ -166,32 +166,42 @@ class InputRouterTest {
     }
 
     @Test
-    fun testSkipKeys_seekStepGrowsWithHoldTime() {
-        assertEquals(2_000, InputRouter.seekStepMs(500L))
-        assertEquals(2_000, InputRouter.seekStepMs(1_999L))
-        assertEquals(5_000, InputRouter.seekStepMs(2_000L))
-        assertEquals(5_000, InputRouter.seekStepMs(4_999L))
-        assertEquals(15_000, InputRouter.seekStepMs(5_000L))
-        assertEquals(15_000, InputRouter.seekStepMs(7_999L))
-        assertEquals(30_000, InputRouter.seekStepMs(8_000L))
-        assertEquals(30_000, InputRouter.seekStepMs(60_000L))
+    fun testSkipKeys_seekSpeedGrowsSmoothlyFrom4xTo120x() {
+        assertEquals(4.0, InputRouter.seekSpeed(0L), 1e-9)
+        assertEquals(4.0 * Math.sqrt(30.0), InputRouter.seekSpeed(3_500L), 1e-9)
+        assertEquals(120.0, InputRouter.seekSpeed(7_000L), 1e-9)
+        assertEquals(120.0, InputRouter.seekSpeed(60_000L), 1e-9)
+        for (t in 0L until 7_000L step 100L) {
+            val ratio = InputRouter.seekSpeed(t + 100L) / InputRouter.seekSpeed(t)
+            assertTrue("Speed must grow by less than 6% per tick at $t ms", ratio > 1.0 && ratio < 1.06)
+        }
+
+        assertEquals(400, InputRouter.seekStepMs(0L, 100L))
+        assertEquals(12_000, InputRouter.seekStepMs(7_000L, 100L))
+        assertEquals(0, InputRouter.seekStepMs(0L, -5L))
     }
 
     @Test
-    fun testSkipKeys_holdSeeksEvery200msWithGrowingSteps() {
+    fun testSkipKeys_holdSeeksOnTimerTicksUntilRelease() {
         inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
-        // Repeats arrive every 50 ms after 500 ms; only one in four seeks
-        assertEquals(-2_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L))
-        assertEquals(0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2, 550L))
-        assertEquals(0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 3, 600L))
-        assertEquals(0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 4, 650L))
-        assertEquals(-2_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 5, 700L))
-        assertEquals(-5_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 32, 2_050L))
-        assertEquals(-30_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 200, 10_000L))
+        assertFalse(inputRouter.isSeeking)
+        assertEquals("The first repeat seeks one tick at 4x",
+            -400, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L))
+        assertTrue(inputRouter.isSeeking)
+        assertEquals("Later repeats only keep the seek alive",
+            0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2, 550L))
 
-        // A new hold starts slow again
-        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
-        assertEquals(-2_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L))
+        assertEquals(-InputRouter.seekStepMs(100L, 100L), inputRouter.onSeekTick(600L))
+        assertEquals(-InputRouter.seekStepMs(300L, 200L), inputRouter.onSeekTick(800L))
+
+        assertFalse(inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 900L))
+        assertFalse("Release must stop the seek", inputRouter.isSeeking)
+        assertEquals(0, inputRouter.onSeekTick(1_000L))
+
+        // A new hold starts slow again, and Next seeks forward
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0, 5_000L)
+        assertEquals(400, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 1, 5_500L))
+        inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, 600L)
     }
 
     @Test

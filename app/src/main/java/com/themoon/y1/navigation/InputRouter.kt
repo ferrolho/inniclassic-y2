@@ -1,13 +1,17 @@
 package com.themoon.y1.navigation
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.controllers.player.PlayerController
 import com.themoon.y1.managers.AudioPlayerManager
 
 /**
@@ -29,9 +33,25 @@ class InputRouter private constructor() {
     var isSkipKeyHeld: Boolean = false
         private set
 
-    // Hold time of the last seek step and its size, to pace and speed up the seek while the key is held
-    private var lastSeekHeldMs: Long = -SEEK_INTERVAL_MS
-    private var lastSeekStepMs: Int = 0
+    // Hold-to-seek state (uptime ms): +1 forward, -1 back, 0 when not seeking
+    private var seekDirection = 0
+    private var seekStartMs = 0L
+    private var lastSeekTickMs = 0L
+    private var lastSkipRepeatMs = 0L
+    private val seekHandler = Handler(Looper.getMainLooper())
+    private val seekTickRunnable = object : Runnable {
+        override fun run() {
+            if (seekDirection == 0) return
+            val now = SystemClock.uptimeMillis()
+            if (now - lastSkipRepeatMs > SEEK_REPEAT_TIMEOUT_MS) {
+                // No key repeats any more, so the key-up went elsewhere
+                stopSeek()
+                return
+            }
+            onSeekTick(now)
+            seekHandler.postDelayed(this, SEEK_TICK_MS)
+        }
+    }
 
     fun suppressBackUntilRelease(debounceMs: Long = 350L) {
         isBackSuppressed = true
@@ -111,7 +131,7 @@ class InputRouter private constructor() {
                 if (isSkipKey(keyCode)) {
                     // Same press/hold behaviour as with the screen on
                     if (action == KeyEvent.ACTION_DOWN) {
-                        onSkipKeyDown(keyCode, event.repeatCount, event.eventTime - event.downTime)
+                        onSkipKeyDown(keyCode, event.repeatCount, event.eventTime)
                     } else if (action == KeyEvent.ACTION_UP) {
                         onSkipKeyUp(keyCode, event.eventTime - event.downTime)
                     }
@@ -207,7 +227,7 @@ class InputRouter private constructor() {
             return true
         }
         if (isSkipKey(keyCode)) {
-            onSkipKeyDown(keyCode, event.repeatCount, event.eventTime - event.downTime)
+            onSkipKeyDown(keyCode, event.repeatCount, event.eventTime)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -267,46 +287,66 @@ class InputRouter private constructor() {
     }
 
     /**
-     * Next/Previous key down. Holding the button seeks in steps that grow the longer it is held
-     * (see [seekStepMs]); a short press changes the track on release (see [onSkipKeyUp]).
-     * Returns the offset of the seek in ms, or 0 if it did not seek.
+     * Next/Previous key down. The first key repeat starts a seek that runs on a timer and speeds up
+     * the longer the button is held (see [seekSpeed]); a short press changes the track on release
+     * (see [onSkipKeyUp]). Returns the offset of the first seek tick in ms, or 0.
      */
-    internal fun onSkipKeyDown(keyCode: Int, repeatCount: Int, heldMs: Long): Int {
-        if (repeatCount == 0 || heldMs < lastSeekHeldMs) {
+    internal fun onSkipKeyDown(keyCode: Int, repeatCount: Int, eventTimeMs: Long): Int {
+        if (repeatCount == 0) {
+            stopSeek()
             isSkipKeyHeld = false
-            lastSeekHeldMs = -SEEK_INTERVAL_MS
-            lastSeekStepMs = 0
-            if (repeatCount == 0) return 0
-        }
-        isSkipKeyHeld = true
-        if (heldMs - lastSeekHeldMs < SEEK_INTERVAL_MS) {
             return 0
         }
-        lastSeekHeldMs = heldMs
-        val stepMs = seekStepMs(heldMs)
+        isSkipKeyHeld = true
+        lastSkipRepeatMs = eventTimeMs
+        if (seekDirection != 0) {
+            return 0
+        }
+        seekDirection = if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) 1 else -1
+        seekStartMs = eventTimeMs
+        lastSeekTickMs = eventTimeMs - SEEK_TICK_MS
+        // One click when the seek starts; a click on every tick would buzz
+        MainActivity.instance?.clickFeedback()
+        val offsetMs = onSeekTick(eventTimeMs)
+        seekHandler.postDelayed(seekTickRunnable, SEEK_TICK_MS)
+        return offsetMs
+    }
+
+    /** One seek tick: moves by the seek speed times the time since the last tick. Returns the offset in ms. */
+    internal fun onSeekTick(nowMs: Long): Int {
+        if (seekDirection == 0) return 0
+        val stepMs = seekStepMs(nowMs - seekStartMs, nowMs - lastSeekTickMs)
+        lastSeekTickMs = nowMs
         val player = AudioPlayerManager.getInstance()
-        val isNext = keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87
-        val offsetMs = if (isNext) {
+        val offsetMs = if (seekDirection > 0) {
             forwardSeekMs(player.getCurrentPosition(), player.getDuration(), stepMs)
         } else {
             -stepMs
         }
         if (offsetMs != 0) {
-            player.seekRelative(offsetMs)
-        }
-        // Click on the first step and when the seek speeds up, not on every step
-        if (stepMs != lastSeekStepMs) {
-            lastSeekStepMs = stepMs
-            MainActivity.instance?.clickFeedback()
+            // Save the position once on release, not on every tick
+            player.seekRelative(offsetMs, savePosition = false)
+            (NavigationManager.getInstance().activeController as? PlayerController)?.updatePlaybackProgress()
         }
         return offsetMs
     }
 
+    private fun stopSeek() {
+        if (seekDirection == 0) return
+        seekDirection = 0
+        seekHandler.removeCallbacks(seekTickRunnable)
+        AudioPlayerManager.getInstance().savePlaybackPositionOnly(sync = true)
+    }
+
+    internal val isSeeking: Boolean
+        get() = seekDirection != 0
+
     /**
-     * Next/Previous key up. Changes the track only after a short press. A long press counts as a hold
-     * even if a controller (e.g. FM radio station seek) consumed the key repeats. Returns true if it skipped.
+     * Next/Previous key up. Stops a seek, and changes the track only after a short press. A long press counts
+     * as a hold even if a controller (e.g. FM radio station seek) consumed the key repeats. Returns true if it skipped.
      */
     internal fun onSkipKeyUp(keyCode: Int, heldMs: Long): Boolean {
+        stopSeek()
         if (isSkipKeyHeld || heldMs >= SKIP_KEY_HOLD_MS) {
             return false
         }
@@ -323,19 +363,28 @@ class InputRouter private constructor() {
         // Android's default long-press / key-repeat timeout
         private const val SKIP_KEY_HOLD_MS = 500L
 
-        // Hold-to-seek speeds up like the iPod's fast-forward: one step every 200 ms, of 2 s until the
-        // button has been held for 2 s (10x), then 5 s until 5 s (25x), then 15 s until 8 s (75x), then
-        // 30 s (150x). Short holds stay precise; a long hold crosses a song in ~7 s and an hour in ~30 s.
-        private const val SEEK_INTERVAL_MS = 200L
-        private val SEEK_STEPS_BY_HOLD_MS = listOf(2_000L to 2_000, 5_000L to 5_000, 8_000L to 15_000)
-        private const val SEEK_MAX_STEP_MS = 30_000
+        // Hold-to-seek speeds up smoothly, like the iPod's fast-forward. Every 100 ms the position moves by the
+        // seek speed times the time since the last tick. The speed starts at 4x and grows exponentially to 120x
+        // over 7 s of seeking (it doubles about every 1.4 s): ~5 s of audio in the first second, ~14 s in two,
+        // a song in ~7 s, then 2 minutes per second. If no key repeat comes for 1 s, the key-up was lost: stop.
+        private const val SEEK_TICK_MS = 100L
+        private const val SEEK_MIN_SPEED = 4.0
+        private const val SEEK_MAX_SPEED = 120.0
+        private const val SEEK_RAMP_MS = 7_000L
+        private const val SEEK_REPEAT_TIMEOUT_MS = 1_000L
 
         // Forward seeks stop this far before the end, so seeking alone never skips to the next track
         private const val SEEK_END_MARGIN_MS = 1_000
 
-        /** Seek step size for a key held for [heldMs]. */
-        internal fun seekStepMs(heldMs: Long): Int {
-            return SEEK_STEPS_BY_HOLD_MS.firstOrNull { heldMs < it.first }?.second ?: SEEK_MAX_STEP_MS
+        /** Seek speed (x real time) after seeking for [seekingMs]. */
+        internal fun seekSpeed(seekingMs: Long): Double {
+            val ramp = seekingMs.coerceIn(0L, SEEK_RAMP_MS).toDouble() / SEEK_RAMP_MS
+            return SEEK_MIN_SPEED * Math.pow(SEEK_MAX_SPEED / SEEK_MIN_SPEED, ramp)
+        }
+
+        /** Seek step in ms for a tick [elapsedMs] after the last one, after seeking for [seekingMs]. */
+        internal fun seekStepMs(seekingMs: Long, elapsedMs: Long): Int {
+            return Math.round(seekSpeed(seekingMs) * elapsedMs.coerceAtLeast(0L)).toInt()
         }
 
         /** Forward seek offset of up to [stepMs], clamped to stop [SEEK_END_MARGIN_MS] before the end. */
