@@ -134,7 +134,7 @@ class InputRouterTest {
 
     @Test
     fun testSkipKeys_shortPressIsNotAHold() {
-        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0, 0L)
         assertFalse("A first key down must not count as a hold", inputRouter.isSkipKeyHeld)
 
         val upEvent = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT)
@@ -144,13 +144,13 @@ class InputRouterTest {
 
     @Test
     fun testSkipKeys_holdSeeksAndNextPressResets() {
-        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
-        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L)
         assertTrue("An auto-repeat must mark the key as held", inputRouter.isSkipKeyHeld)
         assertFalse("Releasing after a seek must not skip the track",
             inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 100L))
 
-        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
         assertFalse("A new press must clear the held state", inputRouter.isSkipKeyHeld)
         assertTrue("A short press must skip the track on release",
             inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 100L))
@@ -159,10 +159,47 @@ class InputRouterTest {
     @Test
     fun testSkipKeys_longPressDoesNotSkipWhenRepeatsWereConsumedElsewhere() {
         // e.g. the FM radio screen consumes the repeats for station seek, so only the first key down arrives
-        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0, 0L)
         assertFalse(inputRouter.isSkipKeyHeld)
         assertFalse("A long press must not skip the track on release",
             inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, 1500L))
+    }
+
+    @Test
+    fun testSkipKeys_seekStepGrowsWithHoldTime() {
+        assertEquals(2_000, InputRouter.seekStepMs(500L))
+        assertEquals(2_000, InputRouter.seekStepMs(1_999L))
+        assertEquals(5_000, InputRouter.seekStepMs(2_000L))
+        assertEquals(5_000, InputRouter.seekStepMs(4_999L))
+        assertEquals(15_000, InputRouter.seekStepMs(5_000L))
+        assertEquals(15_000, InputRouter.seekStepMs(7_999L))
+        assertEquals(30_000, InputRouter.seekStepMs(8_000L))
+        assertEquals(30_000, InputRouter.seekStepMs(60_000L))
+    }
+
+    @Test
+    fun testSkipKeys_holdSeeksEvery200msWithGrowingSteps() {
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
+        // Repeats arrive every 50 ms after 500 ms; only one in four seeks
+        assertEquals(-2_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L))
+        assertEquals(0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2, 550L))
+        assertEquals(0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 3, 600L))
+        assertEquals(0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 4, 650L))
+        assertEquals(-2_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 5, 700L))
+        assertEquals(-5_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 32, 2_050L))
+        assertEquals(-30_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 200, 10_000L))
+
+        // A new hold starts slow again
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
+        assertEquals(-2_000, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L))
+    }
+
+    @Test
+    fun testSkipKeys_forwardSeekStopsBeforeTrackEnd() {
+        assertEquals("Unknown duration seeks the full step", 30_000, InputRouter.forwardSeekMs(10_000, 0, 30_000))
+        assertEquals(15_000, InputRouter.forwardSeekMs(10_000, 180_000, 15_000))
+        assertEquals("Stops 1 s before the end", 9_000, InputRouter.forwardSeekMs(170_000, 180_000, 15_000))
+        assertEquals("Never seeks backwards near the end", 0, InputRouter.forwardSeekMs(179_500, 180_000, 15_000))
     }
 
     @Test
