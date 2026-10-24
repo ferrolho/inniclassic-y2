@@ -22,6 +22,8 @@ def defaultVersionName = todayDate
 
 def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : defaultVersionCode
 def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName') : defaultVersionName
+// Developer test interface (adb broadcast com.themoon.y1.TEST), only for our own builds: -PtestHooks=true
+def testHooks = project.hasProperty('testHooks') ? project.property('testHooks').toString().toBoolean() : false
 
 android {
     namespace 'com.themoon.y1'
@@ -41,6 +43,7 @@ android {
         multiDexEnabled true
         buildConfigField "String", "LASTFM_API_KEY", "\"${lastFmApiKey}\""
         buildConfigField "String", "LASTFM_API_SECRET", "\"${lastFmApiSecret}\""
+        buildConfigField "boolean", "TEST_HOOKS", "${testHooks}"
     }
     buildFeatures {
         buildConfig true
