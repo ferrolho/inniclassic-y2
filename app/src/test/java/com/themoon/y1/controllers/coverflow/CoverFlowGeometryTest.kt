@@ -80,4 +80,11 @@ class CoverFlowGeometryTest {
         assertTrue(pivot - outerK * pivot < 0f)
         assertTrue(pivot + outerK * (size - pivot) > size)
     }
+
+    @Test
+    fun reflectionRows_ofA256Thumbnail() {
+        // 104 of 256 rows = 78 of 192 px, so the reflection view shows the bitmap at the cover's scale.
+        assertEquals(104, CoverFlowGeometry.reflectionRows(256))
+        assertEquals(78, CoverFlowGeometry.reflectionRows(CoverFlowGeometry.COVER_SIZE))
+    }
 }
