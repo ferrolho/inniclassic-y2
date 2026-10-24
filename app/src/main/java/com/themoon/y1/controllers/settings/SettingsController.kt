@@ -868,7 +868,6 @@ class SettingsController(
         containerSettingsItems.removeAllViews()
 
         for (i in 0 until ThemeManager.availableThemes.size) {
-            val index = i
             val theme = ThemeManager.availableThemes[i]
             val isSelected = ThemeManager.getCurrentThemeIndex() == i
             val icon = if (isSelected) TablerIcons.CHECK else null
@@ -880,51 +879,7 @@ class SettingsController(
             )
             btn.setOnClickListener {
                 clickFeedback()
-                ThemeManager.setThemeIndex(index)
-                try {
-                    val editor = prefs.edit()
-                    editor.putInt("app_theme_index", index)
-                    editor.putString("app_theme_name", ThemeManager.availableThemes[index].name)
-                    editor.putString("current_theme_name", ThemeManager.availableThemes[index].name)
-                    editor.putBoolean("reboot_to_theme", true)
-
-                    val selectedTheme = ThemeManager.availableThemes[index]
-                    var hasThemeBg = false
-                    if (!selectedTheme.bgImage.isNullOrEmpty() && File(selectedTheme.folderPath, selectedTheme.bgImage).exists()) {
-                        hasThemeBg = true
-                    }
-                    if (!hasThemeBg && File(selectedTheme.folderPath, "background.png").exists()) hasThemeBg = true
-                    if (!hasThemeBg && File(selectedTheme.folderPath, "bg.png").exists()) hasThemeBg = true
-
-                    if (hasThemeBg) {
-                        editor.putString("bg_path", "THEME_DEFAULT")
-                    }
-
-                    var hasClock = false
-                    var hasAnalog = false
-                    var hasBattery = false
-                    var hasCircular = false
-                    var hasAlbum = false
-                    var hasFocusImage = false
-
-                    for (el in theme.menuElements) {
-                        if ("widget_clock" == el.type) hasClock = true
-                        if ("widget_analog_clock" == el.type) hasAnalog = true
-                        if ("widget_battery" == el.type) hasBattery = true
-                        if ("widget_circular_battery" == el.type) hasCircular = true
-                        if ("widget_album" == el.type) hasAlbum = true
-                        if ("widget_focus_image" == el.type) hasFocusImage = true
-                    }
-
-                    editor.putBoolean("widget_clock", hasClock)
-                    editor.putBoolean("widget_analog_clock", hasAnalog)
-                    editor.putBoolean("widget_battery", hasBattery)
-                    editor.putBoolean("widget_circular_battery", hasCircular)
-                    editor.putBoolean("widget_album", hasAlbum)
-                    editor.putBoolean("widget_focus_image", hasFocusImage)
-                    editor.commit()
-                } catch (_: Exception) {}
-
+                ThemeManager.selectTheme(prefs, theme.name)
                 activity.recreate()
             }
             containerSettingsItems.addView(btn)
