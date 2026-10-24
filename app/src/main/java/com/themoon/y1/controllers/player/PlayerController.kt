@@ -21,6 +21,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.AudioVisualizerView
 import java.io.File
 import java.util.Locale
 
@@ -45,6 +46,7 @@ class PlayerController(
     private val onBrowseArtist: (artistName: String) -> Unit,
     private val onToggleFavorite: () -> Unit,
     private val onAddToOnTheGo: (file: File) -> Unit,
+    private val onAddToPlaylist: (file: File) -> Unit,
     private val onToggleVisualizer: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
@@ -65,6 +67,8 @@ class PlayerController(
     private val frameAlbumReflection: FrameLayout? = rootView.findViewById(R.id.frame_album_reflection)
     private val ivPauseOverlay: ImageView? = rootView.findViewById(R.id.iv_pause_overlay)
     private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
+    private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
+    private var visualizerApplied = false
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
     private val ivPlayerRepeatStatus: ImageView? = rootView.findViewById(R.id.iv_player_repeat_status)
@@ -118,6 +122,13 @@ class PlayerController(
             it.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         }
 
+        // Spectrum takes the album art slot, above the reflection
+        (frameAlbumArt?.parent as? LinearLayout)?.let { column ->
+            val visLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (190 * density).toInt())
+            visLp.bottomMargin = (8 * density).toInt()
+            column.addView(visualizerView, 0, visLp)
+        }
+
         tvScrubStars[0] = rootView.findViewById(R.id.tv_scrub_star_1)
         tvScrubStars[1] = rootView.findViewById(R.id.tv_scrub_star_2)
         tvScrubStars[2] = rootView.findViewById(R.id.tv_scrub_star_3)
@@ -131,6 +142,7 @@ class PlayerController(
         layoutPlayerMode.visibility = View.VISIBLE
         applyThemeColors()
         updatePlayerUI()
+        refreshVisualizerState()
         progressHandler.post(updateProgressTask)
     }
 
@@ -261,6 +273,8 @@ class PlayerController(
             2 -> updateShuffleRepeatScrubLabels()
             3 -> updateRatingScrubStars()
         }
+        // A bottom state may have shown or hidden the lyrics overlay in the album art slot
+        refreshVisualizerState()
     }
 
     fun handleNowPlayingWheelInput(up: Boolean): Boolean {
@@ -409,11 +423,42 @@ class PlayerController(
             isFavorite = isFav,
             onToggleFavorite = onToggleFavorite,
             onAddToOnTheGo = onAddToOnTheGo,
+            onAddToPlaylist = onAddToPlaylist,
             onBrowseAlbum = onBrowseAlbum,
             onBrowseArtist = onBrowseArtist,
+            isSpectrumShowing = main.isVisualizerShowing,
             onToggleVisualizer = onToggleVisualizer,
             localize = localize
         )
+    }
+
+    /**
+     * Spectrum on: the spectrum replaces the album art. Spectrum off: album art.
+     * While the lyrics overlay is showing it owns the album art slot, so the spectrum hides
+     * and comes back when the lyrics are hidden. Runs on toggle, on entering Now Playing and with
+     * every bottom state update (which also covers track changes and showing or hiding lyrics).
+     */
+    fun refreshVisualizerState() {
+        val main = MainActivity.instance ?: return
+        val isOn = main.isVisualizerShowing
+        val lyricsShowing = lyricsOverlayController.isShowing()
+        val showSpectrum = isOn && !lyricsShowing
+
+        // Only undo what this mode changed; the lyrics overlay manages the album art while it shows
+        if (!lyricsShowing) {
+            if (isOn) frameAlbumArt?.visibility = View.GONE else if (visualizerApplied) frameAlbumArt?.visibility = View.VISIBLE
+        }
+        visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
+        visualizerApplied = isOn
+        try {
+            main.audioVisualizer?.setEnabled(showSpectrum)
+        } catch (_: Exception) {}
+    }
+
+    fun updateVisualizer(fft: ByteArray?, color: Int) {
+        if (visualizerView.visibility == View.VISIBLE) {
+            visualizerView.updateVisualizer(fft, color)
+        }
     }
 
     private fun formatTime(ms: Int): String {
@@ -431,6 +476,7 @@ class PlayerController(
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER, 23, KeyEvent.KEYCODE_ENTER -> {
                 if (event.repeatCount == 0) {
+                    MainActivity.instance?.isLongPressConsumed = false
                     event.startTracking()
                 }
                 return true
@@ -463,6 +509,12 @@ class PlayerController(
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            val main = MainActivity.instance
+            if (main != null && main.isLongPressConsumed) {
+                // The hold opened the Now Playing menu, so skip the short-press action
+                main.isLongPressConsumed = false
+                return true
+            }
             if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
                 val now = System.currentTimeMillis()
                 if (now - lastCenterUpTime < 300) {
@@ -492,13 +544,14 @@ class PlayerController(
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85 || keyCode == 86 || keyCode == 126 || keyCode == 127) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
             val main = MainActivity.instance
             if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
                 clickFeedback()
-                main.isMediaLongPressConsumed = true
-                val currentSong = main.currentPlaylist[main.currentIndex]
-                main.showAddToPlaylistDialog(currentSong)
+                main.isLongPressConsumed = true
+                doubleClickHandler.removeCallbacks(singleClickRunnable)
+                lastCenterUpTime = 0
+                showContextMenu()
                 return true
             }
         }
