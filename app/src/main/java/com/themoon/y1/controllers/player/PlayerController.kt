@@ -133,6 +133,7 @@ class PlayerController(
 
     override fun onEnter(state: ScreenState) {
         layoutPlayerMode.visibility = View.VISIBLE
+        resetBottomState()
         applyThemeColors()
         updatePlayerUI()
         startProgressUpdates()
@@ -141,11 +142,15 @@ class PlayerController(
     override fun onExit() {
         progressHandler.removeCallbacks(updateProgressTask)
         layoutPlayerMode.visibility = View.GONE
+        resetBottomState()
+    }
+
+    /** Now Playing always opens in the default state (Progress); a pending seek is discarded. */
+    private fun resetBottomState() {
+        pendingSeekChanged = false
+        nowPlayingBottomState = 0
         lyricsOverlayController.hide()
-        if (nowPlayingBottomState == LYRICS_STATE) {
-            nowPlayingBottomState = 0
-            updateNowPlayingBottomBarState()
-        }
+        updateNowPlayingBottomBarState()
     }
 
     override fun onRefreshUI() {
@@ -544,9 +549,11 @@ class PlayerController(
 
     override fun onBackPressed(): Boolean {
         clickFeedback()
-        if (nowPlayingBottomState == LYRICS_STATE) {
+        // Back from Lyrics, Scrub, Shuffle/Repeat or Rating returns to Progress; a pending seek is discarded
+        if (nowPlayingBottomState != 0) {
+            if (nowPlayingBottomState == LYRICS_STATE) setLyricsShowing(false)
+            pendingSeekChanged = false
             nowPlayingBottomState = 0
-            setLyricsShowing(false)
             updateNowPlayingBottomBarState()
             return true
         }
