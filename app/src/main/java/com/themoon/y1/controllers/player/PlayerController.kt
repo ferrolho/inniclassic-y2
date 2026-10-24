@@ -135,7 +135,7 @@ class PlayerController(
         layoutPlayerMode.visibility = View.VISIBLE
         applyThemeColors()
         updatePlayerUI()
-        progressHandler.post(updateProgressTask)
+        startProgressUpdates()
     }
 
     override fun onExit() {
@@ -220,6 +220,8 @@ class PlayerController(
         if (am.isPlaying()) {
             ivAlbumArt.alpha = 1.0f
             ivPauseOverlay?.visibility = View.GONE
+            // The progress loop stops while paused, so restart it on resume or a delayed start
+            if (layoutPlayerMode.visibility == View.VISIBLE) startProgressUpdates()
         } else {
             ivAlbumArt.alpha = if (ThemeManager.isClassicTheme()) 1f else 0.4f
             ivPauseOverlay?.visibility = if (ThemeManager.isClassicTheme()) View.GONE else View.VISIBLE
@@ -230,6 +232,11 @@ class PlayerController(
         }
 
         updateShuffleRepeatStatusIcons()
+    }
+
+    private fun startProgressUpdates() {
+        progressHandler.removeCallbacks(updateProgressTask)
+        progressHandler.post(updateProgressTask)
     }
 
     private fun updatePlaybackProgress() {
