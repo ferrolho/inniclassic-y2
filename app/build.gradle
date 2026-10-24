@@ -20,6 +20,9 @@ def todayDate = new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
 def defaultVersionCode = todayDate.toInteger()
 def defaultVersionName = todayDate
 
+// Videos feature (main menu item, video scan, Jellyfin video sync). Our own build turns it off: -Pvideos=false
+def videos = project.hasProperty('videos') ? project.property('videos').toString().toBoolean() : true
+
 def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : defaultVersionCode
 def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName') : defaultVersionName
 
@@ -39,6 +42,7 @@ android {
         }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
+        buildConfigField "boolean", "VIDEOS", "${videos}"
         buildConfigField "String", "LASTFM_API_KEY", "\"${lastFmApiKey}\""
         buildConfigField "String", "LASTFM_API_SECRET", "\"${lastFmApiSecret}\""
     }

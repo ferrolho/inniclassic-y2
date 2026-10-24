@@ -64,7 +64,7 @@ class StorageController(
         val videos = videosProvider()
         val rowVideos = createSettingRow(localize("Videos"), videos.size.toString())
         rowVideos.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowVideos)
+        if (com.themoon.y1.VideoFeature.enabled) containerStorageItems.addView(rowVideos)
 
         val uniqueAlbums = HashSet<String>()
         val uniqueArtists = HashSet<String>()
