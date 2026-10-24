@@ -83,14 +83,33 @@ object IpodClassicLayout {
             return
         }
         if (!isActive) return
+        val first = !applied
         applied = true
         appliedTheme = theme
         val d = main.resources.displayMetrics.density
         try {
-            applyStatusBar(main, d)
+            // applyTheme() runs at each screen change, so do only the work that can have an effect:
+            // the status bar again only when its views changed, Now Playing only while it shows
+            // (its onEnter sets colours and the tilt again) or at the first apply (sizes for the lyrics box).
+            val statusKey = statusBarKey(main)
+            if (first || statusKey != appliedStatusKey) {
+                applyStatusBar(main, d)
+                appliedStatusKey = statusBarKey(main)
+            }
             applyScreenPaddings(main, d)
-            IpodClassicNowPlaying.apply(main, d)
+            if (first || main.findViewById<View>(R.id.layout_player_mode)?.visibility == View.VISIBLE) {
+                IpodClassicNowPlaying.apply(main, d)
+            }
         } catch (_: Exception) {}
+    }
+
+    private var appliedStatusKey: String? = null
+
+    // Other code changes only the width, the background and the title text of the status bar
+    private fun statusBarKey(main: MainActivity): String {
+        val bar = main.findViewById<ViewGroup>(R.id.layout_status_bar)
+        val group = main.findViewById<ViewGroup>(R.id.layout_status_right_group)
+        return "${bar?.childCount}|${group?.childCount}|${main.resources.displayMetrics.density}"
     }
 
     // Status bar

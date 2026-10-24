@@ -86,7 +86,8 @@ object IpodClassicNowPlaying {
             val ref = WeakReference(textColumn)
             textColumn.viewTreeObserver.addOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener {
                 val column = ref.get() ?: return@OnGlobalLayoutListener
-                if (L.isActive) layoutText(column, column.resources.displayMetrics.density)
+                // The listener runs at each layout of the window; Now Playing needs it only while it shows
+                if (column.isShown && L.isActive) layoutText(column, column.resources.displayMetrics.density)
             })
         }
 
@@ -245,8 +246,13 @@ object IpodClassicNowPlaying {
         L.record(iv, "image") {
             (it as ImageView).setImageDrawable(oldDrawable)
             it.colorFilter = oldFilter
+            it.setTag(R.id.iv_player_repeat_status, null)
         }
-        iv.setImageResource(res)
+        // A new drawable decodes the resource again and asks for a layout; only change it when it differs
+        if (iv.getTag(R.id.iv_player_repeat_status) != res) {
+            iv.setImageResource(res)
+            iv.setTag(R.id.iv_player_repeat_status, res)
+        }
         iv.setColorFilter(detailColor(), PorterDuff.Mode.SRC_IN)
         iv.scaleType = ImageView.ScaleType.FIT_CENTER
     }
