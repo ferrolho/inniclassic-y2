@@ -168,7 +168,7 @@ class CoverFlowController(
             views[i]?.let { setCardTitleAlpha(it, i == centerIdx, 0) }
         }
 
-        val statusTitle = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        val statusTitle = CoverFlowTitle.format(localize("Cover Flow"), currentCoverFlowIndex + 1, total)
         tvBrowserPath.text = statusTitle
         activity.findViewById<TextView>(R.id.tv_status_clock)?.text = statusTitle
     }
@@ -288,9 +288,10 @@ class CoverFlowController(
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
-        // Album, then artist: bold, primary text colour (black on the Classic themes), on the iPod baselines.
-        val tvTitle = createCardText(TITLE_VIEW_ID, CoverFlowGeometry.TITLE_SIZE * d, CoverFlowGeometry.TITLE_BASELINE * d)
-        val tvArtist = createCardText(ARTIST_VIEW_ID, CoverFlowGeometry.ARTIST_SIZE * d, CoverFlowGeometry.ARTIST_BASELINE * d)
+        // Album (bold, primary colour: black on the Classic themes), then artist (regular, secondary colour),
+        // on the iPod baselines.
+        val tvTitle = createCardText(TITLE_VIEW_ID, CoverFlowGeometry.TITLE_SIZE * d, CoverFlowGeometry.TITLE_BASELINE * d, bold = true)
+        val tvArtist = createCardText(ARTIST_VIEW_ID, CoverFlowGeometry.ARTIST_SIZE * d, CoverFlowGeometry.ARTIST_BASELINE * d, bold = false)
 
         card.addView(ivCover)
         card.addView(ivReflection)
@@ -310,13 +311,13 @@ class CoverFlowController(
         return card
     }
 
-    /** One line of centred text whose baseline is [baseline] px below the card top. */
-    private fun createCardText(viewId: Int, sizePx: Float, baseline: Float): TextView {
+    /** One line of centred text (bold or regular theme font) whose baseline is [baseline] px below the card top. */
+    private fun createCardText(viewId: Int, sizePx: Float, baseline: Float, bold: Boolean): TextView {
         return TextView(activity).apply {
             id = viewId
-            setTextColor(ThemeManager.getTextColorPrimary())
+            setTextColor(if (bold) ThemeManager.getTextColorPrimary() else ThemeManager.getTextColorSecondary())
             setTextSize(TypedValue.COMPLEX_UNIT_PX, sizePx)
-            typeface = ThemeManager.getCustomFontBold()
+            typeface = if (bold) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
             includeFontPadding = false
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             isSingleLine = true
@@ -476,7 +477,7 @@ class CoverFlowController(
             animateTransform(views[i], transX, rotY, scale, alpha, duration)
         }
 
-        val statusTitle = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        val statusTitle = CoverFlowTitle.format(localize("Cover Flow"), currentCoverFlowIndex + 1, total)
         tvBrowserPath.text = statusTitle
         activity.findViewById<TextView>(R.id.tv_status_clock)?.text = statusTitle
     }
