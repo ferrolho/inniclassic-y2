@@ -1,13 +1,18 @@
 package com.themoon.y1.controllers.player
 
 import android.content.Context
-import android.text.Html
+import android.os.SystemClock
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.themoon.y1.MainActivity
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.M4bChapterParser
@@ -17,7 +22,7 @@ import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.io.RandomAccessFile
 import java.util.ArrayList
-import java.util.Locale
+import java.util.Collections
 import java.util.TreeMap
 import java.util.regex.Pattern
 
@@ -49,14 +54,30 @@ class LyricsOverlayController(
     private var lyricTimestamps = ArrayList<Int>()
     private var plainLyrics: String? = null
     private var lastLyricIndex = -1
-    private var autoScrollPaused = false
+    private var lineStarts = IntArray(0)
+    private var lineEnds = IntArray(0)
+    private var activeSpan: ForegroundColorSpan? = null
+    private var plainColor = 0xFFFFFFFF.toInt()
+    private var activeLineColor = 0xFF2588DC.toInt()
+    private var otherLineColor = 0x8CFFFFFF.toInt()
+
+    // Playback position from the last progress tick; frames extrapolate from it while playing
+    private var progressPos = 0
+    private var progressDuration = 0
+    private var progressTime = 0L
+    private var progressPlaying = false
+
+    // Scroll position drawn on the last frame (-1 = jump to the target), and the wheel target (-1 = follow playback)
+    private var scrollPos = -1f
+    private var manualScrollY = -1f
     private var manualLyricIndex = -1
+    private var frameScheduled = false
+    private val frameTask = Runnable { onFrame() }
     private val followPlayback = Runnable {
         manualLyricIndex = -1
-        if (lastLyricIndex != -1) renderSyncedLines(lastLyricIndex) else tvLyrics.text = ""
+        manualScrollY = -1f
+        scheduleFrame()
     }
-    private var activeLineColor = 0xFF00FF00.toInt()
-    private var otherLineColor = 0x77FFFFFF
 
     val hasLyrics: Boolean
         get() = currentLyrics.isNotEmpty() || plainLyrics != null
@@ -86,26 +107,32 @@ class LyricsOverlayController(
         if (!hasLyrics) return
         albumViews.forEach { it.visibility = View.GONE }
         lyricScrollView.visibility = View.VISIBLE
-        autoScrollPaused = false
         manualLyricIndex = -1
+        manualScrollY = -1f
+        scrollPos = -1f
         lyricScrollView.removeCallbacks(followPlayback)
-        if (plainLyrics != null && currentLyrics.isEmpty()) {
-            lyricScrollView.post { lyricScrollView.scrollTo(0, 0) }
+        if (isSynced) {
+            buildSyncedText()
+        } else {
+            tvLyrics.setTextColor(plainColor)
+            tvLyrics.setPadding(20, 40, 20, 40)
         }
+        scheduleFrame()
     }
 
     fun hide() {
         lyricScrollView.visibility = View.GONE
         lyricScrollView.removeCallbacks(followPlayback)
+        lyricScrollView.removeCallbacks(frameTask)
+        frameScheduled = false
         albumViews.forEach { it.visibility = View.VISIBLE }
     }
 
-    /** Match the player text colours so lyrics stay readable on light themes. */
-    fun applyColors(primary: Int, secondary: Int) {
-        tvLyrics.setTextColor(primary)
-        activeLineColor = primary
-        otherLineColor = secondary
-        lastLyricIndex = -1
+    /** Match the player text colours; the line being sung uses the theme accent colour. */
+    fun applyColors(primary: Int, secondary: Int, highlight: Int) {
+        plainColor = primary
+        activeLineColor = highlight or 0xFF000000.toInt()
+        otherLineColor = (secondary and 0x00FFFFFF) or 0x8C000000.toInt()
     }
 
     /**
@@ -113,17 +140,18 @@ class LyricsOverlayController(
      * 3 s without input; plain lyrics stop the autoscroll until the overlay shows again.
      */
     fun scrollLines(lines: Int) {
-        if (!isShowing()) return
+        if (!isShowing() || tvLyrics.layout == null) return
         if (isSynced) {
             val from = if (manualLyricIndex != -1) manualLyricIndex else lastLyricIndex
             manualLyricIndex = Math.max(0, Math.min(lyricTimestamps.size - 1, from + lines))
-            renderSyncedLines(manualLyricIndex)
+            manualScrollY = clampScroll(lineY(manualLyricIndex) - lyricScrollView.height / 3f)
             lyricScrollView.removeCallbacks(followPlayback)
             lyricScrollView.postDelayed(followPlayback, 3000)
-            return
+        } else {
+            val from = if (manualScrollY >= 0f) manualScrollY else lyricScrollView.scrollY.toFloat()
+            manualScrollY = clampScroll(from + lines * tvLyrics.lineHeight)
         }
-        autoScrollPaused = true
-        lyricScrollView.smoothScrollBy(0, lines * tvLyrics.lineHeight)
+        scheduleFrame()
     }
 
     fun isShowing(): Boolean = lyricScrollView.visibility == View.VISIBLE
@@ -132,6 +160,7 @@ class LyricsOverlayController(
         currentLyrics.clear()
         lyricTimestamps.clear()
         lastLyricIndex = -1
+        lineStarts = IntArray(0)
         manualLyricIndex = -1
         plainLyrics = null
         tvLyrics.text = ""
@@ -308,63 +337,115 @@ class LyricsOverlayController(
         return null
     }
 
-    fun updateProgress(currentPos: Int, duration: Int) {
-        if (!isShowing()) return
+    fun updateProgress(currentPos: Int, duration: Int, playing: Boolean) {
+        progressPos = currentPos
+        progressDuration = duration
+        progressTime = SystemClock.uptimeMillis()
+        progressPlaying = playing
+        if (isShowing()) scheduleFrame()
+    }
 
-        // 1. Plain text unsynced lyrics: autoscroll proportionally
-        if (plainLyrics != null && currentLyrics.isEmpty()) {
-            if (autoScrollPaused) return
-            val maxScroll = tvLyrics.height - lyricScrollView.height
-            if (maxScroll > 0 && duration > 0) {
-                val progressRatio = currentPos.toFloat() / duration.toFloat()
-                if (progressRatio < 0.15f) {
-                    lyricScrollView.smoothScrollTo(0, 0)
-                } else if (progressRatio > 0.85f) {
-                    lyricScrollView.smoothScrollTo(0, maxScroll)
-                } else {
-                    val normalizedRatio = (progressRatio - 0.15f) / 0.70f
-                    val targetScroll = (maxScroll * normalizedRatio).toInt()
-                    lyricScrollView.smoothScrollTo(0, targetScroll)
-                }
-            }
+    /** All synced lines in one text, so the view can glide between them. */
+    private fun buildSyncedText() {
+        lyricTimestamps = ArrayList(currentLyrics.keys)
+        val sb = SpannableStringBuilder()
+        lineStarts = IntArray(lyricTimestamps.size)
+        lineEnds = IntArray(lyricTimestamps.size)
+        for (i in lyricTimestamps.indices) {
+            if (i > 0) sb.append("\n\n")
+            lineStarts[i] = sb.length
+            sb.append(currentLyrics[lyricTimestamps[i]])
+            lineEnds[i] = sb.length
+        }
+        tvLyrics.setTextColor(otherLineColor)
+        tvLyrics.setPadding(20, 10, 20, 10)
+        tvLyrics.setText(sb, TextView.BufferType.SPANNABLE)
+        activeSpan = null
+        lastLyricIndex = -1
+    }
+
+    private fun scheduleFrame() {
+        if (frameScheduled) return
+        frameScheduled = true
+        lyricScrollView.postOnAnimation(frameTask)
+    }
+
+    /** Moves the scroll position a step towards the target; runs every frame only while playing or moving. */
+    private fun onFrame() {
+        frameScheduled = false
+        // isShown is false when a parent is hidden too; the next progress tick starts the frames again
+        if (!lyricScrollView.isShown || MainActivity.instance?.isScreenSleeping == true) return
+        if (isSynced && lineStarts.isEmpty()) buildSyncedText()
+        if (tvLyrics.layout == null || tvLyrics.isLayoutRequested || lyricScrollView.isLayoutRequested) {
+            scheduleFrame()
             return
         }
 
-        // 2. Synchronized LRC: find active lyric line and highlight
-        if (currentLyrics.isNotEmpty()) {
-            val entry = currentLyrics.floorEntry(currentPos)
-            if (entry != null) {
-                val activeTimestamp = entry.key
-                val activeIndex = lyricTimestamps.indexOf(activeTimestamp)
+        // Stop after 1.5 s without a progress tick, so a stopped progress loop also stops the frames
+        val now = SystemClock.uptimeMillis()
+        val live = progressPlaying && now - progressTime < 1500
+        val pos = if (live) progressPos + ((now - progressTime) * AudioPlayerManager.getInstance().getCurrentSpeed()).toInt() else progressPos
 
-                if (activeIndex != -1 && activeIndex != lastLyricIndex) {
-                    lastLyricIndex = activeIndex
-                    renderSyncedLines(if (manualLyricIndex != -1) manualLyricIndex else activeIndex)
-                }
+        if (isSynced) setActiveLine(lineIndexAt(pos))
+        val target = clampScroll(
+            when {
+                manualScrollY >= 0f -> manualScrollY
+                isSynced -> syncedScrollY(pos)
+                else -> plainScrollY(pos)
             }
+        )
+        val diff = target - scrollPos
+        scrollPos = if (scrollPos < 0f || Math.abs(diff) < 1f) target else scrollPos + diff * 0.2f
+        lyricScrollView.scrollTo(0, Math.round(scrollPos))
+        if (live || scrollPos != target) scheduleFrame()
+    }
+
+    /** Puts the line being sung at a third of the height, and glides to the next line until its time. */
+    private fun syncedScrollY(pos: Int): Float {
+        val i = lineIndexAt(pos)
+        if (i < 0) return 0f
+        var y = lineY(i)
+        if (i + 1 < lyricTimestamps.size) {
+            val start = lyricTimestamps[i]
+            val end = lyricTimestamps[i + 1]
+            val fraction = Math.max(0f, Math.min(1f, (pos - start).toFloat() / Math.max(1, end - start)))
+            y += (lineY(i + 1) - y) * fraction
+        }
+        return y - lyricScrollView.height / 3f
+    }
+
+    /** Plain lyrics scroll in proportion to the playback position. */
+    private fun plainScrollY(pos: Int): Float {
+        if (progressDuration <= 0) return 0f
+        val ratio = (pos.toFloat() / progressDuration - 0.15f) / 0.70f
+        return maxScroll() * Math.max(0f, Math.min(1f, ratio))
+    }
+
+    private fun setActiveLine(index: Int) {
+        if (index == lastLyricIndex) return
+        lastLyricIndex = index
+        val text = tvLyrics.text as? Spannable ?: return
+        activeSpan?.let { text.removeSpan(it) }
+        activeSpan = null
+        if (index >= 0) {
+            val span = ForegroundColorSpan(activeLineColor)
+            text.setSpan(span, lineStarts[index], lineEnds[index], Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            activeSpan = span
         }
     }
 
-    /** Shows the lines around [centerIndex], highlighting the line that is playing. */
-    private fun renderSyncedLines(centerIndex: Int) {
-        val sb = StringBuilder()
-        val totalLines = lyricTimestamps.size
-        val startLine = Math.max(0, centerIndex - 1)
-        val endLine = Math.min(totalLines - 1, centerIndex + 2)
-
-        for (i in startLine..endLine) {
-            val lyricText = currentLyrics[lyricTimestamps[i]]
-            if (i == lastLyricIndex) {
-                sb.append("<font color='").append(htmlColor(activeLineColor)).append("'><b>").append(lyricText).append("</b></font><br><br>")
-            } else {
-                sb.append("<font color='").append(htmlColor(otherLineColor)).append("'>").append(lyricText).append("</font><br><br>")
-            }
-        }
-
-        tvLyrics.text = Html.fromHtml(sb.toString())
-        tvLyrics.setPadding(20, 10, 20, 10)
-        lyricScrollView.scrollTo(0, 0)
+    /** Index of the line being sung at [pos], or -1 before the first line. */
+    private fun lineIndexAt(pos: Int): Int {
+        val i = Collections.binarySearch(lyricTimestamps, pos)
+        return if (i >= 0) i else -i - 2
     }
 
-    private fun htmlColor(color: Int): String = String.format(Locale.US, "#%06X", color and 0xFFFFFF)
+    private fun lineY(index: Int): Float {
+        val layout = tvLyrics.layout ?: return 0f
+        return (layout.getLineTop(layout.getLineForOffset(lineStarts[index])) + tvLyrics.totalPaddingTop).toFloat()
+    }
+
+    private fun maxScroll(): Int = Math.max(0, tvLyrics.height - lyricScrollView.height)
+
+    private fun clampScroll(y: Float): Float = Math.max(0f, Math.min(maxScroll().toFloat(), y))
 }

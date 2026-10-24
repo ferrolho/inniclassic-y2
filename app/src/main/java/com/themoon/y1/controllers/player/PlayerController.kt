@@ -255,7 +255,7 @@ class PlayerController(
                 playerProgress.progress = (pos * 100) / dur
             }
         }
-        lyricsOverlayController.updateProgress(pos, dur)
+        lyricsOverlayController.updateProgress(pos, dur, am.isPlaying())
     }
 
     fun updateNowPlayingBottomBarState() {
@@ -340,10 +340,12 @@ class PlayerController(
 
     private fun setLyricsShowing(showing: Boolean) {
         if (showing) {
-            lyricsOverlayController.applyColors(tvPlayerTitle.currentTextColor, tvPlayerArtist.currentTextColor)
+            // The line being sung uses the focus colour of list rows
+            val highlight = if (ThemeManager.isClassicTheme()) 0xFF2588DC.toInt() else ThemeManager.getListButtonFocusedBg()
+            lyricsOverlayController.applyColors(tvPlayerTitle.currentTextColor, tvPlayerArtist.currentTextColor, highlight)
             lyricsOverlayController.show()
             val am = AudioPlayerManager.getInstance()
-            lyricsOverlayController.updateProgress(am.getCurrentPosition(), am.getDuration())
+            lyricsOverlayController.updateProgress(am.getCurrentPosition(), am.getDuration(), am.isPlaying())
         } else {
             lyricsOverlayController.hide()
         }
