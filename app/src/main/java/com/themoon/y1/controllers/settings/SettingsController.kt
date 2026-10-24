@@ -19,6 +19,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
+import com.themoon.y1.changeTheme
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -150,6 +151,18 @@ class SettingsController(
     override fun onRefreshUI() {
         if (currentSettingsDepth == 0) {
             buildSettingsUI()
+        }
+    }
+
+    // First row of the theme list when it was made; the list still shows while this row is in the container
+    private var themeListFirstRow: View? = null
+
+    override fun onThemeChanged() {
+        when {
+            currentSettingsDepth == 0 -> buildSettingsUI()
+            themeListFirstRow != null && containerSettingsItems.getChildAt(0) === themeListFirstRow -> buildThemeSelectorUI()
+            // Other sub-screens: one level up, as Back does
+            else -> buildSettingsUI()
         }
     }
 
@@ -879,8 +892,8 @@ class SettingsController(
             )
             btn.setOnClickListener {
                 clickFeedback()
-                ThemeManager.selectTheme(prefs, theme.name)
-                activity.recreate()
+                // Live: the theme list is made again in the new theme, with the focus on this row
+                mainActivity?.changeTheme(theme.name)
             }
             containerSettingsItems.addView(btn)
         }
@@ -888,6 +901,7 @@ class SettingsController(
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
+        themeListFirstRow = containerSettingsItems.getChildAt(0)
     }
 
     private fun buildVibrationSettingsUI() {
