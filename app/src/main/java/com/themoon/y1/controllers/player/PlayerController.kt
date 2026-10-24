@@ -21,6 +21,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.AudioVisualizerView
 import java.io.File
 import java.util.Locale
 
@@ -45,6 +46,7 @@ class PlayerController(
     private val onBrowseArtist: (artistName: String) -> Unit,
     private val onToggleFavorite: () -> Unit,
     private val onAddToOnTheGo: (file: File) -> Unit,
+    private val onAddToPlaylist: (file: File) -> Unit,
     private val onToggleVisualizer: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
@@ -65,6 +67,9 @@ class PlayerController(
     private val frameAlbumReflection: FrameLayout? = rootView.findViewById(R.id.frame_album_reflection)
     private val ivPauseOverlay: ImageView? = rootView.findViewById(R.id.iv_pause_overlay)
     private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
+    private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
+    private var visualizerApplied = false
+    private var visualizerShowsLyrics = false
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
     private val ivPlayerRepeatStatus: ImageView? = rootView.findViewById(R.id.iv_player_repeat_status)
@@ -118,6 +123,13 @@ class PlayerController(
             it.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         }
 
+        // Spectrum takes the album art slot, above the reflection
+        (frameAlbumArt?.parent as? LinearLayout)?.let { column ->
+            val visLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (190 * density).toInt())
+            visLp.bottomMargin = (8 * density).toInt()
+            column.addView(visualizerView, 0, visLp)
+        }
+
         tvScrubStars[0] = rootView.findViewById(R.id.tv_scrub_star_1)
         tvScrubStars[1] = rootView.findViewById(R.id.tv_scrub_star_2)
         tvScrubStars[2] = rootView.findViewById(R.id.tv_scrub_star_3)
@@ -131,6 +143,7 @@ class PlayerController(
         layoutPlayerMode.visibility = View.VISIBLE
         applyThemeColors()
         updatePlayerUI()
+        refreshVisualizerState()
         progressHandler.post(updateProgressTask)
     }
 
@@ -188,6 +201,7 @@ class PlayerController(
                 pendingSeekChanged = false
                 nowPlayingBottomState = 0
                 updateNowPlayingBottomBarState()
+                refreshVisualizerState()
             }
 
             val totalCount = playlist.size
@@ -409,11 +423,39 @@ class PlayerController(
             isFavorite = isFav,
             onToggleFavorite = onToggleFavorite,
             onAddToOnTheGo = onAddToOnTheGo,
+            onAddToPlaylist = onAddToPlaylist,
             onBrowseAlbum = onBrowseAlbum,
             onBrowseArtist = onBrowseArtist,
             onToggleVisualizer = onToggleVisualizer,
             localize = localize
         )
+    }
+
+    /**
+     * Visualizer on: album art is replaced by lyrics if the track has any, else by the spectrum.
+     * Visualizer off: album art. Called on toggle, on track change and on entering Now Playing.
+     */
+    fun refreshVisualizerState() {
+        val main = MainActivity.instance ?: return
+        val isOn = main.isVisualizerShowing
+        val showLyrics = isOn && lyricsOverlayController.hasLyrics
+        val showSpectrum = isOn && !showLyrics
+
+        // Only undo what this mode changed, so other users of the lyrics overlay are not affected
+        if (showLyrics) lyricsOverlayController.show() else if (visualizerShowsLyrics) lyricsOverlayController.hide()
+        if (isOn) frameAlbumArt?.visibility = View.GONE else if (visualizerApplied) frameAlbumArt?.visibility = View.VISIBLE
+        visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
+        visualizerApplied = isOn
+        visualizerShowsLyrics = showLyrics
+        try {
+            main.audioVisualizer?.setEnabled(showSpectrum)
+        } catch (_: Exception) {}
+    }
+
+    fun updateVisualizer(fft: ByteArray?, color: Int) {
+        if (visualizerView.visibility == View.VISIBLE) {
+            visualizerView.updateVisualizer(fft, color)
+        }
     }
 
     private fun formatTime(ms: Int): String {
@@ -497,8 +539,7 @@ class PlayerController(
             if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
                 clickFeedback()
                 main.isMediaLongPressConsumed = true
-                val currentSong = main.currentPlaylist[main.currentIndex]
-                main.showAddToPlaylistDialog(currentSong)
+                showContextMenu()
                 return true
             }
         }
@@ -506,6 +547,12 @@ class PlayerController(
     }
 
     override fun onBackPressed(): Boolean {
+        // In visualizer mode lyrics or the spectrum replace the album art, so Back leaves the screen
+        if (MainActivity.instance?.isVisualizerShowing == true) {
+            clickFeedback()
+            onNavigateBack()
+            return true
+        }
         clickFeedback()
         if (lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
             lyricsOverlayController.hide()
