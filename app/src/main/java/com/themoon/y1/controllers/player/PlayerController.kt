@@ -122,9 +122,10 @@ class PlayerController(
             it.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         }
 
-        // Spectrum takes the album art slot, above the reflection
+        // Spectrum takes the album art slot; same width as the art, so the column keeps its width
         (frameAlbumArt?.parent as? LinearLayout)?.let { column ->
-            val visLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (190 * density).toInt())
+            val visWidth = frameAlbumArt.layoutParams?.width ?: ViewGroup.LayoutParams.MATCH_PARENT
+            val visLp = LinearLayout.LayoutParams(visWidth, (190 * density).toInt())
             visLp.bottomMargin = (8 * density).toInt()
             column.addView(visualizerView, 0, visLp)
         }
@@ -433,7 +434,7 @@ class PlayerController(
     }
 
     /**
-     * Spectrum on: the spectrum replaces the album art. Spectrum off: album art.
+     * Spectrum on: the spectrum replaces the album art and its reflection. Spectrum off: album art.
      * While the lyrics overlay is showing it owns the album art slot, so the spectrum hides
      * and comes back when the lyrics are hidden. Runs on toggle, on entering Now Playing and with
      * every bottom state update (which also covers track changes and showing or hiding lyrics).
@@ -446,7 +447,11 @@ class PlayerController(
 
         // Only undo what this mode changed; the lyrics overlay manages the album art while it shows
         if (!lyricsShowing) {
-            if (isOn) frameAlbumArt?.visibility = View.GONE else if (visualizerApplied) frameAlbumArt?.visibility = View.VISIBLE
+            val albumVisibility = if (isOn) View.GONE else if (visualizerApplied) View.VISIBLE else null
+            if (albumVisibility != null) {
+                frameAlbumArt?.visibility = albumVisibility
+                frameAlbumReflection?.visibility = albumVisibility
+            }
         }
         visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
         visualizerApplied = isOn
