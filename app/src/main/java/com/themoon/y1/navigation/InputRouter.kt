@@ -24,6 +24,13 @@ class InputRouter private constructor() {
     var backDebounceUntil: Long = 0L
         private set
 
+    // Set when Next/Previous auto-repeats, so the release does not skip the track
+    @Volatile
+    var isSkipKeyHeld: Boolean = false
+        private set
+
+    private var lastSeekTime: Long = 0L
+
     fun suppressBackUntilRelease(debounceMs: Long = 350L) {
         isBackSuppressed = true
         backDebounceUntil = System.currentTimeMillis() + debounceMs
@@ -99,12 +106,15 @@ class InputRouter private constructor() {
                     keyCode == 88
 
             if (isMediaKey) {
-                if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                    when (keyCode) {
-                        KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack()
-                        KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack()
-                        else -> com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
+                if (isSkipKey(keyCode)) {
+                    // Same press/hold behaviour as with the screen on
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        onSkipKeyDown(keyCode, event.repeatCount)
+                    } else if (action == KeyEvent.ACTION_UP) {
+                        onSkipKeyUp(keyCode, event.eventTime - event.downTime)
                     }
+                } else if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
                 }
                 return true
             }
@@ -194,12 +204,8 @@ class InputRouter private constructor() {
             AudioPlayerManager.getInstance().playOrPauseMusic()
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-            AudioPlayerManager.getInstance().nextTrack()
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-            AudioPlayerManager.getInstance().prevTrack()
+        if (isSkipKey(keyCode)) {
+            onSkipKeyDown(keyCode, event.repeatCount)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -222,6 +228,10 @@ class InputRouter private constructor() {
         }
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
             isBackSuppressed = false
+            return true
+        }
+        if (isSkipKey(keyCode)) {
+            onSkipKeyUp(keyCode, event.eventTime - event.downTime)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -249,7 +259,51 @@ class InputRouter private constructor() {
         return activeController?.onKeyLongPress(keyCode, event) == true
     }
 
+    private fun isSkipKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87 ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88
+    }
+
+    /**
+     * Next/Previous key down. Holding the button jumps +/-10 s every 300 ms;
+     * a short press changes the track on release (see [onSkipKeyUp]).
+     */
+    internal fun onSkipKeyDown(keyCode: Int, repeatCount: Int) {
+        if (repeatCount == 0) {
+            isSkipKeyHeld = false
+            return
+        }
+        isSkipKeyHeld = true
+        val now = System.currentTimeMillis()
+        if (now - lastSeekTime > 300) {
+            lastSeekTime = now
+            val isNext = keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87
+            AudioPlayerManager.getInstance().seekRelative(if (isNext) 10000 else -10000)
+            MainActivity.instance?.clickFeedback()
+        }
+    }
+
+    /**
+     * Next/Previous key up. Changes the track only after a short press. A long press counts as a hold
+     * even if a controller (e.g. FM radio station seek) consumed the key repeats. Returns true if it skipped.
+     */
+    internal fun onSkipKeyUp(keyCode: Int, heldMs: Long): Boolean {
+        if (isSkipKeyHeld || heldMs >= SKIP_KEY_HOLD_MS) {
+            return false
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+            AudioPlayerManager.getInstance().nextTrack()
+        } else {
+            AudioPlayerManager.getInstance().prevTrack()
+        }
+        MainActivity.instance?.clickFeedback()
+        return true
+    }
+
     companion object {
+        // Android's default long-press / key-repeat timeout
+        private const val SKIP_KEY_HOLD_MS = 500L
+
         @Volatile
         private var instance: InputRouter? = null
 

@@ -133,6 +133,39 @@ class InputRouterTest {
     }
 
     @Test
+    fun testSkipKeys_shortPressIsNotAHold() {
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        assertFalse("A first key down must not count as a hold", inputRouter.isSkipKeyHeld)
+
+        val upEvent = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT)
+        assertTrue("Next key release should be consumed",
+            inputRouter.onKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, upEvent, mainMenuController))
+    }
+
+    @Test
+    fun testSkipKeys_holdSeeksAndNextPressResets() {
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
+        assertTrue("An auto-repeat must mark the key as held", inputRouter.isSkipKeyHeld)
+        assertFalse("Releasing after a seek must not skip the track",
+            inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 100L))
+
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0)
+        assertFalse("A new press must clear the held state", inputRouter.isSkipKeyHeld)
+        assertTrue("A short press must skip the track on release",
+            inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 100L))
+    }
+
+    @Test
+    fun testSkipKeys_longPressDoesNotSkipWhenRepeatsWereConsumedElsewhere() {
+        // e.g. the FM radio screen consumes the repeats for station seek, so only the first key down arrives
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        assertFalse(inputRouter.isSkipKeyHeld)
+        assertFalse("A long press must not skip the track on release",
+            inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, 1500L))
+    }
+
+    @Test
     fun testSuppressBackUntilRelease_blocksBackEventsUntilUp() {
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.CoverFlow)
