@@ -271,7 +271,9 @@ class CoverFlowController(
             gravity = Gravity.CENTER
         }
         card.layoutParams = lp
-        // Scale and turn the side cards about the same point as before (centre of the old 320 dp card).
+        // Scale and turn the side cards about the same point as before (centre of the old 350 x 320 dp card).
+        // Setting one pivot stops Android from centring the other, so set both.
+        card.pivotX = lp.width / 2f
         card.pivotY = 160 * d
         card.setLayerType(View.LAYER_TYPE_NONE, null)
 
