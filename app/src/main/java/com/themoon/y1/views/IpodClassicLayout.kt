@@ -73,6 +73,7 @@ object IpodClassicLayout {
         try {
             applyStatusBar(main, d)
             applyScreenPaddings(main, d)
+            IpodClassicNowPlaying.apply(main, d)
         } catch (_: Exception) {}
     }
 
@@ -167,15 +168,22 @@ object IpodClassicLayout {
     // Text helpers
 
     /**
-     * Gives [tv] the full height of its row and a top padding that puts the centre of its capital
-     * letters on the centre of a box [boxHeight] tall that starts at the top of [tv].
+     * Gives [tv] the [height] (default: the full height of its row) and a top padding that puts the centre
+     * of its capital letters on the centre of a box [boxHeight] tall that starts at the top of [tv].
      */
-    internal fun styleCentredText(tv: TextView, sizePx: Float, typeface: Typeface?, boxHeight: Float) {
+    internal fun styleCentredText(
+        tv: TextView,
+        sizePx: Float,
+        typeface: Typeface?,
+        boxHeight: Float,
+        height: Int = ViewGroup.LayoutParams.MATCH_PARENT,
+        hGravity: Int = horizontalGravity(tv)
+    ) {
         setTextSizePx(tv, sizePx)
         if (typeface != null) setTypeface(tv, typeface)
         setIncludeFontPadding(tv, false)
-        setHeight(tv, ViewGroup.LayoutParams.MATCH_PARENT)
-        setTextGravity(tv, horizontalGravity(tv) or Gravity.TOP)
+        setHeight(tv, height)
+        setTextGravity(tv, hGravity or Gravity.TOP)
         setPadding(tv, tv.paddingLeft, capCentredPaddingTop(tv, boxHeight), tv.paddingRight, 0)
     }
 
