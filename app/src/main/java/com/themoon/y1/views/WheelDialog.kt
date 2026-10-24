@@ -57,7 +57,8 @@ class WheelDialog private constructor(private val context: Context) {
                 }
                 setColor(baseBg)
                 cornerRadius = 15f * d
-                setStroke((1f * d).toInt(), 0x33FFFFFF)
+                val strokeColor = if (ThemeManager.isClassicLightTheme()) 0x33000000 else 0x33FFFFFF
+                setStroke((1f * d).toInt(), strokeColor)
             }
             background = bg
             setPadding((15f * d).toInt(), (20f * d).toInt(), (15f * d).toInt(), (15f * d).toInt())
@@ -154,22 +155,40 @@ class WheelDialog private constructor(private val context: Context) {
             gravity = Gravity.CENTER
             setPadding((12f * d).toInt(), (10f * d).toInt(), (12f * d).toInt(), (10f * d).toInt())
 
-            val normalColor = if (isDestructive) 0xFFFF5555.toInt() else 0xFFEEEEEE.toInt()
+            val textPrimary = try {
+                ThemeManager.getTextColorPrimary()
+            } catch (_: Exception) {
+                0xFFEEEEEE.toInt()
+            }
+            val focusedText = try {
+                ThemeManager.getListButtonFocusedTextColor()
+            } catch (_: Exception) {
+                Color.WHITE
+            }
+            val normalColor = if (isDestructive) 0xFFFF5555.toInt() else textPrimary
+            val focusedColor = if (isDestructive) Color.WHITE else focusedText
             setTextColor(normalColor)
 
+            // Tint the idle background with the text colour so it shows on light and dark overlays.
             val normalBg = GradientDrawable().apply {
-                setColor(0x15FFFFFF)
+                setColor((textPrimary and 0x00FFFFFF) or 0x14000000)
                 cornerRadius = 8f * d
             }
-            val focusedBg = GradientDrawable().apply {
-                setColor(if (isDestructive) 0x66FF0000.toInt() else 0x44FFFFFF)
-                cornerRadius = 8f * d
-                setStroke((1f * d).toInt(), if (isDestructive) 0xFFFF5555.toInt() else 0xFFFFFFFF.toInt())
+            val focusedBg = if (isDestructive) {
+                GradientDrawable().apply {
+                    setColor(0xFFD93030.toInt())
+                    cornerRadius = 8f * d
+                }
+            } else {
+                ListItemViewFactory.createFocusedButtonBackground(context).apply {
+                    cornerRadius = 8f * d
+                }
             }
 
             background = normalBg
             setOnFocusChangeListener { _, hasFocus ->
                 background = if (hasFocus) focusedBg else normalBg
+                setTextColor(if (hasFocus) focusedColor else normalColor)
             }
         }
         val params = LinearLayout.LayoutParams(
