@@ -459,6 +459,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         updateMainMenuBackground()
         changeScreen(STATE_MENU)
         applyTheme()
+        com.themoon.y1.managers.AutoThemeManager.restoreScreen(this)
         Handler(Looper.getMainLooper()).postDelayed({ usbStateReceiverReady = true }, 2000)
     }
 

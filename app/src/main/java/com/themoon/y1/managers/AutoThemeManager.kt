@@ -5,7 +5,11 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import com.themoon.y1.MainActivity
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.handleMainMenuAction
+import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.views.TablerIcons
 import java.util.TimeZone
 
@@ -16,6 +20,10 @@ import java.util.TimeZone
  *
  * The resolved theme is saved as the normal selected theme (app_theme_name), so code that reads
  * the theme name works as before.
+ *
+ * The restart releases the player (MainActivity.onDestroy) and restores it paused, so the theme
+ * does not change while audio plays (music, FM radio, web server) or on screens with state that
+ * a restart loses. After the restart, [restoreScreen] opens the screen the user was on.
  */
 object AutoThemeManager {
 
@@ -43,11 +51,64 @@ object AutoThemeManager {
     }
 
     /** Screen comes on: if day/night changed since the last change, change the theme. */
-    fun onScreenOn(activity: Activity, prefs: SharedPreferences) {
-        if (!isEnabled(prefs) || activity.isFinishing) return
+    fun onScreenOn(activity: MainActivity, prefs: SharedPreferences) {
+        if (!isEnabled(prefs) || activity.isFinishing || isBusy(activity)) return
         val target = resolvedThemeName()
         if (ThemeManager.getCurrentTheme().name == target) return
-        if (selectTheme(prefs, target)) recreateLater(activity)
+        val screenAction = screenActionFor(NavigationManager.getInstance().currentState, activity.isAudiobookLibraryMode)
+        if (selectTheme(prefs, target)) {
+            pendingScreenAction = screenAction
+            recreateLater(activity)
+        }
+    }
+
+    // Main menu action that opens the screen to show after the restart (null = main menu)
+    private var pendingScreenAction: String? = null
+
+    /** End of MainActivity.onCreate: after an Auto theme restart, open the screen the user was on. */
+    fun restoreScreen(activity: MainActivity) {
+        val action = pendingScreenAction ?: return
+        pendingScreenAction = null
+        Handler(Looper.getMainLooper()).post { openWhenReady(activity, action, PLAYER_WAIT_TRIES) }
+    }
+
+    // Now Playing needs the restored playlist, which can load after onCreate
+    private const val PLAYER_WAIT_TRIES = 20
+    private const val PLAYER_WAIT_STEP_MS = 250L
+
+    private fun openWhenReady(activity: MainActivity, action: String, triesLeft: Int) {
+        // Stop if the user has already moved away from the main menu
+        if (activity.isFinishing || NavigationManager.getInstance().currentState != ScreenState.MainMenu) return
+        if (action == "OPEN_PLAYER" && activity.currentPlaylist.isEmpty()) {
+            if (triesLeft > 0) {
+                Handler(Looper.getMainLooper()).postDelayed(
+                    { openWhenReady(activity, action, triesLeft - 1) }, PLAYER_WAIT_STEP_MS
+                )
+            }
+            return
+        }
+        activity.handleMainMenuAction(action)
+    }
+
+    /** The main menu action that opens [state] again, or null to stay on the main menu. */
+    fun screenActionFor(state: ScreenState?, audiobookMode: Boolean): String? = when (state) {
+        is ScreenState.Player -> "OPEN_PLAYER"
+        is ScreenState.Settings -> "OPEN_SETTINGS"
+        is ScreenState.Browser -> if (audiobookMode) "OPEN_AUDIOBOOKS" else "OPEN_BROWSER"
+        is ScreenState.CoverFlow -> "OPEN_COVER_FLOW"
+        is ScreenState.Podcasts, is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> "OPEN_PODCASTS"
+        else -> null
+    }
+
+    /** True when a restart now would stop audio or lose what the user is doing. */
+    private fun isBusy(activity: MainActivity): Boolean {
+        val state = NavigationManager.getInstance().currentState
+        if (state is ScreenState.VideoPlayer || state is ScreenState.MusicQuiz || state is ScreenState.WifiKeyboard) {
+            return true
+        }
+        return AudioPlayerManager.getInstance().isPlaying() ||
+            FmRadioManager.getInstance(activity).isPowerUp ||
+            activity.isServerRunning
     }
 
     /** Value of the Theme row in Settings, e.g. "Auto (Dark)". */
@@ -125,6 +186,8 @@ object AutoThemeManager {
 
     // Do not recreate inside a broadcast receiver or a click handler; let them finish first
     private fun recreateLater(activity: Activity) {
-        Handler(Looper.getMainLooper()).post { if (!activity.isFinishing) activity.recreate() }
+        Handler(Looper.getMainLooper()).post {
+            if (activity.isFinishing) pendingScreenAction = null else activity.recreate()
+        }
     }
 }
