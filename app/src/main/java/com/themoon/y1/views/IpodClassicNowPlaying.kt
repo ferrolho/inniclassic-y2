@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.PorterDuff
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.text.Editable
 import android.text.TextPaint
 import android.text.TextWatcher
@@ -28,8 +29,13 @@ import com.themoon.y1.views.IpodClassicMetrics as M
  * and the progress bar and times at the iPod positions. All changes are recorded by [IpodClassicLayout].
  */
 object IpodClassicNowPlaying {
-    private const val DETAIL_COLOR = 0xFF333333.toInt()
-    private const val ICON_COLOR = 0xFF333333.toInt()
+    // Dark grey on a white Now Playing screen, light grey on a dark one (Classic Dark without a restart)
+    private fun detailColor(): Int {
+        val bg = MainActivity.instance?.findViewById<View>(R.id.layout_player_mode)?.background as? ColorDrawable
+        val c = bg?.color ?: return 0xFF333333.toInt()
+        val dark = 0.299 * ((c shr 16) and 0xFF) + 0.587 * ((c shr 8) and 0xFF) + 0.114 * (c and 0xFF) < 128
+        return if (dark) 0xFFCCCCCC.toInt() else 0xFF333333.toInt()
+    }
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val STAR = "★"
     private const val HOLLOW_STAR = '☆'
@@ -142,7 +148,7 @@ object IpodClassicNowPlaying {
                 L.setTextSizePx(it, M.NP_DETAIL_SP * d)
                 L.setTypeface(it, bold)
                 L.setIncludeFontPadding(it, false)
-                L.setTextColor(it, DETAIL_COLOR)
+                L.setTextColor(it, detailColor())
             }
         }
         main.findViewById<TextView>(R.id.tv_player_rating)?.let { rating ->
@@ -153,7 +159,7 @@ object IpodClassicNowPlaying {
             probe.getTextBounds(STAR, 0, STAR.length, bounds)
             L.setTextSizePx(rating, M.scaleTextSizeToHeight(base, bounds.height().toFloat(), M.NP_RATING_HEIGHT * d))
             L.setIncludeFontPadding(rating, false)
-            L.setTextColor(rating, DETAIL_COLOR)
+            L.setTextColor(rating, detailColor())
             if (hooked.add(rating)) rating.addTextChangedListener(HollowStarRemover)
             val text = rating.text.toString()
             if (text.indexOf(HOLLOW_STAR) >= 0) rating.text = text.substringBefore(HOLLOW_STAR)
@@ -241,7 +247,7 @@ object IpodClassicNowPlaying {
             it.colorFilter = oldFilter
         }
         iv.setImageResource(res)
-        iv.setColorFilter(ICON_COLOR, PorterDuff.Mode.SRC_IN)
+        iv.setColorFilter(detailColor(), PorterDuff.Mode.SRC_IN)
         iv.scaleType = ImageView.ScaleType.FIT_CENTER
     }
 

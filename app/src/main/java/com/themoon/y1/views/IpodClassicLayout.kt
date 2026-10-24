@@ -34,6 +34,8 @@ object IpodClassicLayout {
     private var enabled: Boolean? = null
     private var listenedPrefs: SharedPreferences? = null
     private var applied = false
+    private var appliedTheme: String? = null
+    private var reapplying = false
 
     // SharedPreferences keeps listeners in a weak map, so this object holds the only strong reference.
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
@@ -63,15 +65,26 @@ object IpodClassicLayout {
 
     /** Applies (or, when the layout is off, restores) the static views. Called at the end of applyTheme(). */
     fun apply(main: MainActivity) {
-        if (!isActive) {
-            if (applied) {
-                restoreAll()
-                removeAddedViews(main)
-                applied = false
+        val theme = ThemeManager.getCurrentTheme().name
+        if (applied && (!isActive || theme != appliedTheme)) {
+            // Layout off, or a theme change without a restart: restore the recorded values, then let
+            // applyTheme() set the values of the current theme on the restored views (and call apply() again).
+            restoreAll()
+            removeAddedViews(main)
+            applied = false
+            if (!reapplying) {
+                reapplying = true
+                try {
+                    main.applyTheme()
+                } finally {
+                    reapplying = false
+                }
             }
             return
         }
+        if (!isActive) return
         applied = true
+        appliedTheme = theme
         val d = main.resources.displayMetrics.density
         try {
             applyStatusBar(main, d)
