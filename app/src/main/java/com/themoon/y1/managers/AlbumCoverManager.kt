@@ -4,12 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.LinearGradient
-import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.Shader
 import android.media.MediaMetadataRetriever
 import android.os.Handler
 import android.os.Looper
@@ -20,7 +15,6 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
-import com.themoon.y1.controllers.coverflow.CoverFlowGeometry
 import com.themoon.y1.models.SongItem
 import java.io.File
 import java.io.FileInputStream
@@ -38,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * High-performance centralized album art and thumbnail manager for InniClassic on Y2.
  * Provides:
- * 1. Fast in-memory LRU caching of downsampled (256x256) album covers and reflections.
+ * 1. Fast in-memory LRU caching of downsampled (256x256) album covers (Cover Flow draws the reflections from them).
  * 2. Pre-scaled disk caching in /storage/sdcard0/.y1_thumbs_cache/.
  * 3. Bounded, LIFO-priority background thread pool preventing thread storms and CPU/SD thrashing.
  * 4. Shared access for both Cover Flow and the Album List (CategoryListAdapter).
@@ -58,14 +52,12 @@ class AlbumCoverManager private constructor() {
     @Volatile
     private var pregeneratedSignature: Long? = null
 
-    // Transparent bitmap with the size of a reflection (Cover Flow starts its reflection views with it).
-    private var emptyReflection: Bitmap? = null
-
     // Placeholder for albums without art, decoded one time for each theme.
     private var placeholder: Bitmap? = null
     private var placeholderTheme: Any? = null
 
     interface CoverCallback {
+        /** [reflection] is always null: Cover Flow draws the reflection from the cover. */
         fun onCoverLoaded(albumKey: String, cover: Bitmap?, reflection: Bitmap?)
     }
 
@@ -167,13 +159,6 @@ class AlbumCoverManager private constructor() {
         return out
     }
 
-    /** Transparent bitmap with the size of a thumbnail reflection. Call on the main thread. */
-    fun getEmptyReflection(): Bitmap {
-        emptyReflection?.let { return it }
-        return Bitmap.createBitmap(THUMB_SIZE, CoverFlowGeometry.reflectionRows(THUMB_SIZE), Bitmap.Config.ALPHA_8)
-            .also { emptyReflection = it }
-    }
-
     private fun signatureFile(): File = File(StoragePaths.getThumbsCacheDir(), PREGEN_SIGNATURE_FILE)
 
     /** The signature of the last complete pre-generation, also after an app restart. */
@@ -199,11 +184,6 @@ class AlbumCoverManager private constructor() {
     fun getMemoryCover(albumKey: String?): Bitmap? {
         if (albumKey == null) return null
         return memoryCache.get(albumKey)
-    }
-
-    fun getMemoryReflection(albumKey: String?): Bitmap? {
-        if (albumKey == null) return null
-        return memoryCache.get("ref_$albumKey")
     }
 
     fun getThumbnailDirect(albumKey: String?): Bitmap? {
@@ -232,9 +212,8 @@ class AlbumCoverManager private constructor() {
         val albumKey = getAlbumKey(song.file, song.album)
 
         val memBmp = getMemoryCover(albumKey)
-        val memRef = getMemoryReflection(albumKey)
         if (memBmp != null) {
-            callback?.onCoverLoaded(albumKey, memBmp, memRef)
+            callback?.onCoverLoaded(albumKey, memBmp, null)
             return
         }
         if (noArtKeys.contains(albumKey)) {
@@ -269,21 +248,15 @@ class AlbumCoverManager private constructor() {
                 }
             }
 
-            var ref: Bitmap? = null
             if (bmp != null) {
-                ref = generateReflection(bmp)
                 memoryCache.put(albumKey, bmp)
-                if (ref != null) {
-                    memoryCache.put("ref_$albumKey", ref)
-                }
             }
 
             pendingKeys.remove(albumKey)
 
             val finalBmp = bmp
-            val finalRef = ref
             mainHandler.post {
-                callback?.onCoverLoaded(albumKey, finalBmp, finalRef)
+                callback?.onCoverLoaded(albumKey, finalBmp, null)
             }
         }
     }
@@ -535,7 +508,7 @@ class AlbumCoverManager private constructor() {
         private const val TAG = "AlbumCoverManager"
         const val THUMB_SIZE: Int = 256
         private const val NO_ART_SUFFIX = ".noart"
-        // 12 MB: approx. 50 albums (cover and reflection). A larger cache made more GCs while it filled.
+        // 12 MB: approx. 96 covers. A larger cache made more GCs while it filled.
         private const val MEMORY_CACHE_MAX_KB = 12288
         // Signature of the album list at the last complete pre-generation (deleted with the disk cache).
         private const val PREGEN_SIGNATURE_FILE = "pregen-albums.sig"
@@ -611,41 +584,6 @@ class AlbumCoverManager private constructor() {
                 }
             }
             return Math.max(1, inSampleSize)
-        }
-        fun generateReflection(src: Bitmap?): Bitmap? {
-            if (src == null) return null
-            return try {
-                val w = src.width
-                val h = src.height
-                // The iPod reflection: as tall as 78/192 of the cover, from 28 % opacity at the top to 0.
-                val reqH = CoverFlowGeometry.reflectionRows(h)
-                if (reqH <= 0) return null
-
-                val matrix = Matrix().apply {
-                    preScale(1f, -1f)
-                }
-
-                val flipped = Bitmap.createBitmap(src, 0, h - reqH, w, reqH, matrix, false)
-                val reflection = Bitmap.createBitmap(w, reqH, Bitmap.Config.ARGB_8888)
-
-                val canvas = Canvas(reflection)
-                canvas.drawBitmap(flipped, 0f, 0f, null)
-                flipped.recycle()
-
-                val paint = Paint().apply {
-                    shader = LinearGradient(
-                        0f, 0f, 0f, reqH.toFloat(),
-                        (CoverFlowGeometry.REFLECTION_TOP_ALPHA shl 24) or 0xFFFFFF, 0x00FFFFFF,
-                        Shader.TileMode.CLAMP
-                    )
-                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-                }
-                canvas.drawRect(0f, 0f, w.toFloat(), reqH.toFloat(), paint)
-
-                reflection
-            } catch (t: Throwable) {
-                null
-            }
         }
     }
 }

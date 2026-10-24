@@ -217,13 +217,12 @@ class CoverFlowController(
 
         val manager = AlbumCoverManager.getInstance()
         val cachedBmp = manager.getMemoryCover(albumKey)
-        val cachedRef = manager.getMemoryReflection(albumKey)
 
         if (cachedBmp != null) {
             ivCover?.animate()?.cancel()
             ivCover?.alpha = 1.0f
             ivCover?.let { setBitmapIfChanged(it, cachedBmp) }
-            if (ivReflection != null) showReflection(ivReflection, cachedRef)
+            if (ivReflection != null) showReflection(ivReflection, cachedBmp)
             return
         }
 
@@ -241,21 +240,24 @@ class CoverFlowController(
                     if (cover != null) {
                         ivCover.setImageBitmap(cover)
                     }
-                    if (ivReflection != null) showReflection(ivReflection, reflection)
+                    if (ivReflection != null) showReflection(ivReflection, cover)
                 }
             }
         })
     }
 
     /**
-     * Shows [reflection], or hides the view with alpha 0 (not drawn) and keeps its old bitmap. All reflections
-     * have the same size, so the view never changes size: no requestLayout, which on Android 4.4 lays out the
-     * full window. setVisibility is not used for the same reason.
+     * Shows the reflection of [cover] (drawn from the cover, no reflection bitmap), or hides the view with
+     * alpha 0 (not drawn) and keeps its old drawable. All reflections have the same intrinsic size, so the view
+     * never changes size: no requestLayout, which on Android 4.4 lays out the full window. setVisibility is not
+     * used for the same reason.
      */
-    private fun showReflection(iv: ImageView, reflection: Bitmap?) {
+    private fun showReflection(iv: ImageView, cover: Bitmap?) {
         iv.animate().cancel()
-        if (reflection != null) {
-            setBitmapIfChanged(iv, reflection)
+        if (cover != null) {
+            if ((iv.drawable as? CoverReflectionDrawable)?.cover !== cover) {
+                iv.setImageDrawable(CoverReflectionDrawable(cover, AlbumCoverManager.THUMB_SIZE))
+            }
             iv.alpha = 1.0f
         } else {
             iv.alpha = 0f
@@ -307,8 +309,8 @@ class CoverFlowController(
                 topMargin = coverSize
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            // Starts with an empty bitmap of the reflection size, so the first reflection does not change its size.
-            setImageBitmap(AlbumCoverManager.getInstance().getEmptyReflection())
+            // Starts empty, with the reflection size, so the first reflection does not change its size.
+            setImageDrawable(CoverReflectionDrawable(null, AlbumCoverManager.THUMB_SIZE))
             alpha = 0f
         }
 
