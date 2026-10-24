@@ -44,8 +44,6 @@ class PlayerController(
     private val clickFeedback: () -> Unit,
     private val onAdjustVolume: (up: Boolean) -> Unit,
     private val onTogglePlayback: () -> Unit,
-    private val onNextTrack: () -> Unit,
-    private val onPreviousTrack: () -> Unit,
     private val onNavigateBack: () -> Unit,
     private val onBrowseAlbum: (albumName: String) -> Unit,
     private val onBrowseArtist: (artistName: String) -> Unit,
@@ -233,7 +231,7 @@ class PlayerController(
         tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
 
         if (dur > 0) {
-            playerProgress.progress = (pos * 100) / dur
+            playerProgress.progress = (pos.toLong() * 1000 / dur).toInt()
         } else {
             playerProgress.progress = 0
         }
@@ -253,7 +251,7 @@ class PlayerController(
         updateShuffleRepeatStatusIcons()
     }
 
-    private fun updatePlaybackProgress() {
+    fun updatePlaybackProgress() {
         val am = AudioPlayerManager.getInstance()
         val pos = am.getCurrentPosition()
         val dur = am.getDuration()
@@ -266,7 +264,7 @@ class PlayerController(
             tvPlayerTimeCurrent.text = formatTime(pos)
             tvPlayerTimeTotal.text = "-${formatTime(Math.max(0, dur - pos))}"
             if (dur > 0) {
-                playerProgress.progress = (pos * 100) / dur
+                playerProgress.progress = (pos.toLong() * 1000 / dur).toInt()
             }
         }
         lyricsOverlayController.updateProgress(pos, dur)
@@ -546,18 +544,6 @@ class PlayerController(
                     MainActivity.instance?.isMediaLongPressConsumed = false
                     event.startTracking()
                 }
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> {
-                clickFeedback()
-                onNextTrack()
-                updatePlayerUI()
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> {
-                clickFeedback()
-                onPreviousTrack()
-                updatePlayerUI()
                 return true
             }
             KeyEvent.KEYCODE_BACK, 4 -> {
