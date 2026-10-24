@@ -115,10 +115,11 @@ class CoverFlowController(
             scrollViewBrowser.clipToPadding = false
         }
 
-        val containerHeight = (380 * activity.resources.displayMetrics.density).toInt()
+        // Fill the space below the status bar (the ScrollView fills its viewport), so that
+        // the cards, which use Gravity.CENTER, are centred in it for each status bar height.
         containerBrowserItems.addView(
             cfLayout,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, containerHeight)
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
 
         val views = arrayOfNulls<View>(visibleCoversCount)
@@ -266,11 +267,13 @@ class CoverFlowController(
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        val lp = FrameLayout.LayoutParams((350 * d).toInt(), (320 * d).toInt()).apply {
+        // The card wraps the cover, the reflection and the text, so Gravity.CENTER centres all of them.
+        val lp = FrameLayout.LayoutParams((350 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER
-            topMargin = (-20 * d).toInt()
         }
         card.layoutParams = lp
+        // Scale and turn the side cards about the same point as before (centre of the old 320 dp card).
+        card.pivotY = 160 * d
         card.setLayerType(View.LAYER_TYPE_NONE, null)
 
         // Smooth edges while the cards turn (see SmoothEdges)
@@ -286,7 +289,6 @@ class CoverFlowController(
             id = REFLECTION_VIEW_ID
             layoutParams = LinearLayout.LayoutParams((200 * d).toInt(), (50 * d).toInt()).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = (2 * d).toInt()
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
@@ -304,7 +306,8 @@ class CoverFlowController(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = (-40 * d).toInt()
+                // Below the visible part of the reflection fade
+                topMargin = (-16 * d).toInt()
                 bottomMargin = 0
             }
         }
