@@ -456,12 +456,7 @@ class WifiKeyboardController(
                 }
                 return true
             } else {
-                if (event.repeatCount == 0) {
-                    InputRouter.getInstance().suppressBackUntilRelease(300L)
-                    clickFeedback()
-                    exitKeyboard()
-                }
-                return true
+                return true // exit on release (onKeyUp)
             }
         }
 
@@ -542,6 +537,10 @@ class WifiKeyboardController(
                 clickFeedback()
                 return true
             } else {
+                if (!event.isCanceled) {
+                    clickFeedback()
+                    exitKeyboard()
+                }
                 return true
             }
         }
