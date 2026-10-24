@@ -453,10 +453,6 @@ class PlayerController(
                 updatePlayerUI()
                 return true
             }
-            KeyEvent.KEYCODE_BACK, 4 -> {
-                onBackPressed()
-                return true
-            }
         }
         return false
     }

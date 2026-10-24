@@ -576,18 +576,7 @@ class MusicQuizController(
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            when (currentScreenMode) {
-                MODE_LEADERBOARD -> {
-                    showStartHub()
-                }
-                MODE_GAME -> {
-                    exitQuiz()
-                }
-                else -> {
-                    exitQuiz()
-                }
-            }
-            return true
+            return false // Back on release: the router calls onBackPressed
         }
 
         return true
