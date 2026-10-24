@@ -32,7 +32,7 @@ object IpodClassicLists {
             title.setTextSize(TypedValue.COMPLEX_UNIT_PX, IpodClassicMetrics.LIST_TEXT_SP * d)
         }
         // Rows with cover art (64 dp) or thumbnails stack two lines of text; only one-line rows are centred.
-        if (active && heightDp == ClassicMenuStyle.ROW_HEIGHT_DP) {
+        if (heightDp == ClassicMenuStyle.ROW_HEIGHT_DP) {
             centreInRow(title, heightDp * d)
         } else if (centred.remove(title)) {
             uncentre(title)
@@ -46,33 +46,41 @@ object IpodClassicLists {
         }
     }
 
-    /** Called at the end of the ListItemViewFactory row builders. [row] can be the title itself (a Button). */
+    /**
+     * Called at the end of the ListItemViewFactory row builders. [row] can be the title itself (a Button).
+     * In a Classic theme the text is cap-centred; the iPod layout also sets the iPod row metrics.
+     */
     fun styleListRow(row: View, title: TextView, value: TextView?) {
-        if (!IpodClassicLayout.isActive) return
+        if (!ThemeManager.isClassicTheme()) return
+        val active = IpodClassicLayout.isActive
         val d = row.resources.displayMetrics.density
-        val rowHeight = px(IpodClassicMetrics.ROW_HEIGHT, d)
-        row.layoutParams?.let {
-            it.height = rowHeight
-            row.layoutParams = it
-        }
+        val rowHeight = if (active) px(IpodClassicMetrics.ROW_HEIGHT, d) else row.layoutParams?.height ?: return
+        if (rowHeight <= 0) return
         val textSize = IpodClassicMetrics.LIST_TEXT_SP * d
-        val padLeft = px(IpodClassicMetrics.ROW_PADDING_LEFT, d)
-        val padRight = px(IpodClassicMetrics.ROW_PADDING_RIGHT, d)
-        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize)
-        title.typeface = ThemeManager.getCustomFontBold()
+        val padLeft = if (active) px(IpodClassicMetrics.ROW_PADDING_LEFT, d) else row.paddingLeft
+        val padRight = if (active) px(IpodClassicMetrics.ROW_PADDING_RIGHT, d) else row.paddingRight
+        if (active) {
+            row.layoutParams?.let {
+                it.height = rowHeight
+                row.layoutParams = it
+            }
+            title.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize)
+            title.typeface = ThemeManager.getCustomFontBold()
+        }
         title.includeFontPadding = false
         if (row === title) {
             title.gravity = IpodClassicLayout.horizontalGravity(title) or Gravity.TOP
             title.setPadding(padLeft, IpodClassicLayout.capCentredPaddingTop(title, rowHeight.toFloat()), padRight, 0)
             return
         }
-        row.setPadding(padLeft, 0, padRight, 0)
-        title.isSingleLine = true
-        title.ellipsize = TextUtils.TruncateAt.END
+        if (active) {
+            row.setPadding(padLeft, 0, padRight, 0)
+            title.isSingleLine = true
+            title.ellipsize = TextUtils.TruncateAt.END
+        }
         centreInRow(title, rowHeight.toFloat())
         if (value != null) {
-            value.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize)
-            value.includeFontPadding = false
+            if (active) value.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize)
             centreInRow(value, rowHeight.toFloat())
         }
     }
@@ -102,18 +110,24 @@ object IpodClassicLists {
         }
     }
 
-    /** Main menu rows: iPod padding, cap-centred text and a drawn chevron in place of the "›" text. */
+    /**
+     * Main menu rows in a Classic theme: cap-centred text. The iPod layout also sets the iPod padding
+     * and a drawn chevron in place of the "›" text.
+     */
     fun styleMainMenuButtons(buttons: List<LinearLayout>) {
-        if (!IpodClassicLayout.isActive) return
+        if (!ThemeManager.isClassicTheme()) return
+        val active = IpodClassicLayout.isActive
         for (btn in buttons) {
             val main = btn.getChildAt(0) as? TextView ?: continue
             val right = btn.getChildAt(1) as? TextView
             val d = btn.resources.displayMetrics.density
             val height = btn.layoutParams?.height ?: continue
-            if (height <= 0) continue
-            btn.setPadding(px(IpodClassicMetrics.ROW_PADDING_LEFT, d), 0, px(IpodClassicMetrics.ROW_PADDING_RIGHT, d), 0)
+            if (height <= 0 || btn.paddingTop != 0 || btn.paddingBottom != 0) continue
+            if (active) {
+                btn.setPadding(px(IpodClassicMetrics.ROW_PADDING_LEFT, d), 0, px(IpodClassicMetrics.ROW_PADDING_RIGHT, d), 0)
+                if (right != null) showChevron(right, d)
+            }
             centreInRow(main, height.toFloat())
-            if (right != null) showChevron(right, d)
         }
     }
 
