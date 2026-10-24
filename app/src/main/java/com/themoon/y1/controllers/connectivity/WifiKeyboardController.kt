@@ -422,8 +422,8 @@ class WifiKeyboardController(
             }
         } else {
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
-                if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                    InputRouter.getInstance().suppressBackUntilRelease(300L)
+                // Exit on release, like Back on the other screens
+                if (action == KeyEvent.ACTION_UP && !event.isCanceled) {
                     clickFeedback()
                     exitKeyboard()
                 }
