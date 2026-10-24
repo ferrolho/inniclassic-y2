@@ -218,7 +218,8 @@ internal fun MainActivity.initControllers() {
             browserController.buildVirtualSongs()
         },
         onToggleFavorite = { toggleFavorite() },
-        onAddToOnTheGo = { showAddToPlaylistDialog(it) },
+        onAddToOnTheGo = { playlistController.addSongToOnTheGo(it) },
+        onAddToPlaylist = { showAddToPlaylistDialog(it) },
         onToggleVisualizer = { toggleVisualizer() },
         localize = { t(it) }
     )
