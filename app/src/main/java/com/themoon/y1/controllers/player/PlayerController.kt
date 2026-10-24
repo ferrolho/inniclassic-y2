@@ -130,6 +130,14 @@ class PlayerController(
         frameAlbumReflection?.let {
             it.setCameraDistance(density * 3500f)
             it.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            // Use the cover's centre as the tilt pivot, so both share one perspective and the
+            // reflection mirrors the tilted cover (with its own centre, a wedge-shaped gap shows)
+            val coverLp = frameAlbumArt?.layoutParams
+            val reflectionLp = it.layoutParams as? ViewGroup.MarginLayoutParams
+            if (coverLp != null && reflectionLp != null && coverLp.height > 0 && reflectionLp.width > 0) {
+                it.pivotX = reflectionLp.width / 2f
+                it.pivotY = -(coverLp.height / 2f + reflectionLp.topMargin)
+            }
         }
 
         // Spectrum takes the album art slot; same width as the art, so the column keeps its width
