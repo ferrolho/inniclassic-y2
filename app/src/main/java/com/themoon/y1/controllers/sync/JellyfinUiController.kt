@@ -344,6 +344,7 @@ class JellyfinUiController(
             }
         } else {
             for (lib in cachedLibs) {
+                if (!com.themoon.y1.VideoFeature.syncsLibrary(lib.collectionType)) continue
                 val defaultMode = if ("music".equals(lib.collectionType, ignoreCase = true)) {
                     "all"
                 } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true) ||
@@ -410,7 +411,7 @@ class JellyfinUiController(
             provider.isTranscodeVideoEnabled = newVal
             (btnTranscode.getChildAt(1) as? TextView)?.text = if (newVal) localize("ON") else localize("OFF")
         }
-        containerSettingsItems.addView(btnTranscode)
+        if (com.themoon.y1.VideoFeature.enabled) containerSettingsItems.addView(btnTranscode)
 
         val btnCovers = createWrappedSettingRow(
             localize("Download Covers"),
