@@ -612,32 +612,32 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 stopUsbStorage()
             },
             onAdjustVolume = this,
-            activeController = getActiveScreenController()
-        ) || super.dispatchKeyEvent(event)
+            activeController = com.themoon.y1.eventlog.KeyTrace.controller(getActiveScreenController(), "dispatch")
+        ).let { com.themoon.y1.eventlog.KeyTrace.done(event, it || com.themoon.y1.eventlog.KeyTrace.passed() && super.dispatchKeyEvent(event)) }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         return InputRouter.getInstance().onKeyDown(
             keyCode = keyCode,
             event = event,
-            activeController = getActiveScreenController()
-        ) || super.onKeyDown(keyCode, event)
+            activeController = com.themoon.y1.eventlog.KeyTrace.controller(getActiveScreenController(), "down")
+        ) || com.themoon.y1.eventlog.KeyTrace.activity(super.onKeyDown(keyCode, event))
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         return InputRouter.getInstance().onKeyUp(
             keyCode = keyCode,
             event = event,
-            activeController = getActiveScreenController()
-        ) || super.onKeyUp(keyCode, event)
+            activeController = com.themoon.y1.eventlog.KeyTrace.controller(getActiveScreenController(), "up")
+        ) || com.themoon.y1.eventlog.KeyTrace.activity(super.onKeyUp(keyCode, event))
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
         return InputRouter.getInstance().onKeyLongPress(
             keyCode = keyCode,
             event = event,
-            activeController = getActiveScreenController()
-        ) || super.onKeyLongPress(keyCode, event)
+            activeController = com.themoon.y1.eventlog.KeyTrace.controller(getActiveScreenController(), "long")
+        ) || com.themoon.y1.eventlog.KeyTrace.activity(super.onKeyLongPress(keyCode, event))
     }
 
     @Suppress("DEPRECATION")
