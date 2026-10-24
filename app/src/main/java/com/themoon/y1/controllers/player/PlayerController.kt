@@ -68,6 +68,7 @@ class PlayerController(
     private val ivPauseOverlay: ImageView? = rootView.findViewById(R.id.iv_pause_overlay)
     private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
     private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
+    private var visualizerApplied = false
     private var visualizerShowsLyrics = false
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
@@ -196,11 +197,11 @@ class PlayerController(
             if (path != displayedPlayerPath) {
                 displayedPlayerPath = path
                 lyricsOverlayController.loadLyrics(file)
-                refreshVisualizerState()
                 updateRatingDisplay()
                 pendingSeekChanged = false
                 nowPlayingBottomState = 0
                 updateNowPlayingBottomBarState()
+                refreshVisualizerState()
             }
 
             val totalCount = playlist.size
@@ -436,13 +437,15 @@ class PlayerController(
      */
     fun refreshVisualizerState() {
         val main = MainActivity.instance ?: return
-        val showLyrics = main.isVisualizerShowing && lyricsOverlayController.hasLyrics
-        val showSpectrum = main.isVisualizerShowing && !showLyrics
+        val isOn = main.isVisualizerShowing
+        val showLyrics = isOn && lyricsOverlayController.hasLyrics
+        val showSpectrum = isOn && !showLyrics
 
-        frameAlbumArt?.visibility = if (main.isVisualizerShowing) View.GONE else View.VISIBLE
-        visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
-        // Only hide lyrics that this mode showed
+        // Only undo what this mode changed, so other users of the lyrics overlay are not affected
         if (showLyrics) lyricsOverlayController.show() else if (visualizerShowsLyrics) lyricsOverlayController.hide()
+        if (isOn) frameAlbumArt?.visibility = View.GONE else if (visualizerApplied) frameAlbumArt?.visibility = View.VISIBLE
+        visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
+        visualizerApplied = isOn
         visualizerShowsLyrics = showLyrics
         try {
             main.audioVisualizer?.setEnabled(showSpectrum)
@@ -544,10 +547,14 @@ class PlayerController(
     }
 
     override fun onBackPressed(): Boolean {
+        // In visualizer mode lyrics or the spectrum replace the album art, so Back leaves the screen
+        if (MainActivity.instance?.isVisualizerShowing == true) {
+            clickFeedback()
+            onNavigateBack()
+            return true
+        }
         clickFeedback()
-        // In visualizer mode the lyrics replace the album art, so Back leaves the screen
-        if (MainActivity.instance?.isVisualizerShowing != true &&
-            lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
+        if (lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
             lyricsOverlayController.hide()
             return true
         }
