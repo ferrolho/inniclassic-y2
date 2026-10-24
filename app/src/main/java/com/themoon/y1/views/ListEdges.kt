@@ -1,6 +1,8 @@
 package com.themoon.y1.views
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.util.AttributeSet
@@ -19,9 +21,10 @@ import java.util.WeakHashMap
  * - Fade: a short fade at each list edge that has more rows past it. The fade is 2/3 of a row,
  *   so it only covers the edge row. The focused row is always kept clear of the fades.
  *
- * Lists use [EdgeFadeScrollView] or [EdgeFadeListView]. Their fading edges are Android's own
- * vertical fading edges, which show only where there is more content. Over an opaque colour
- * background the views draw the fade with that colour (no off-screen layer).
+ * Lists use [EdgeFadeScrollView] or [EdgeFadeListView]. They turn on Android's vertical fading edges
+ * for the fade length and for the scroll margin that keeps the focused row clear of the fade.
+ * Over an opaque colour background they draw the fade themselves ([EdgeFadePainter]); else
+ * Android draws it.
  */
 object ListEdges {
     const val PREF_KEY = "list_edges_fade"
@@ -164,7 +167,8 @@ object ListEdges {
 
     /**
      * The colour of the background behind [v], when it is one opaque colour; else 0.
-     * With a colour, Android draws the fade in that colour; with 0, it fades the content in an off-screen layer.
+     * With a colour, [EdgeFadePainter] draws the fade in that colour; with 0, Android fades the content
+     * in an off-screen layer.
      */
     internal fun solidColorBehind(v: View): Int {
         val layers = ArrayList<Int?>()
@@ -194,6 +198,12 @@ object ListEdges {
     /** For a ListView: true when rows are below the bottom edge (last child at adapter position [lastPos]). */
     fun listHasMoreBelow(lastPos: Int, count: Int, lastBottom: Int, viewBottom: Int): Boolean =
         lastPos < count - 1 || lastBottom > viewBottom
+
+    /**
+     * Alpha (0..255) of the fade colour at pixel row [i] from the list edge (0 = the edge row of pixels)
+     * for a fade [length] pixels long: from almost opaque at the edge to almost clear at the end.
+     */
+    fun fadeAlpha(i: Int, length: Int): Int = ((2 * (length - i) - 1) * 255 + length) / (2 * length)
 
     /** Fade length for rows of these heights: 2/3 of the smallest row, so the fade covers only the edge row. */
     fun fadeLength(rowHeights: List<Int>, fallbackRowHeight: Int): Int {
@@ -256,13 +266,23 @@ open class EdgeFadeScrollView @JvmOverloads constructor(
         super.onDetachedFromWindow()
     }
 
-    override fun getSolidColor(): Int = ListEdges.solidColorBehind(this)
+    private val painter = EdgeFadePainter()
 
-    override fun getTopFadingEdgeStrength(): Float = ListEdges.edgeStrength(childCount > 0 && scrollY > 0)
+    private fun moreAbove(): Boolean = childCount > 0 && scrollY > 0
 
-    override fun getBottomFadingEdgeStrength(): Float = ListEdges.edgeStrength(
-        childCount > 0 && getChildAt(0).bottom - scrollY > height - paddingBottom
-    )
+    private fun moreBelow(): Boolean = childCount > 0 && getChildAt(0).bottom - scrollY > height - paddingBottom
+
+    // Android's own fade only where this view does not draw it (a background that is not one opaque colour).
+    override fun getSolidColor(): Int = 0
+
+    override fun getTopFadingEdgeStrength(): Float = painter.androidStrength(this, moreAbove())
+
+    override fun getBottomFadingEdgeStrength(): Float = painter.androidStrength(this, moreBelow())
+
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+        painter.draw(canvas, this, moreAbove(), moreBelow())
+    }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         // The rows are measured. ScrollView keeps the focused row this far from a fading edge.
@@ -311,17 +331,26 @@ open class EdgeFadeListView(context: Context) : ListView(context) {
         super.onDetachedFromWindow()
     }
 
-    override fun getSolidColor(): Int = ListEdges.solidColorBehind(this)
+    private val painter = EdgeFadePainter()
 
-    override fun getTopFadingEdgeStrength(): Float = ListEdges.edgeStrength(
+    private fun moreAbove(): Boolean =
         childCount > 0 && ListEdges.listHasMoreAbove(firstVisiblePosition, getChildAt(0).top, paddingTop)
+
+    private fun moreBelow(): Boolean = childCount > 0 && ListEdges.listHasMoreBelow(
+        firstVisiblePosition + childCount - 1, count, getChildAt(childCount - 1).bottom, height - paddingBottom
     )
 
-    override fun getBottomFadingEdgeStrength(): Float = ListEdges.edgeStrength(
-        childCount > 0 && ListEdges.listHasMoreBelow(
-            firstVisiblePosition + childCount - 1, count, getChildAt(childCount - 1).bottom, height - paddingBottom
-        )
-    )
+    // Android's own fade only where this view does not draw it (a background that is not one opaque colour).
+    override fun getSolidColor(): Int = 0
+
+    override fun getTopFadingEdgeStrength(): Float = painter.androidStrength(this, moreAbove())
+
+    override fun getBottomFadingEdgeStrength(): Float = painter.androidStrength(this, moreBelow())
+
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+        painter.draw(canvas, this, moreAbove(), moreBelow())
+    }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         super.onLayout(changed, l, t, r, b)
@@ -331,5 +360,45 @@ open class EdgeFadeListView(context: Context) : ListView(context) {
     override fun requestChildFocus(child: View?, focused: View?) {
         super.requestChildFocus(child, focused)
         if (child != null) ListEdges.revealRow(this, child)
+    }
+}
+
+/**
+ * Draws the list fade over an opaque colour background as 1 px strips of that colour, from almost
+ * opaque at the edge to almost clear. It uses no shader: with Android's own solid-colour fade
+ * (a gradient shader that View.draw moves with setLocalMatrix for each edge), the Y2 sometimes
+ * drew a solid band of the colour when it drew both the top and the bottom fade.
+ */
+internal class EdgeFadePainter {
+    private var paints: Array<Paint> = emptyArray()
+    private var color = 0
+    private var length = 0
+
+    /** The fade strength for Android's own drawing: none where this painter draws the fade. */
+    fun androidStrength(v: View, moreContent: Boolean): Float =
+        if (ListEdges.solidColorBehind(v) != 0) 0f else ListEdges.edgeStrength(moreContent)
+
+    fun draw(canvas: Canvas, v: View, moreAbove: Boolean, moreBelow: Boolean) {
+        if (!moreAbove && !moreBelow) return
+        if (!v.isVerticalFadingEdgeEnabled || !ListEdges.isFade(v.context)) return
+        val solid = ListEdges.solidColorBehind(v)
+        val len = v.verticalFadingEdgeLength
+        if (solid == 0 || len <= 0) return
+        if (solid != color || len != length || paints.size != len) {
+            color = solid
+            length = len
+            val rgb = solid and 0x00FFFFFF
+            paints = Array(len) { i -> Paint().apply { this.color = (ListEdges.fadeAlpha(i, len) shl 24) or rgb } }
+        }
+        // The canvas is in scrolled coordinates: the visible area starts at (scrollX, scrollY).
+        val left = (v.scrollX + v.paddingLeft).toFloat()
+        val right = (v.scrollX + v.width - v.paddingRight).toFloat()
+        val top = v.scrollY + v.paddingTop
+        val bottom = v.scrollY + v.height - v.paddingBottom
+        val n = minOf(len, (bottom - top) / 2)
+        for (i in 0 until n) {
+            if (moreAbove) canvas.drawRect(left, (top + i).toFloat(), right, (top + i + 1).toFloat(), paints[i])
+            if (moreBelow) canvas.drawRect(left, (bottom - i - 1).toFloat(), right, (bottom - i).toFloat(), paints[i])
+        }
     }
 }

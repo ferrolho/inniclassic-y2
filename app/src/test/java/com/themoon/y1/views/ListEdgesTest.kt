@@ -1,6 +1,7 @@
 package com.themoon.y1.views
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ListEdgesTest {
@@ -85,5 +86,13 @@ class ListEdgesTest {
         assertEquals(true, ListEdges.listHasMoreAbove(3, 0, 0))
         assertEquals(true, ListEdges.listHasMoreAbove(0, -1, 0))
         assertEquals(false, ListEdges.listHasMoreAbove(0, 0, 0))
+    }
+
+    @Test
+    fun fadeAlpha_goesFromAlmostOpaqueAtTheEdgeToAlmostClear() {
+        assertEquals(250, ListEdges.fadeAlpha(0, 25))
+        assertEquals(5, ListEdges.fadeAlpha(24, 25))
+        assertEquals(128, ListEdges.fadeAlpha(12, 25))
+        for (i in 1 until 25) assertTrue(ListEdges.fadeAlpha(i, 25) < ListEdges.fadeAlpha(i - 1, 25))
     }
 }
