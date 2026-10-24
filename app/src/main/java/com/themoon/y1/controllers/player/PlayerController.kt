@@ -18,11 +18,11 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.TimeFormat
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import java.io.File
-import java.util.Locale
 
 /**
  * Controller for Now Playing view:
@@ -417,9 +417,7 @@ class PlayerController(
     }
 
     private fun formatTime(ms: Int): String {
-        val s = (ms / 1000) % 60
-        val m = (ms / (1000 * 60)) % 60
-        return String.format(Locale.US, "%02d:%02d", m, s)
+        return TimeFormat.format(ms)
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
