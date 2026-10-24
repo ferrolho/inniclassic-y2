@@ -179,6 +179,7 @@ class WheelDialog private constructor(private val context: Context) {
         }
 
         dialog.setContentView(rootLayout)
+        ListEdges.install(rootLayout)
         dialog.show()
 
         if (focusableButtons.isNotEmpty()) {
