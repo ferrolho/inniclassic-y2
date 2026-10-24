@@ -289,7 +289,9 @@ class SettingsController(
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) &&
+            (event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0
+        ) {
             toggleMenuReorderMode()
             clickFeedback()
             return true
