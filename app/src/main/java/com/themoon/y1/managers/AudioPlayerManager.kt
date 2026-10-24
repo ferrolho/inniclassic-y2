@@ -667,7 +667,7 @@ class AudioPlayerManager private constructor() {
         main.updatePlayerUI()
     }
 
-    fun seekRelative(offsetMs: Int) {
+    fun seekRelative(offsetMs: Int, savePosition: Boolean = true) {
         val currentPos = getCurrentPosition().toLong()
         val duration = getDuration().toLong()
         var targetPos = currentPos + offsetMs
@@ -679,7 +679,7 @@ class AudioPlayerManager private constructor() {
         } else if (exoPlayer != null) {
             exoPlayer?.seekTo(targetPos)
         }
-        savePlaybackPositionOnly(sync = true)
+        if (savePosition) savePlaybackPositionOnly(sync = true)
     }
 
     fun prepareMusicTrack(index: Int, initialSeekMs: Long = 0L, initialDurationMs: Long = 0L) {
@@ -751,7 +751,7 @@ class AudioPlayerManager private constructor() {
                 val remS = (remaining / 1000) % 60
                 val remM = remaining / (1000 * 60)
                 main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
-                main.playerProgress.progress = ((effectiveSeekMs * 100) / effectiveDurMs).toInt()
+                main.playerProgress.progress = ((effectiveSeekMs * 1000) / effectiveDurMs).toInt()
             } else {
                 main.tvPlayerTimeTotal.text = "00:00"
                 main.playerProgress.progress = 0
