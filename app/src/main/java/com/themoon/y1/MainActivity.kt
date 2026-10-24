@@ -366,6 +366,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             ?: prefs.getString("current_theme_name", "Classic Light")
         val themeIdx = ThemeManager.findThemeIndexByName(savedThemeName)
         if (themeIdx != -1) ThemeManager.setThemeIndex(themeIdx)
+        com.themoon.y1.managers.AutoThemeManager.applyAtStart(prefs)
 
         loadPreferences()
         initViewBindings()
@@ -477,6 +478,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         updateMainMenuBackground()
         changeScreen(STATE_MENU)
         applyTheme()
+        com.themoon.y1.managers.AutoThemeManager.restoreScreen(this)
         Handler(Looper.getMainLooper()).postDelayed({ usbStateReceiverReady = true }, 2000)
     }
 
@@ -924,6 +926,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }
         powerBacklightManager?.resetTimer()
         updateScreenOffFeedback(true)
+        com.themoon.y1.managers.AutoThemeManager.onScreenOn(this, prefs)
     }
 
     fun updateScreenOffFeedback(screenOn: Boolean) {
@@ -1233,6 +1236,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     startMediaLibraryScan()
                 }
                 Intent.ACTION_SCREEN_ON -> {
+                    // Posts the theme change (if any) to run after this block
+                    com.themoon.y1.managers.AutoThemeManager.onScreenOn(this@MainActivity, prefs)
                     isScreenSleeping = false
                     powerBacklightManager?.resetTimer()
                     updateScreenOffFeedback(true)
