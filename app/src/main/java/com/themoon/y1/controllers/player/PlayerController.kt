@@ -552,15 +552,6 @@ class PlayerController(
                 return true
             }
         }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85 || keyCode == 86 || keyCode == 126 || keyCode == 127) {
-            val main = MainActivity.instance
-            if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
-                clickFeedback()
-                main.isMediaLongPressConsumed = true
-                showContextMenu()
-                return true
-            }
-        }
         return false
     }
 

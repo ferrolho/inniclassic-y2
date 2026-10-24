@@ -6,7 +6,7 @@ import com.themoon.y1.views.WheelDialog
 import java.io.File
 
 /**
- * Context menu displayed on long pressing center or play/pause button in Now Playing screen.
+ * Context menu displayed on long pressing the center button in Now Playing screen.
  * Replicates iPod Classic context actions:
  * - Add/Remove from Favorites
  * - Add to On-The-Go playlist
