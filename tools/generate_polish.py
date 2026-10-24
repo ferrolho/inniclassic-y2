@@ -97,6 +97,7 @@ polish_dict = {
   "Failed to delete playlist.": "Nie udało się usunąć playlisty.",
   "No .m3u files found in Y1_Playlists": "Nie znaleziono plików .m3u w Y1_Playlists",
   "ADD TO PLAYLIST": "DODAJ DO PLAYLISTY",
+  "Add to Playlist": "Dodaj do playlisty",
   "Added to playlist successfully!": "Pomyślnie dodano do playlisty!",
   "On-The-Go": "On-The-Go",
   "Add to On-The-Go": "Dodaj do On-The-Go",

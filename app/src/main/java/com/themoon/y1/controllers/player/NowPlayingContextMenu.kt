@@ -10,6 +10,7 @@ import java.io.File
  * Replicates iPod Classic context actions:
  * - Add/Remove from Favorites
  * - Add to On-The-Go playlist
+ * - Add to Playlist
  * - Browse Album / Browse Artist
  * - Toggle Audio Visualizer
  */
@@ -22,6 +23,7 @@ object NowPlayingContextMenu {
         isFavorite: Boolean,
         onToggleFavorite: () -> Unit,
         onAddToOnTheGo: (file: File) -> Unit,
+        onAddToPlaylist: (file: File) -> Unit,
         onBrowseAlbum: (albumName: String) -> Unit,
         onBrowseArtist: (artistName: String) -> Unit,
         onToggleVisualizer: () -> Unit,
@@ -42,6 +44,13 @@ object NowPlayingContextMenu {
                 icon = null
             ) {
                 onAddToOnTheGo(songFile)
+            }
+
+            addButton(
+                text = localize("Add to Playlist"),
+                icon = null
+            ) {
+                onAddToPlaylist(songFile)
             }
 
             if (songItem != null) {
