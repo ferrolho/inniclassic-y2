@@ -71,6 +71,15 @@ class InputRouter private constructor() {
         fun adjustVolume(isUp: Boolean)
     }
 
+    // One centre push does one action, on release. A release acts only if its press went to the same
+    // screen: a press can open another screen, wake the screen, or start a long press of the focused row.
+    private var centrePressScreen: ScreenController? = null
+    private var isCentrePressed = false
+    private var isCentrePressRouted = false
+
+    private fun isCentreKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
+
     fun dispatchKeyEvent(
         event: KeyEvent,
         context: Context,
@@ -172,6 +181,19 @@ class InputRouter private constructor() {
             return true
         }
 
+        if (isCentreKey(keyCode)) {
+            if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                isCentrePressed = true
+                isCentrePressRouted = false
+                centrePressScreen = activeController
+            } else if (action == KeyEvent.ACTION_UP) {
+                val isSameScreen = isCentrePressed && centrePressScreen === activeController
+                isCentrePressed = false
+                centrePressScreen = null
+                if (!isSameScreen) return true
+            }
+        }
+
         // Allow active controller to intercept raw dispatchKeyEvent if needed (when screen is on)
         if (isScreenOn && activeController?.dispatchKeyEvent(event) == true) {
             return true
@@ -195,6 +217,8 @@ class InputRouter private constructor() {
         event: KeyEvent,
         activeController: ScreenController?
     ): Boolean {
+        // A focused row did not take this press (it takes it for its own click or long press)
+        if (isCentreKey(keyCode) && event.repeatCount == 0) isCentrePressRouted = true
         if (keyCode == 21 || keyCode == 22) {
             val delta = if (keyCode == 22) 1 else -1
             if (activeController?.onWheel(delta, event) == true) {
@@ -271,6 +295,12 @@ class InputRouter private constructor() {
         event: KeyEvent,
         activeController: ScreenController?
     ): Boolean {
+        if (isCentreKey(keyCode)) {
+            val isRouted = isCentrePressRouted
+            isCentrePressRouted = false
+            // The focused row had the press: its click was not done because its long press acted
+            if (!isRouted) return true
+        }
         if (activeController?.onKeyUp(keyCode, event) == true) {
             return true
         }
