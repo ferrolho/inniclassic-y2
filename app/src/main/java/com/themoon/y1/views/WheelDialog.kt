@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.core.extensions.dpToPx
@@ -47,7 +48,19 @@ class WheelDialog private constructor(private val context: Context) {
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         val d = context.resources.displayMetrics.density
-        val rootLayout = LinearLayout(context).apply {
+        // Cap the dialog to the screen; the item list scrolls inside it.
+        val maxDialogHeight = context.resources.displayMetrics.heightPixels - (24f * d).toInt()
+        val rootLayout = object : LinearLayout(context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val specSize = MeasureSpec.getSize(heightMeasureSpec)
+                val cap = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+                    maxDialogHeight
+                } else {
+                    minOf(specSize, maxDialogHeight)
+                }
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST))
+            }
+        }.apply {
             orientation = LinearLayout.VERTICAL
             val bg = GradientDrawable().apply {
                 val baseBg = try {
@@ -97,13 +110,40 @@ class WheelDialog private constructor(private val context: Context) {
         }
 
         val focusableButtons = mutableListOf<View>()
+        val itemsLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val scrollView = ScrollView(context).apply {
+            isFocusable = false
+            isVerticalScrollBarEnabled = true
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            addView(itemsLayout)
+        }
+
+        // Scroll so the whole item, including its bottom margin, is on screen
+        fun focusItem(item: View) {
+            item.requestFocus()
+            val margin = (item.layoutParams as? ViewGroup.MarginLayoutParams)?.bottomMargin ?: 0
+            val top = item.top
+            val bottom = item.bottom + margin
+            val visibleTop = scrollView.scrollY
+            val visibleBottom = visibleTop + scrollView.height
+            if (top < visibleTop) {
+                scrollView.scrollTo(0, top)
+            } else if (bottom > visibleBottom) {
+                scrollView.scrollTo(0, bottom - scrollView.height)
+            }
+        }
 
         val wheelKeyListener = View.OnKeyListener { v, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (keyCode == 21 || keyCode == 19) { // DPAD_LEFT or DPAD_UP (CCW)
                     val idx = focusableButtons.indexOf(v)
                     if (idx > 0) {
-                        focusableButtons[idx - 1].requestFocus()
+                        focusItem(focusableButtons[idx - 1])
                         context.vibrateFeedback(25)
                         return@OnKeyListener true
                     }
@@ -112,7 +152,7 @@ class WheelDialog private constructor(private val context: Context) {
                 if (keyCode == 22 || keyCode == 20) { // DPAD_RIGHT or DPAD_DOWN (CW)
                     val idx = focusableButtons.indexOf(v)
                     if (idx in 0 until focusableButtons.size - 1) {
-                        focusableButtons[idx + 1].requestFocus()
+                        focusItem(focusableButtons[idx + 1])
                         context.vibrateFeedback(25)
                         return@OnKeyListener true
                     }
@@ -131,8 +171,11 @@ class WheelDialog private constructor(private val context: Context) {
                 dialog.dismiss()
                 btnConfig.onClick?.invoke()
             }
-            rootLayout.addView(btnView)
+            itemsLayout.addView(btnView)
             focusableButtons.add(btnView)
+        }
+        if (focusableButtons.isNotEmpty()) {
+            rootLayout.addView(scrollView)
         }
 
         dialog.setContentView(rootLayout)
@@ -140,7 +183,7 @@ class WheelDialog private constructor(private val context: Context) {
 
         if (focusableButtons.isNotEmpty()) {
             rootLayout.postDelayed({
-                focusableButtons.first().requestFocus()
+                focusItem(focusableButtons.first())
             }, 50)
         }
 
