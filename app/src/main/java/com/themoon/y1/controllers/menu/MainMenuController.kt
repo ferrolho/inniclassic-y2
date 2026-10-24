@@ -24,6 +24,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.CustomAnalogClockView
+import com.themoon.y1.views.IpodClassicLists
 import com.themoon.y1.views.WidgetBatteryBarView
 import java.util.Locale
 import java.io.File
@@ -160,7 +161,7 @@ class MainMenuController(
         ivWidgetFocusImage = null
         ivAnimatedCover = null
 
-        val elements = ThemeManager.getCurrentTheme().menuElements
+        val elements = IpodClassicLists.menuElements(ThemeManager.getCurrentTheme().menuElements, activity)
         val buttonElements = ArrayList<ThemeManager.MenuElement>()
         val widgetElements = ArrayList<ThemeManager.MenuElement>()
 
@@ -683,6 +684,7 @@ class MainMenuController(
 
         currentButtons.clear()
         currentButtons.addAll(createdButtons)
+        IpodClassicLists.styleMainMenuButtons(createdButtons)
 
         // 3. Chain Focus Navigation Loop
         val totalBtns = createdButtons.size
