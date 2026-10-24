@@ -147,9 +147,7 @@ class PlayerController(
     }
 
     fun applyAlbumTiltSetting() {
-        val isTiltEnabled = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
-            .getBoolean("album_tilt_enabled", true)
-        val tilt = if (isTiltEnabled) 18f else 0f
+        val tilt = AlbumTiltSetting.rotationY(AlbumTiltSetting.isEnabled(activity))
         frameAlbumArt?.rotationY = tilt
         frameAlbumReflection?.rotationY = tilt
     }
