@@ -17,6 +17,7 @@ import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.io.RandomAccessFile
 import java.util.ArrayList
+import java.util.Locale
 import java.util.TreeMap
 import java.util.regex.Pattern
 
@@ -26,7 +27,8 @@ import java.util.regex.Pattern
  */
 class LyricsOverlayController(
     private val context: Context,
-    private val playerInnerLayout: ViewGroup
+    private val playerInnerLayout: ViewGroup,
+    private val albumViews: List<View> = emptyList()
 ) {
 
     val lyricScrollView: ScrollView = ScrollView(context).apply {
@@ -47,14 +49,28 @@ class LyricsOverlayController(
     private var lyricTimestamps = ArrayList<Int>()
     private var plainLyrics: String? = null
     private var lastLyricIndex = -1
+    private var autoScrollPaused = false
+    private var manualLyricIndex = -1
+    private val followPlayback = Runnable {
+        manualLyricIndex = -1
+        if (lastLyricIndex != -1) renderSyncedLines(lastLyricIndex) else tvLyrics.text = ""
+    }
+    private var activeLineColor = 0xFF00FF00.toInt()
+    private var otherLineColor = 0x77FFFFFF
 
     val hasLyrics: Boolean
         get() = currentLyrics.isNotEmpty() || plainLyrics != null
 
+    /** Synced LRC lyrics and M4B chapters follow playback; plain lyrics do not. */
+    val isSynced: Boolean
+        get() = currentLyrics.isNotEmpty()
+
     init {
-        val visLp = FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
+        // Take the place and size of the album art (and its reflection) when shown
+        val visLp = ViewGroup.MarginLayoutParams(
+            albumViews.firstOrNull()?.layoutParams?.width ?: ViewGroup.LayoutParams.MATCH_PARENT,
+            if (albumViews.isEmpty()) ViewGroup.LayoutParams.MATCH_PARENT
+            else albumViews.sumOf { it.layoutParams.height + ((it.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0) }
         )
         lyricScrollView.addView(
             tvLyrics,
@@ -68,7 +84,11 @@ class LyricsOverlayController(
 
     fun show() {
         if (!hasLyrics) return
+        albumViews.forEach { it.visibility = View.GONE }
         lyricScrollView.visibility = View.VISIBLE
+        autoScrollPaused = false
+        manualLyricIndex = -1
+        lyricScrollView.removeCallbacks(followPlayback)
         if (plainLyrics != null && currentLyrics.isEmpty()) {
             lyricScrollView.post { lyricScrollView.scrollTo(0, 0) }
         }
@@ -76,6 +96,34 @@ class LyricsOverlayController(
 
     fun hide() {
         lyricScrollView.visibility = View.GONE
+        lyricScrollView.removeCallbacks(followPlayback)
+        albumViews.forEach { it.visibility = View.VISIBLE }
+    }
+
+    /** Match the player text colours so lyrics stay readable on light themes. */
+    fun applyColors(primary: Int, secondary: Int) {
+        tvLyrics.setTextColor(primary)
+        activeLineColor = primary
+        otherLineColor = secondary
+        lastLyricIndex = -1
+    }
+
+    /**
+     * Wheel scrolling. Synced lyrics move by whole lines and follow playback again after
+     * 3 s without input; plain lyrics stop the autoscroll until the overlay shows again.
+     */
+    fun scrollLines(lines: Int) {
+        if (!isShowing()) return
+        if (isSynced) {
+            val from = if (manualLyricIndex != -1) manualLyricIndex else lastLyricIndex
+            manualLyricIndex = Math.max(0, Math.min(lyricTimestamps.size - 1, from + lines))
+            renderSyncedLines(manualLyricIndex)
+            lyricScrollView.removeCallbacks(followPlayback)
+            lyricScrollView.postDelayed(followPlayback, 3000)
+            return
+        }
+        autoScrollPaused = true
+        lyricScrollView.smoothScrollBy(0, lines * tvLyrics.lineHeight)
     }
 
     fun isShowing(): Boolean = lyricScrollView.visibility == View.VISIBLE
@@ -84,6 +132,7 @@ class LyricsOverlayController(
         currentLyrics.clear()
         lyricTimestamps.clear()
         lastLyricIndex = -1
+        manualLyricIndex = -1
         plainLyrics = null
         tvLyrics.text = ""
 
@@ -264,6 +313,7 @@ class LyricsOverlayController(
 
         // 1. Plain text unsynced lyrics: autoscroll proportionally
         if (plainLyrics != null && currentLyrics.isEmpty()) {
+            if (autoScrollPaused) return
             val maxScroll = tvLyrics.height - lyricScrollView.height
             if (maxScroll > 0 && duration > 0) {
                 val progressRatio = currentPos.toFloat() / duration.toFloat()
@@ -289,26 +339,32 @@ class LyricsOverlayController(
 
                 if (activeIndex != -1 && activeIndex != lastLyricIndex) {
                     lastLyricIndex = activeIndex
-
-                    val sb = StringBuilder()
-                    val totalLines = lyricTimestamps.size
-                    val startLine = Math.max(0, activeIndex - 1)
-                    val endLine = Math.min(totalLines - 1, activeIndex + 2)
-
-                    for (i in startLine..endLine) {
-                        val lyricText = currentLyrics[lyricTimestamps[i]]
-                        if (i == activeIndex) {
-                            sb.append("<font color='#00FF00'><b>").append(lyricText).append("</b></font><br><br>")
-                        } else {
-                            sb.append("<font color='#77FFFFFF'>").append(lyricText).append("</font><br><br>")
-                        }
-                    }
-
-                    tvLyrics.text = Html.fromHtml(sb.toString())
-                    tvLyrics.setPadding(20, 10, 20, 10)
-                    lyricScrollView.scrollTo(0, 0)
+                    renderSyncedLines(if (manualLyricIndex != -1) manualLyricIndex else activeIndex)
                 }
             }
         }
     }
+
+    /** Shows the lines around [centerIndex], highlighting the line that is playing. */
+    private fun renderSyncedLines(centerIndex: Int) {
+        val sb = StringBuilder()
+        val totalLines = lyricTimestamps.size
+        val startLine = Math.max(0, centerIndex - 1)
+        val endLine = Math.min(totalLines - 1, centerIndex + 2)
+
+        for (i in startLine..endLine) {
+            val lyricText = currentLyrics[lyricTimestamps[i]]
+            if (i == lastLyricIndex) {
+                sb.append("<font color='").append(htmlColor(activeLineColor)).append("'><b>").append(lyricText).append("</b></font><br><br>")
+            } else {
+                sb.append("<font color='").append(htmlColor(otherLineColor)).append("'>").append(lyricText).append("</font><br><br>")
+            }
+        }
+
+        tvLyrics.text = Html.fromHtml(sb.toString())
+        tvLyrics.setPadding(20, 10, 20, 10)
+        lyricScrollView.scrollTo(0, 0)
+    }
+
+    private fun htmlColor(color: Int): String = String.format(Locale.US, "#%06X", color and 0xFFFFFF)
 }
