@@ -147,7 +147,7 @@ internal fun MainActivity.loadPreferences() {
     isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false)
     isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
     isSoundCheckEnabled = prefs.getBoolean("sound_check", false)
-    isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
+    isAlbumTiltEnabled = com.themoon.y1.controllers.player.AlbumTiltSetting.isEnabled(prefs)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq", false)
     currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
