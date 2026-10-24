@@ -137,9 +137,9 @@ internal fun MainActivity.applyRootSystemSettings() {
 internal fun MainActivity.loadPreferences() {
     isShuffleMode = prefs.getBoolean("shuffle", false)
     repeatMode = prefs.getInt("repeat_mode", 0)
-    isSoundEffectEnabled = prefs.getBoolean("sound_effect", true)
-    isVibrationEnabled = prefs.getBoolean("vibration", true)
-    vibrationStrengthLevel = prefs.getInt("vibration_level", 1)
+    isSoundEffectEnabled = prefs.getBoolean("sound", true)
+    isVibrationEnabled = prefs.getBoolean("vibrate", true)
+    vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
     isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
     isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
     isAutoFetchEnabled = prefs.getBoolean("auto_fetch", true)

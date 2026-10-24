@@ -946,6 +946,7 @@ class SettingsController(
         )
         btnToggle.setOnClickListener {
             isVibrationEnabled = !isVibrationEnabled
+            mainActivity?.isVibrationEnabled = isVibrationEnabled
             clickFeedback()
             val tv = btnToggle.getChildAt(1) as? TextView
             tv?.text = if (isVibrationEnabled) localize("ON") else localize("OFF")
@@ -968,6 +969,7 @@ class SettingsController(
         )
         btnStrength.setOnClickListener {
             vibrationStrengthLevel = (vibrationStrengthLevel + 1) % 3
+            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
             clickFeedback()
             val tv = btnStrength.getChildAt(1) as? TextView
             tv?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
