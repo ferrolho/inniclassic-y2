@@ -40,6 +40,9 @@ object IpodClassicLayout {
         if (key == PREF_KEY) {
             enabled = prefs.getBoolean(PREF_KEY, false)
             MainActivity.instance?.applyTheme()
+        } else if (key == "album_tilt_enabled" && isEnabled()) {
+            // The iPod tilt (pivot, scaleX) is set in applyTheme, so set it again when the tilt changes
+            MainActivity.instance?.applyTheme()
         }
     }
 
