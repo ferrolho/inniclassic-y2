@@ -60,6 +60,7 @@ class LyricsOverlayController(
     private var plainColor = 0xFFFFFFFF.toInt()
     private var activeLineColor = 0xFF2588DC.toInt()
     private var otherLineColor = 0x8CFFFFFF.toInt()
+    private var colorsOverridden = false
 
     // Playback position from the last progress tick; frames extrapolate from it while playing
     private var progressPos = 0
@@ -105,6 +106,7 @@ class LyricsOverlayController(
 
     fun show() {
         if (!hasLyrics) return
+        if (!colorsOverridden) applyThemeColors()
         albumViews.forEach { it.visibility = View.GONE }
         lyricScrollView.visibility = View.VISIBLE
         manualLyricIndex = -1
@@ -128,8 +130,23 @@ class LyricsOverlayController(
         albumViews.forEach { it.visibility = View.VISIBLE }
     }
 
-    /** Match the player text colours; the line being sung uses the theme accent colour. */
+    /** Overrides the theme colours that show() uses by default. */
     fun applyColors(primary: Int, secondary: Int, highlight: Int) {
+        colorsOverridden = true
+        setColors(primary, secondary, highlight)
+    }
+
+    /** Same text colours as Now Playing; the line being sung uses the focus colour of list rows. */
+    private fun applyThemeColors() {
+        val classic = ThemeManager.isClassicTheme()
+        setColors(
+            if (classic) 0xFF000000.toInt() else ThemeManager.getTextColorPrimary(),
+            if (classic) 0xFF3C3C43.toInt() else ThemeManager.getTextColorSecondary(),
+            if (classic) 0xFF2588DC.toInt() else ThemeManager.getListButtonFocusedBg()
+        )
+    }
+
+    private fun setColors(primary: Int, secondary: Int, highlight: Int) {
         plainColor = primary
         activeLineColor = highlight or 0xFF000000.toInt()
         otherLineColor = (secondary and 0x00FFFFFF) or 0x8C000000.toInt()
