@@ -1239,7 +1239,8 @@ class BrowserController(
     }
 
     private fun isMusicMenuItemHidden(id: String): Boolean {
-        return activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+        // Settings > Music Menu Items writes these keys to AppPrefs.
+        return activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE)
             .getBoolean("hide_music_btn_$id", false)
     }
 
