@@ -378,6 +378,7 @@ class SettingsController(
             clickFeedback()
             isSoundCheckEnabled = !isSoundCheckEnabled
             prefs.edit().putBoolean("sound_check_enabled", isSoundCheckEnabled).commit()
+            mainActivity?.isSoundCheckEnabled = isSoundCheckEnabled
             val tvStatus = btnSoundCheck.getChildAt(1) as? TextView
             tvStatus?.text = if (isSoundCheckEnabled) localize("ON") else localize("OFF")
             AudioEffectManager.getInstance().applySoundCheck()
@@ -1467,6 +1468,7 @@ class SettingsController(
                 .commit()
         } catch (_: Exception) {}
 
+        mainActivity?.isSoundCheckEnabled = false
         AudioEffectManager.getInstance().applySoundCheck()
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()

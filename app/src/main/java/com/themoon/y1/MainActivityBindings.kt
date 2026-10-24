@@ -146,10 +146,10 @@ internal fun MainActivity.loadPreferences() {
     is24HourFormat = prefs.getBoolean("is_24_hour_format", false)
     isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false)
     isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
-    isSoundCheckEnabled = prefs.getBoolean("sound_check", false)
+    isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
     isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
-    isSoftwareEqEnabled = prefs.getBoolean("software_eq", false)
+    isSoftwareEqEnabled = prefs.getBoolean("software_eq_enabled", false)
     currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
     currentSystemBrightness = prefs.getInt("brightness_level", 255)
 
