@@ -65,28 +65,31 @@ internal class TestHookReceiver(val main: MainActivity) : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         val cmd = intent.getStringExtra("cmd")?.trim()?.lowercase(Locale.US).let { if (it.isNullOrEmpty()) "state" else it }
-        val settleMs = intent.getIntExtra("wait", if (cmd == "state") 0 else DEFAULT_SETTLE_MS).toLong().coerceIn(0L, 10000L)
+        val settleMs = intent.getIntExtra("wait", if (cmd == "state" || cmd == "log") 0 else DEFAULT_SETTLE_MS).toLong().coerceIn(0L, 10000L)
         val options = TestState.Options(
             items = intent.getBooleanExtra("items", false),
             allPrefs = intent.getBooleanExtra("prefs", false)
         )
         var finished = false
+        com.themoon.y1.eventlog.EventLog.testCommand(cmd, intent)
+        val commands = TestCommands(main, handler)
         val done: (String?) -> Unit = { error ->
             if (!finished) {
                 finished = true
-                handler.postDelayed({ finish(pending, cmd, error, options) }, settleMs)
+                handler.postDelayed({ finish(pending, cmd, error, options, commands.reply) }, settleMs)
             }
         }
         try {
-            TestCommands(main, handler).run(cmd, intent, done)
+            commands.run(cmd, intent, done)
         } catch (t: Throwable) {
             done("$cmd failed: $t")
         }
     }
 
-    private fun finish(pending: PendingResult, cmd: String, error: String?, options: TestState.Options) {
+    /** [reply]: the result of a command that gives its own data (log) in place of the app state. */
+    private fun finish(pending: PendingResult, cmd: String, error: String?, options: TestState.Options, reply: org.json.JSONObject?) {
         var err = error
-        val state = try {
+        val state = if (reply != null) null else try {
             TestState(main, options).build()
         } catch (t: Throwable) {
             if (err == null) err = "state failed: $t"
@@ -94,6 +97,10 @@ internal class TestHookReceiver(val main: MainActivity) : BroadcastReceiver() {
         }
         val ok = err == null
         val result = TestHookLogic.result(ok, err, cmd, state)
+        if (reply != null) {
+            result.remove("state")
+            for (k in reply.keys()) result.put(k, reply.get(k))
+        }
         var file: File? = null
         try {
             val dir = main.getExternalFilesDir(null)
