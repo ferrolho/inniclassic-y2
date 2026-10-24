@@ -29,6 +29,7 @@ internal fun MainActivity.loadLibraryCacheInternal(onLoaded: ((Boolean) -> Unit)
             val scanStarted = isCustomScanning || mlm.isScanning || mediaLibraryScanCount != scansBeforeLoad
             val applied = if (cache != null && !scanStarted) {
                 applyLibraryCache(mlm, cache)
+                com.themoon.y1.navigation.NavigationManager.getInstance().activeController?.onLibraryLoaded()
                 true
             } else {
                 false
