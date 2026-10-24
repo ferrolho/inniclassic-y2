@@ -457,7 +457,7 @@ class FmRadioManager private constructor(context: Context) {
             return instance
         }
 
-        private fun runSuQuiet(cmd: String): Boolean {
+        internal fun runSuQuiet(cmd: String): Boolean {
             val suCandidates = arrayOf("su", "/system/xbin/su", "/system/bin/su")
             for (suBin in suCandidates) {
                 var p: Process? = null
