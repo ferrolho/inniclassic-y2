@@ -31,12 +31,25 @@ object AssetInstaller {
         } catch (_: Exception) {}
     }
 
+    /**
+     * Puts [newId] directly after [afterId] in a saved main menu order ("id1,id2,..."), so a new
+     * built-in item shows in its default place and not at the end. Other orders stay the same.
+     */
+    internal fun insertMenuItemAfter(order: String, newId: String, afterId: String): String {
+        val ids = order.split(",").toMutableList()
+        if (newId in ids) return order
+        val afterIndex = ids.indexOf(afterId)
+        if (afterIndex == -1) return order
+        ids.add(afterIndex + 1, newId)
+        return ids.joinToString(",")
+    }
+
     fun installBundledThemes(context: Context, prefs: SharedPreferences) {
         val themesDir = File(context.filesDir, "themes")
         if (!themesDir.exists()) themesDir.mkdirs()
 
         val lastThemeVersion = prefs.getInt("last_installed_theme_version", 0)
-        val currentThemeVersion = 1011
+        val currentThemeVersion = 1012
         if (lastThemeVersion >= currentThemeVersion) return
 
         try {
@@ -95,6 +108,12 @@ object AssetInstaller {
                 ?: prefs.getString("custom_menu_order_iPod Classic (Dark)", null)
             if (orderDark != null && !prefs.contains("custom_menu_order_Classic Dark")) {
                 prefs.edit().putString("custom_menu_order_Classic Dark", orderDark).apply()
+            }
+
+            for ((key, value) in prefs.all) {
+                if (!key.startsWith("custom_menu_order_") || value !is String) continue
+                val newOrder = insertMenuItemAfter(value, "btn_shuffle", "btn_music")
+                if (newOrder != value) prefs.edit().putString(key, newOrder).apply()
             }
 
             val themeAssets = context.assets.list("themes") ?: return
