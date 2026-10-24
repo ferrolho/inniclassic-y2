@@ -58,6 +58,9 @@ class AlbumCoverManager private constructor() {
     @Volatile
     private var pregeneratedSignature: Long? = null
 
+    // Transparent bitmap with the size of a reflection (Cover Flow starts its reflection views with it).
+    private var emptyReflection: Bitmap? = null
+
     // Placeholder for albums without art, decoded one time for each theme.
     private var placeholder: Bitmap? = null
     private var placeholderTheme: Any? = null
@@ -162,6 +165,35 @@ class AlbumCoverManager private constructor() {
         placeholder = out
         placeholderTheme = theme
         return out
+    }
+
+    /** Transparent bitmap with the size of a thumbnail reflection. Call on the main thread. */
+    fun getEmptyReflection(): Bitmap {
+        emptyReflection?.let { return it }
+        return Bitmap.createBitmap(THUMB_SIZE, CoverFlowGeometry.reflectionRows(THUMB_SIZE), Bitmap.Config.ALPHA_8)
+            .also { emptyReflection = it }
+    }
+
+    private fun signatureFile(): File = File(StoragePaths.getThumbsCacheDir(), PREGEN_SIGNATURE_FILE)
+
+    /** The signature of the last complete pre-generation, also after an app restart. */
+    private fun lastPregenSignature(): Long? {
+        pregeneratedSignature?.let { return it }
+        return try {
+            val f = signatureFile()
+            if (f.exists()) CoverCacheRules.parseSignature(f.readText()) else null
+        } catch (ignored: Throwable) {
+            null
+        }
+    }
+
+    private fun savePregenSignature(signature: Long) {
+        pregeneratedSignature = signature
+        try {
+            val f = signatureFile()
+            f.parentFile?.let { if (!it.exists()) it.mkdirs() }
+            f.writeText(CoverCacheRules.formatSignature(signature))
+        } catch (ignored: Throwable) {}
     }
 
     fun getMemoryCover(albumKey: String?): Bitmap? {
@@ -381,6 +413,7 @@ class AlbumCoverManager private constructor() {
         // The files can have changed, so search the albums without art again.
         noArtKeys.clear()
         pregeneratedSignature = null
+        try { signatureFile().delete() } catch (ignored: Throwable) {}
         if (!memoryOnly) {
             clearDiskCache()
         } else {
@@ -422,7 +455,7 @@ class AlbumCoverManager private constructor() {
                 val keys = ArrayList<String>(copy.size)
                 for (item in copy) keys.add(if (item.file != null) getAlbumKey(item.file, item.album) else "")
                 val signature = CoverCacheRules.albumListSignature(keys)
-                if (onlyIfChanged && signature == pregeneratedSignature) {
+                if (onlyIfChanged && signature == lastPregenSignature()) {
                     Log.d(TAG, "pregenerateThumbnails: album list not changed, skipping.")
                     return@Thread
                 }
@@ -470,7 +503,7 @@ class AlbumCoverManager private constructor() {
                     }
                 }
 
-                pregeneratedSignature = signature
+                savePregenSignature(signature)
                 val elapsed = System.currentTimeMillis() - startTime
                 val finalGenerated = generated
                 val finalSkipped = skipped
@@ -502,8 +535,10 @@ class AlbumCoverManager private constructor() {
         private const val TAG = "AlbumCoverManager"
         const val THUMB_SIZE: Int = 256
         private const val NO_ART_SUFFIX = ".noart"
-        // 16 MB: approx. 70 albums (cover and reflection)
-        private const val MEMORY_CACHE_MAX_KB = 16384
+        // 12 MB: approx. 50 albums (cover and reflection). A larger cache made more GCs while it filled.
+        private const val MEMORY_CACHE_MAX_KB = 12288
+        // Signature of the album list at the last complete pre-generation (deleted with the disk cache).
+        private const val PREGEN_SIGNATURE_FILE = "pregen-albums.sig"
 
         @Volatile
         private var sInstance: AlbumCoverManager? = null
@@ -583,7 +618,7 @@ class AlbumCoverManager private constructor() {
                 val w = src.width
                 val h = src.height
                 // The iPod reflection: as tall as 78/192 of the cover, from 28 % opacity at the top to 0.
-                val reqH = h * CoverFlowGeometry.REFLECTION_HEIGHT / CoverFlowGeometry.COVER_SIZE
+                val reqH = CoverFlowGeometry.reflectionRows(h)
                 if (reqH <= 0) return null
 
                 val matrix = Matrix().apply {

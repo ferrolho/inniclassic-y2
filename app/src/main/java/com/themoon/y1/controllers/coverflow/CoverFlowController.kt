@@ -110,6 +110,8 @@ class CoverFlowController(
             clipToPadding = false
             // The cover top is at the iPod position for the space below the status bar.
             childTopForHeight = { height -> (CoverFlowGeometry.coverTop((height / d).toInt()) * d).toInt() }
+            // Changes in a card do not lay out the full window.
+            isLayoutBoundary = true
         }
         coverFlowContainer = cfLayout
         (cfLayout.parent as? ViewGroup)?.removeView(cfLayout)
@@ -221,12 +223,7 @@ class CoverFlowController(
             ivCover?.animate()?.cancel()
             ivCover?.alpha = 1.0f
             ivCover?.let { setBitmapIfChanged(it, cachedBmp) }
-            if (ivReflection != null) {
-                ivReflection.animate().cancel()
-                ivReflection.alpha = 1.0f
-                setBitmapIfChanged(ivReflection, cachedRef)
-                ivReflection.visibility = if (cachedRef != null) View.VISIBLE else View.INVISIBLE
-            }
+            if (ivReflection != null) showReflection(ivReflection, cachedRef)
             return
         }
 
@@ -234,12 +231,7 @@ class CoverFlowController(
         ivCover?.animate()?.cancel()
         ivCover?.alpha = 1.0f
         ivCover?.let { setBitmapIfChanged(it, manager.getPlaceholder(activity)) }
-        if (ivReflection != null) {
-            ivReflection.animate().cancel()
-            ivReflection.alpha = 1.0f
-            setBitmapIfChanged(ivReflection, null)
-            ivReflection.visibility = View.INVISIBLE
-        }
+        if (ivReflection != null) showReflection(ivReflection, null)
         // Known to have no art: nothing to load.
         if (manager.hasNoArt(albumKey)) return
 
@@ -249,17 +241,25 @@ class CoverFlowController(
                     if (cover != null) {
                         ivCover.setImageBitmap(cover)
                     }
-                    if (ivReflection != null) {
-                        if (reflection != null) {
-                            ivReflection.setImageBitmap(reflection)
-                            ivReflection.visibility = View.VISIBLE
-                        } else {
-                            ivReflection.visibility = View.INVISIBLE
-                        }
-                    }
+                    if (ivReflection != null) showReflection(ivReflection, reflection)
                 }
             }
         })
+    }
+
+    /**
+     * Shows [reflection], or hides the view with alpha 0 (not drawn) and keeps its old bitmap. All reflections
+     * have the same size, so the view never changes size: no requestLayout, which on Android 4.4 lays out the
+     * full window. setVisibility is not used for the same reason.
+     */
+    private fun showReflection(iv: ImageView, reflection: Bitmap?) {
+        iv.animate().cancel()
+        if (reflection != null) {
+            setBitmapIfChanged(iv, reflection)
+            iv.alpha = 1.0f
+        } else {
+            iv.alpha = 0f
+        }
     }
 
     /** Sets [bmp] only when the view does not already show it (a new drawable makes the card draw its art again). */
@@ -307,6 +307,9 @@ class CoverFlowController(
                 topMargin = coverSize
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
+            // Starts with an empty bitmap of the reflection size, so the first reflection does not change its size.
+            setImageBitmap(AlbumCoverManager.getInstance().getEmptyReflection())
+            alpha = 0f
         }
 
         // Album (bold, primary colour: black on the Classic themes), then artist (regular, secondary colour),
@@ -393,22 +396,17 @@ class CoverFlowController(
         v.rotationY = rotY
         v.scaleX = scale
         v.scaleY = scale
+        // A card at alpha 0 is not drawn. Not setVisibility: on Android 4.4 it lays out the full window.
         v.alpha = alpha
-        // A card at alpha 0 is not drawn at all.
-        v.visibility = if (alpha > 0f) View.VISIBLE else View.INVISIBLE
     }
 
     private fun animateTransform(v: View?, transX: Float, rotY: Float, scale: Float, alpha: Float, duration: Int) {
         if (v == null) return
         when (CoverFlowSteps.cardAnimation(v.alpha, alpha, duration)) {
             CoverFlowSteps.Change.NONE, CoverFlowSteps.Change.SET -> applyTransform(v, transX, rotY, scale, alpha)
-            CoverFlowSteps.Change.ANIMATE -> {
-                v.visibility = View.VISIBLE
-                val anim = v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha)
-                    .setDuration(duration.toLong())
-                if (alpha <= 0f) anim.withEndAction { if (v.alpha <= 0f) v.visibility = View.INVISIBLE }
-                anim.start()
-            }
+            CoverFlowSteps.Change.ANIMATE ->
+                v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha)
+                    .setDuration(duration.toLong()).start()
         }
     }
 

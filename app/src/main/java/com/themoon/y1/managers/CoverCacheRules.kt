@@ -38,6 +38,18 @@ object CoverCacheRules {
         return sum xor (count * 0x5851F42D4C957F2DL)
     }
 
+    private const val SIGNATURE_PREFIX = "albums-v1:"
+
+    /** Text of the signature file. The prefix changes when the signature method changes. */
+    fun formatSignature(signature: Long): String = SIGNATURE_PREFIX + signature
+
+    /** Signature from the file text, or null when the text is not from [formatSignature]. */
+    fun parseSignature(text: String): Long? {
+        val t = text.trim()
+        if (!t.startsWith(SIGNATURE_PREFIX)) return null
+        return t.substring(SIGNATURE_PREFIX.length).toLongOrNull()
+    }
+
     enum class PregenAction { SKIP, EXTRACT }
 
     /**

@@ -64,4 +64,20 @@ class CoverCacheRulesTest {
         assertEquals(PregenAction.EXTRACT, CoverCacheRules.pregenAction(true, false) { checked = true; true })
         assertFalse(checked)
     }
+
+    @Test
+    fun signatureText_roundTrips() {
+        for (sig in listOf(0L, 1L, -1L, Long.MAX_VALUE, Long.MIN_VALUE, -6066549580653094763L)) {
+            assertEquals(sig, CoverCacheRules.parseSignature(CoverCacheRules.formatSignature(sig)))
+        }
+        assertEquals(42L, CoverCacheRules.parseSignature(CoverCacheRules.formatSignature(42L) + "\n"))
+    }
+
+    @Test
+    fun signatureText_rejectsOtherText() {
+        assertEquals(null, CoverCacheRules.parseSignature(""))
+        assertEquals(null, CoverCacheRules.parseSignature("42"))
+        assertEquals(null, CoverCacheRules.parseSignature("albums-v0:42"))
+        assertEquals(null, CoverCacheRules.parseSignature(CoverCacheRules.formatSignature(1L) + "x"))
+    }
 }
