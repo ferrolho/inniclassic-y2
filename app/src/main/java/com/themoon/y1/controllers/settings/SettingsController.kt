@@ -27,6 +27,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.AutoThemeManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
@@ -596,7 +597,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBacklightTimer)
 
-        val btnTheme = createSettingRow(localize("Theme"), ThemeManager.getCurrentTheme().name)
+        val btnTheme = createSettingRow(localize("Theme"), AutoThemeManager.settingsRowValue(prefs, localize))
         btnTheme.setOnClickListener {
             clickFeedback()
             buildThemeSelectorUI()
@@ -953,10 +954,13 @@ class SettingsController(
         val themeFolder = File(activity.filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeFolder)
         containerSettingsItems.removeAllViews()
+        containerSettingsItems.addView(
+            AutoThemeManager.createSelectorRow(activity, prefs, createTablerListButton, clickFeedback, localize)
+        )
 
         for (i in 0 until ThemeManager.availableThemes.size) {
             val theme = ThemeManager.availableThemes[i]
-            val isSelected = ThemeManager.getCurrentThemeIndex() == i
+            val isSelected = ThemeManager.getCurrentThemeIndex() == i && !AutoThemeManager.isEnabled(prefs)
             val icon = if (isSelected) TablerIcons.CHECK else null
             val btn = createTablerListButton(
                 icon,
@@ -966,6 +970,7 @@ class SettingsController(
             )
             btn.setOnClickListener {
                 clickFeedback()
+                AutoThemeManager.turnOff(activity, prefs)
                 // Live: the theme list is made again in the new theme, with the focus on this row
                 mainActivity?.changeTheme(theme.name)
             }
@@ -1550,6 +1555,7 @@ class SettingsController(
     }
 
     private fun resetAllAppSettings() {
+        AutoThemeManager.reset(activity, prefs)
         try {
             prefs.edit()
                 .remove(ClockSettings.KEY_24_HOUR_FORMAT)
