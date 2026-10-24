@@ -8,6 +8,8 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import com.themoon.y1.MainActivity
+import com.themoon.y1.eventlog.EventLog
+import com.themoon.y1.eventlog.EventLogLogic
 import com.themoon.y1.handleMainMenuAction
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
@@ -15,6 +17,8 @@ import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.testhooks.TestHookLogic.BrowseType
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -31,8 +35,14 @@ import java.io.File
  * - `key --ei code <keycode> [--ez long true] [--ei hold <ms>] [--ei count <n>] [--ei gap <ms>]`
  * - `theme --es name <theme>`: the live theme change of Settings → Theme, without the Theme list
  *   (builds with the live theme change only).
+ * - `log [--ei lines <n>] [--es since <uptimeMs>] [--ez clear true]`: lines of the event log
+ *   (see [com.themoon.y1.eventlog.EventLog]) in place of the state.
  */
 internal class TestCommands(private val main: MainActivity, private val handler: Handler) {
+
+    /** Set by commands that reply with their own data in place of the app state. */
+    var reply: JSONObject? = null
+        private set
 
     fun run(cmd: String, intent: Intent, done: (String?) -> Unit) {
         when (cmd) {
@@ -58,7 +68,8 @@ internal class TestCommands(private val main: MainActivity, private val handler:
                 )
             }
             "theme" -> done(theme(intent.getStringExtra("name")))
-            else -> done("unknown cmd '$cmd'; use state|open|browse|play|seek|bottom|key|theme")
+            "log" -> done(log(intent))
+            else -> done("unknown cmd '$cmd'; use state|open|browse|play|seek|bottom|key|theme|log")
         }
     }
 
@@ -292,6 +303,60 @@ internal class TestCommands(private val main: MainActivity, private val handler:
         return if (ok) null else "theme '$name' is not installed"
     }
 
+    // --- log ---
+
+    /**
+     * The last `lines` lines (default 100) of the event log, or the lines after uptime `since`. All selected
+     * lines go to `<external files>/event-log-tail.jsonl`; the reply has them in `events` only when it stays
+     * short enough for the broadcast result.
+     */
+    private fun log(intent: Intent): String? {
+        if (!EventLog.enabled) return "the event log is off in this build"
+        if (intent.getBooleanExtra("clear", false)) {
+            EventLog.clear()
+            reply = JSONObject().put("cleared", true).put("uptimeMs", SystemClock.uptimeMillis())
+            return null
+        }
+        // --es, --ei or --el
+        @Suppress("DEPRECATION")
+        val since = when (val v = intent.extras?.get("since")) {
+            null -> null
+            is Number -> v.toLong()
+            else -> v.toString().trim().toLongOrNull() ?: return "since needs a number: --es since <uptimeMs>"
+        }
+        val all = EventLog.readAll()
+        var lines = if (since != null) EventLogLogic.since(all, since) else all
+        if (intent.hasExtra("lines") || since == null) {
+            lines = EventLogLogic.tail(lines, intent.getIntExtra("lines", 100).coerceIn(1, 20000))
+        }
+        val out = JSONObject()
+            .put("count", lines.size)
+            .put("total", all.size)
+            .put("uptimeMs", SystemClock.uptimeMillis())
+            .put("logDir", EventLog.dir?.absolutePath ?: JSONObject.NULL)
+            .put("logBytes", EventLog.bytes())
+        try {
+            val dir = main.getExternalFilesDir(null)
+            if (dir != null) {
+                val tail = File(dir, LOG_TAIL_FILE)
+                tail.writeText(if (lines.isEmpty()) "" else lines.joinToString("\n", postfix = "\n"))
+                out.put("tailFile", tail.absolutePath)
+            }
+        } catch (t: Throwable) {
+            out.put("tailFileError", t.toString())
+        }
+        val chars = lines.sumOf { it.length + 1 }
+        if (chars <= TestHookLogic.MAX_BROADCAST_CHARS - 1000) {
+            val events = JSONArray()
+            for (line in lines) events.put(try { JSONObject(line) } catch (_: Exception) { line })
+            out.put("events", events)
+        } else {
+            out.put("inline", false) // too long for the broadcast result: read tailFile
+        }
+        reply = out
+        return null
+    }
+
     // --- key ---
 
     /**
@@ -345,5 +410,9 @@ internal class TestCommands(private val main: MainActivity, private val handler:
             val next = focused.focusSearch(direction)
             if (next != null && next !== focused) next.requestFocus(direction)
         }
+    }
+
+    companion object {
+        const val LOG_TAIL_FILE = "event-log-tail.jsonl"
     }
 }
