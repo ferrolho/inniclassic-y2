@@ -624,6 +624,39 @@ class AudioPlayerManager private constructor() {
         MainActivity.instance?.updatePlayerUI()
     }
 
+    /** Stop: pause and go back to the start of the current track. The queue is kept. */
+    fun stopMusic() {
+        val main = MainActivity.instance
+        try {
+            if (isUsingLegacyPlayer && legacyPlayer != null) {
+                val player = legacyPlayer ?: return
+                if (player.isPlaying) {
+                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
+                    saveAudiobookBookmarkIfNeeded()
+                    player.pause()
+                }
+                player.seekTo(0)
+            } else if (exoPlayer != null) {
+                val player = exoPlayer ?: return
+                if (player.playWhenReady) {
+                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
+                    saveAudiobookBookmarkIfNeeded()
+                    player.playWhenReady = false
+                }
+                player.seekTo(0)
+            } else {
+                return
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AudioPlayerManager", "Failed to stop: ${e.message}")
+        }
+        isPlayingActive = false
+        stopPeriodicPositionSaver()
+        main?.isPausedByHand = true
+        savePlaybackState(sync = true)
+        main?.updatePlayerUI()
+    }
+
     fun nextTrack() {
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return

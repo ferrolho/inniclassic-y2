@@ -437,6 +437,7 @@ class PlayerController(
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {
                 if (event.repeatCount == 0) {
+                    MainActivity.instance?.isMediaLongPressConsumed = false
                     event.startTracking()
                 }
                 return true
@@ -497,8 +498,8 @@ class PlayerController(
             if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
                 clickFeedback()
                 main.isMediaLongPressConsumed = true
-                val currentSong = main.currentPlaylist[main.currentIndex]
-                main.showAddToPlaylistDialog(currentSong)
+                // Hold Play/Pause = Stop (the button is printed play/pause/stop)
+                AudioPlayerManager.getInstance().stopMusic()
                 return true
             }
         }
