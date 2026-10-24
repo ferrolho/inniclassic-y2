@@ -46,6 +46,9 @@ object CoverFlowGeometry {
      */
     const val PIVOT_Y_FRACTION = 0.727f
 
+    /** Rows of a cover bitmap [coverRows] tall that its reflection shows (78/192 of the cover). */
+    fun reflectionRows(coverRows: Int): Int = coverRows * REFLECTION_HEIGHT / COVER_SIZE
+
     /** Top of the cover below the top of an area [areaHeight] tall (the screen below the status bar). */
     fun coverTop(areaHeight: Int): Int {
         val free = areaHeight - ARTIST_BASELINE
