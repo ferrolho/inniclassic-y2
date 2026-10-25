@@ -140,6 +140,7 @@ class SettingsController(
             arrayOf("track_artists", "Artists"),
             arrayOf("artists", "Album Artists"),
             arrayOf("albums", "Albums"),
+            arrayOf("compilations", "Compilations"),
             arrayOf("songs", "Songs"),
             arrayOf("shuffle_songs", "Shuffle Songs"),
             arrayOf("genres", "Genres"),
@@ -1498,7 +1499,7 @@ class SettingsController(
 
         for (item in MUSIC_MENU_ITEMS) {
             val id = item[0]
-            val isHidden = prefs.getBoolean("hide_music_btn_$id", false)
+            val isHidden = com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
             val stateIcon = if (isHidden) "\uE5CD" else "\uE8F4"
 
             val row = createSettingRow(localize(item[1]), stateIcon)
@@ -1516,7 +1517,7 @@ class SettingsController(
             val rowHighlight = row.onFocusChangeListener
             row.setOnFocusChangeListener { v, hasFocus ->
                 rowHighlight?.onFocusChange(v, hasFocus)
-                val currHidden = prefs.getBoolean("hide_music_btn_$id", false)
+                val currHidden = com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
                 if (hasFocus) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 } else {
@@ -1528,7 +1529,7 @@ class SettingsController(
 
             row.setOnClickListener {
                 clickFeedback()
-                val newState = !prefs.getBoolean("hide_music_btn_$id", false)
+                val newState = !com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
                 prefs.edit().putBoolean("hide_music_btn_$id", newState).commit()
                 tvRight?.text = if (newState) "\uE5CD" else "\uE8F4"
                 if (row.hasFocus()) {
