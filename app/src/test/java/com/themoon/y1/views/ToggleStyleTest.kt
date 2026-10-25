@@ -87,6 +87,15 @@ class ToggleStyleTest {
     }
 
     @Test
+    fun switchHasTheIosProportions() {
+        val ratio = SettingValueView.SWITCH_HEIGHT_DP / SettingValueView.SWITCH_WIDTH_DP
+        assertTrue("height/width = $ratio", ratio in 0.55f..0.61f)
+        // Fits in the Classic rows (33 dp; 38 dp with iPod Classic Layout) and the other rows (48 dp).
+        assertTrue(SettingValueView.SWITCH_HEIGHT_DP <= 24f)
+        assertTrue(SettingValueView.KNOB_INSET_DP * 2 < SettingValueView.SWITCH_HEIGHT_DP / 2)
+    }
+
+    @Test
     fun greyKeepsTheLuminance() {
         assertEquals(0xFF666666.toInt(), ToggleStyle.grey(0xFF666666.toInt()))
         assertEquals(0xFF000000.toInt(), ToggleStyle.grey(0xFF000000.toInt()))

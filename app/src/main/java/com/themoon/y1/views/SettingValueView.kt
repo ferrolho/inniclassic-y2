@@ -101,8 +101,10 @@ class SettingValueView(context: Context) : TextView(context) {
     }
 
     companion object {
-        const val SWITCH_WIDTH_DP = 30f
-        const val SWITCH_HEIGHT_DP = 18f
+        // iOS proportions (track height = 0.58 × width). 38 × 22 dp: on the Y2 (density 1), 38 × 22 px; the row
+        // text has a cap height of ~15 px. The row centres the view, so the switch stays on the text line.
+        const val SWITCH_WIDTH_DP = 38f
+        const val SWITCH_HEIGHT_DP = 22f
         const val KNOB_INSET_DP = 2f
 
         /** The middle colour of the Classic themes' selected-row gradient (ListItemViewFactory). */
