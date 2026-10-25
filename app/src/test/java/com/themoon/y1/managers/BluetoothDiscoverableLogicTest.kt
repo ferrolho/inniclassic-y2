@@ -8,8 +8,6 @@ import org.junit.Test
 
 class BluetoothDiscoverableLogicTest {
 
-    private val identity: (String) -> String = { it }
-
     @Test
     fun noTimerGivesNoRemainingTime() {
         assertNull(BluetoothDiscoverableLogic.remainingMs(0L, 5_000L))
@@ -46,32 +44,21 @@ class BluetoothDiscoverableLogicTest {
     }
 
     @Test
-    fun rowValueShowsStateAndTimeLeft() {
-        assertEquals("Off", BluetoothDiscoverableLogic.value(false, null, identity))
-        assertEquals("Off", BluetoothDiscoverableLogic.value(false, 30_000L, identity))
-        assertEquals("On", BluetoothDiscoverableLogic.value(true, null, identity))
-        assertEquals("On · 1:45", BluetoothDiscoverableLogic.value(true, 105_000L, identity))
+    fun timeLeftShowsOnlyWhileDiscoverableWithOurTimer() {
+        assertNull(BluetoothDiscoverableLogic.timeLeftText(false, null))
+        assertNull(BluetoothDiscoverableLogic.timeLeftText(false, 30_000L))
+        assertNull(BluetoothDiscoverableLogic.timeLeftText(true, null))
+        assertEquals("1:45", BluetoothDiscoverableLogic.timeLeftText(true, 105_000L))
+        assertEquals("2:00", BluetoothDiscoverableLogic.timeLeftText(true, 120_000L))
     }
 
     @Test
-    fun rowValueIsTranslated() {
-        val german: (String) -> String = { mapOf("On" to "Ein", "Off" to "Aus")[it] ?: it }
-        assertEquals("Ein · 0:30", BluetoothDiscoverableLogic.value(true, 30_000L, german))
-        assertEquals("Aus", BluetoothDiscoverableLogic.value(false, null, german))
-    }
-
-    @Test
-    fun namePressGivesInnioasisY2ThenTheSavedName() {
-        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameAfterPress("MT6582", null))
-        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameAfterPress("Y2", "MT6582"))
-        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameAfterPress(null, null))
-        assertEquals("MT6582", BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", "MT6582"))
-    }
-
-    @Test
-    fun namePressOnInnioasisY2WithoutSavedNameChangesNothing() {
-        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", null))
-        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", ""))
-        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", "Innioasis Y2"))
+    fun theNameIsAlwaysInnioasisY2() {
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.DEVICE_NAME)
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameToSet("MT6582"))
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameToSet("Y2"))
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameToSet(""))
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameToSet(null))
+        assertNull(BluetoothDiscoverableLogic.nameToSet("Innioasis Y2"))
     }
 }

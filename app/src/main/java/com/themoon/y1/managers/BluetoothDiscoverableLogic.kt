@@ -2,13 +2,13 @@ package com.themoon.y1.managers
 
 import java.util.Locale
 
-/** Pure rules for the Discoverable and Name rows of the Bluetooth screen. */
+/** Pure rules for the Discoverable row of the Bluetooth screen and for the Bluetooth name. */
 object BluetoothDiscoverableLogic {
 
     /** How long the Y2 stays discoverable after the user turns it on. */
     const val DURATION_S = 120
 
-    /** Name that a press on the Name row gives, so the user can find the Y2 in a car list. */
+    /** The Bluetooth name of the Y2 (the name in a car list). The app sets it; there is no setting. */
     const val DEVICE_NAME = "Innioasis Y2"
 
     /** True if discoverable mode must stop: the Y2 is discoverable, but not from a press on the row (no timer). */
@@ -24,19 +24,10 @@ object BluetoothDiscoverableLogic {
         return String.format(Locale.US, "%d:%02d", totalS / 60, totalS % 60)
     }
 
-    /** Value of the Discoverable row: "Off", "On" (no timer of ours; only for a moment) or "On · 1:45". */
-    fun value(discoverable: Boolean, remainingMs: Long?, localize: (String) -> String): String = when {
-        !discoverable -> localize("Off")
-        remainingMs == null -> localize("On")
-        else -> localize("On") + " · " + formatRemaining(remainingMs)
-    }
+    /** Time left on the left of the On/Off value ("1:45"), or null: not discoverable, or no timer of ours. */
+    fun timeLeftText(discoverable: Boolean, remainingMs: Long?): String? =
+        if (!discoverable || remainingMs == null) null else formatRemaining(remainingMs)
 
-    /**
-     * New adapter name after a press on the Name row, or null for no change.
-     * A name other than [DEVICE_NAME] becomes [DEVICE_NAME]; [DEVICE_NAME] goes back to [savedName].
-     */
-    fun nameAfterPress(current: String?, savedName: String?): String? {
-        if (current != DEVICE_NAME) return DEVICE_NAME
-        return savedName?.takeIf { it.isNotBlank() && it != DEVICE_NAME }
-    }
+    /** The name to give the adapter, or null if it already has [DEVICE_NAME]. */
+    fun nameToSet(current: String?): String? = if (current == DEVICE_NAME) null else DEVICE_NAME
 }

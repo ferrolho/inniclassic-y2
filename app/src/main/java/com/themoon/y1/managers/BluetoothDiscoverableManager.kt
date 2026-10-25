@@ -18,6 +18,9 @@ import android.util.Log
  * BLUETOOTH permission (ACTION_REQUEST_DISCOVERABLE opens a system dialog that needs a touch screen).
  * The timer is ours: the stack does not always end discoverable mode by itself (Settings uses an alarm too).
  *
+ * It also gives the adapter the name [BluetoothDiscoverableLogic.DEVICE_NAME] at app start and when Bluetooth
+ * turns on.
+ *
  * The Y2 is discoverable ONLY after a press on the Discoverable row. If it becomes discoverable in another way
  * (for example: the Y2 Bluetooth.apk starts in discoverable mode with no time limit when the stored discoverable
  * timeout is 0, see AdapterProperties.onBluetoothReady), this class sets it back to connectable at once.
@@ -29,7 +32,7 @@ object BluetoothDiscoverableManager {
     private var endAtMs = 0L
     private var registered = false
 
-    /** Called on the main thread when the scan mode, the name or the timer changes. */
+    /** Called on the main thread when the scan mode, the Bluetooth state or the timer changes. */
     var listener: (() -> Unit)? = null
 
     private val turnOff = Runnable {
@@ -40,7 +43,10 @@ object BluetoothDiscoverableManager {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             // Read the current mode, not the extra: an old broadcast must not stop a new timer.
-            if (intent.action != BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED) enforce()
+            enforce()
+            if (intent.action == BluetoothAdapter.ACTION_STATE_CHANGED &&
+                intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR) == BluetoothAdapter.STATE_ON
+            ) setDeviceName()
             listener?.invoke()
         }
     }
@@ -51,11 +57,25 @@ object BluetoothDiscoverableManager {
         val filter = IntentFilter().apply {
             addAction(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
-            addAction(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED)
         }
         context.applicationContext.registerReceiver(receiver, filter)
         registered = true
         enforce()
+        setDeviceName()
+    }
+
+    /** Gives the adapter the name [BluetoothDiscoverableLogic.DEVICE_NAME] if it has another name and is on. */
+    @SuppressLint("MissingPermission")
+    private fun setDeviceName() {
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+            if (adapter.state != BluetoothAdapter.STATE_ON) return
+            val current = adapter.name
+            val name = BluetoothDiscoverableLogic.nameToSet(current) ?: return
+            Log.w(TAG, "Bluetooth name \"$current\" -> \"$name\": ${adapter.setName(name)}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Cannot set the Bluetooth name", e)
+        }
     }
 
     /** Stops our timer when the Y2 is not discoverable, and stops discoverable mode that our timer did not start. */
