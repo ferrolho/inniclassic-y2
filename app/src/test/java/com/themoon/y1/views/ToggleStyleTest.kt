@@ -6,6 +6,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -29,6 +30,18 @@ class ToggleStyleTest {
     }
 
     @Test
+    fun stateFollowsTheMarkAndSurvivesTextViewResets() {
+        assertEquals(false, ToggleStyle.nextState(null, onOff(false) { it }, ""))
+        assertEquals(true, ToggleStyle.nextState(false, onOff(true) { it }, "Off"))
+        // TextView sets its own (plain) text again: keep the state.
+        assertEquals(true, ToggleStyle.nextState(true, "On", "On"))
+        // A new text without a mark: no state.
+        assertNull(ToggleStyle.nextState(true, "Wait...", "On"))
+        assertNull(ToggleStyle.nextState(false, "Weak", "Off"))
+        assertNull(ToggleStyle.nextState(null, "Off", "Off"))
+    }
+
+    @Test
     fun prefValueRoundTripsAndDefaultsToText() {
         assertTrue(ToggleStyle.isSwitchPref(ToggleStyle.prefValue(true)))
         assertFalse(ToggleStyle.isSwitchPref(ToggleStyle.prefValue(false)))
@@ -36,6 +49,16 @@ class ToggleStyleTest {
         assertFalse(ToggleStyle.isSwitchPref("something else"))
         assertEquals("switch", ToggleStyle.prefValue(true))
         assertEquals("text", ToggleStyle.prefValue(false))
+    }
+
+    @Test
+    fun labelIsEnglishWhenNoLanguageFileIsLoaded() {
+        // English (Default): LanguageManager.t() gives the key back.
+        assertEquals("Text", ToggleStyle.label(false) { it })
+        assertEquals("Switch", ToggleStyle.label(true) { it })
+        val polish = mapOf("Text (Toggle Style)" to "Tekst", "Switch (Toggle Style)" to "Przełącznik")
+        assertEquals("Tekst", ToggleStyle.label(false) { polish[it] ?: it })
+        assertEquals("Przełącznik", ToggleStyle.label(true) { polish[it] ?: it })
     }
 
     @Test

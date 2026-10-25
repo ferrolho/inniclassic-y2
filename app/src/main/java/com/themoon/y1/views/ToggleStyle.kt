@@ -2,6 +2,7 @@ package com.themoon.y1.views
 
 import android.content.Context
 import android.view.View
+import com.themoon.y1.core.extensions.onOffState
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -28,6 +29,15 @@ object ToggleStyle {
         else -> Look.SWITCH_OFF
     }
 
+    /**
+     * The on/off state of a setting value after a new text: the state of the text's mark. A text without a mark
+     * that is the same as the shown text keeps the state: TextView sets its own text again in some calls.
+     * Other texts without a mark ("Wait...", "Weak") have no state.
+     */
+    fun nextState(previous: Boolean?, newText: CharSequence?, shownText: CharSequence?): Boolean? =
+        onOffState(newText)
+            ?: if (previous != null && newText?.toString() == shownText?.toString()) previous else null
+
     /** The stored value is [SWITCH] or [TEXT]; any other value (or none) is Text. */
     fun isSwitchPref(value: String?): Boolean = value == SWITCH
 
@@ -35,6 +45,16 @@ object ToggleStyle {
 
     /** Language key of the row value. "Switch" alone is a verb in the language files, so the keys are separate. */
     fun labelKey(isSwitch: Boolean): String = if (isSwitch) "Switch (Toggle Style)" else "Text (Toggle Style)"
+
+    /**
+     * Row value: "Text" or "Switch", translated. English (the default) loads no language file, so the
+     * translation of the key is the key itself: then use the English word.
+     */
+    fun label(isSwitch: Boolean, localize: (String) -> String): String {
+        val key = labelKey(isSwitch)
+        val text = localize(key)
+        return if (text == key) (if (isSwitch) "Switch" else "Text") else text
+    }
 
     class SwitchColors(val track: Int, val knob: Int)
 

@@ -533,13 +533,13 @@ class SettingsController(
         containerSettingsItems.addView(btnTheme)
 
         var isSwitchToggleStyle = ToggleStyle.isSwitch(activity)
-        val btnToggleStyle = createSettingRow(localize("Toggle Style"), localize(ToggleStyle.labelKey(isSwitchToggleStyle)))
+        val btnToggleStyle = createSettingRow(localize("Toggle Style"), ToggleStyle.label(isSwitchToggleStyle, localize))
         btnToggleStyle.setOnClickListener {
             clickFeedback()
             isSwitchToggleStyle = !isSwitchToggleStyle
             ToggleStyle.setSwitch(activity, isSwitchToggleStyle)
             val tvStatus = btnToggleStyle.getChildAt(1) as? TextView
-            tvStatus?.text = localize(ToggleStyle.labelKey(isSwitchToggleStyle))
+            tvStatus?.text = ToggleStyle.label(isSwitchToggleStyle, localize)
         }
         containerSettingsItems.addView(btnToggleStyle)
 

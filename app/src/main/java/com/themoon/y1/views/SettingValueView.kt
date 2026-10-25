@@ -18,7 +18,11 @@ import com.themoon.y1.core.extensions.withoutOnOffMark
  * The switch uses only API 19 drawing calls (drawRoundRect, drawCircle), at whole pixels.
  */
 class SettingValueView(context: Context) : TextView(context) {
+    // setText() is also called from the TextView constructor, before these initialisers: they then set the defaults.
+    private var ready = false
     private var state: Boolean? = null
+    /** The look of the last onMeasure(): a switch is narrower than the text, so a new look needs a new layout. */
+    private var measuredLook: ToggleStyle.Look? = null
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val track = RectF()
 
@@ -26,12 +30,20 @@ class SettingValueView(context: Context) : TextView(context) {
         // The row has the focus: take its state, so the switch draws again when the row is selected.
         isDuplicateParentStateEnabled = true
         ToggleStyle.register(this)
+        ready = true
     }
 
     override fun setText(text: CharSequence?, type: TextView.BufferType?) {
-        // Also called from the TextView constructor; the field initialiser then sets the state to null.
-        state = onOffState(text)
+        if (!ready) {
+            super.setText(withoutOnOffMark(text), type)
+            return
+        }
+        val before = look()
+        state = ToggleStyle.nextState(state, text, this.text)
         super.setText(withoutOnOffMark(text), type)
+        // TextView itself does not lay out again when it has no text layout yet (switch shown until now).
+        if (look() != before || look() != measuredLook) requestLayout()
+        invalidate()
     }
 
     private fun look(): ToggleStyle.Look = ToggleStyle.look(ToggleStyle.isSwitch(context), state)
@@ -39,7 +51,8 @@ class SettingValueView(context: Context) : TextView(context) {
     private fun px(dp: Float): Int = Math.max(1, Math.round(dp * resources.displayMetrics.density))
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        if (look() == ToggleStyle.Look.TEXT) {
+        measuredLook = look()
+        if (measuredLook == ToggleStyle.Look.TEXT) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             return
         }
@@ -55,6 +68,8 @@ class SettingValueView(context: Context) : TextView(context) {
 
     override fun onDraw(canvas: Canvas) {
         val look = look()
+        // The size is for the other look (text in a switch-wide view breaks into lines): measure again.
+        if (look != measuredLook) requestLayout()
         if (look == ToggleStyle.Look.TEXT) {
             super.onDraw(canvas)
             return
