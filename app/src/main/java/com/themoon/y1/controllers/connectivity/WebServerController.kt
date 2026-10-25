@@ -143,12 +143,6 @@ class WebServerController(
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            clickFeedback()
-            onNavigateBack()
-            return true
-        }
-
         return false
     }
 
@@ -162,6 +156,7 @@ class WebServerController(
     }
 
     override fun onBackPressed(): Boolean {
+        clickFeedback()
         onNavigateBack()
         return true
     }
