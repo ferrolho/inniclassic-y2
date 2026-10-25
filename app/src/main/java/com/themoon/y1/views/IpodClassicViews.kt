@@ -21,7 +21,7 @@ class IpodPlayStateView(context: Context) : View(context) {
     private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1f
-        color = 0xFF1A5DB0.toInt()
+        color = StatusIcons.EDGE
     }
     private val path = Path()
 
@@ -65,7 +65,7 @@ class IpodPlayStateView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        fill.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), 0xFFA6D6FF.toInt(), 0xFF1F70D6.toInt(), Shader.TileMode.CLAMP)
+        fill.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), StatusIcons.FILL_TOP, StatusIcons.FILL_BOTTOM, Shader.TileMode.CLAMP)
     }
 
     override fun onDraw(canvas: Canvas) {
