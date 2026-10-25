@@ -81,6 +81,7 @@ class MediaLibraryManager private constructor() {
     ) {
         if (isScanning) return
         isScanning = true
+        @Suppress("NAME_SHADOWING") val listener = com.themoon.y1.eventlog.EventLog.scan(listener)
 
         Thread({
             try {
