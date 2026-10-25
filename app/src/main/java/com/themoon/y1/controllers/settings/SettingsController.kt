@@ -627,14 +627,14 @@ class SettingsController(
 
         val btnCellRadio = createSettingRow(
             localize("Cell Radio"),
-            localize(if (CellRadioManager.isCellRadioOn(activity)) "On" else "Off")
+            com.themoon.y1.core.extensions.onOff(CellRadioManager.isCellRadioOn(activity), localize)
         )
         btnCellRadio.setOnClickListener {
             clickFeedback()
             val turnOn = !CellRadioManager.isCellRadioOn(activity)
             CellRadioManager.setCellRadioOn(activity, turnOn) { isOn ->
                 val tvStatus = btnCellRadio.getChildAt(1) as? TextView
-                tvStatus?.text = localize(if (isOn) "On" else "Off")
+                tvStatus?.text = com.themoon.y1.core.extensions.onOff(isOn, localize)
                 if (isOn != turnOn) {
                     Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
                 }
