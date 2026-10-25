@@ -26,6 +26,7 @@ import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
+import com.themoon.y1.managers.WirelessAdbManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
 import com.themoon.y1.navigation.ScreenState
@@ -616,6 +617,21 @@ class SettingsController(
             onNavigateToScreen(8) // STATE_WEBSERVER
         }
         containerSettingsItems.addView(btnServerMenu)
+
+        // adb over Wi-Fi until the next restart (never persistent: root adb has no key check on this ROM).
+        val btnWirelessAdb = createSettingRow(localize("Wireless ADB"), WirelessAdbManager.currentLabel(activity, localize))
+        btnWirelessAdb.setOnClickListener {
+            clickFeedback()
+            val turnOn = WirelessAdbManager.currentPort() == null
+            WirelessAdbManager.setOn(activity, turnOn) { port ->
+                val tvStatus = btnWirelessAdb.getChildAt(1) as? TextView
+                tvStatus?.text = WirelessAdbManager.label(port, WirelessAdbManager.wifiIp(activity), localize)
+                if ((port != null) != turnOn) {
+                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        containerSettingsItems.addView(btnWirelessAdb)
 
         val btnWifiMenu = createSettingRow(localize("Wi-Fi"), "〉 ")
         btnWifiMenu.setOnClickListener {
