@@ -210,7 +210,13 @@ private fun MainActivity.setStatusBarIcon(
     } else {
         com.themoon.y1.views.IpodClassicLayout.px(16, d)
     }
-    val bmp = com.themoon.y1.views.StatusIcons.render(icon, heightPx, active, isLightStatusBar(), connected)
+    // The gradient spans the status item box (the cap height), as in the play/pause icon.
+    val boxPx = if (ipod) {
+        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
+    } else {
+        heightPx
+    }
+    val bmp = com.themoon.y1.views.StatusIcons.render(icon, heightPx, active, isLightStatusBar(), connected, boxPx)
     iv.colorFilter = null
     iv.scaleType = android.widget.ImageView.ScaleType.CENTER
     iv.setImageBitmap(bmp)

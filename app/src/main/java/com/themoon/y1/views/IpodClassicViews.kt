@@ -2,10 +2,8 @@ package com.themoon.y1.views
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Shader
 import android.view.View
 import android.view.ViewTreeObserver
 import com.themoon.y1.MainActivity
@@ -64,7 +62,8 @@ class IpodPlayStateView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        fill.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), StatusIcons.FILL_TOP, StatusIcons.FILL_BOTTOM, Shader.TileMode.CLAMP)
+        // The view is the status item box: the gradient of all status icons.
+        fill.shader = StatusIcons.gradient(0f, h.toFloat())
     }
 
     override fun onDraw(canvas: Canvas) {
