@@ -109,6 +109,7 @@ internal fun MainActivity.rebuildUniqueAlbumListInternal() {
             uniqueAlbumList.add(song)
         }
     }
+    com.themoon.y1.controllers.coverflow.CoverFlowOrder.sort(uniqueAlbumList)
 }
 
 internal fun MainActivity.scanVideosInternal() {
