@@ -1,5 +1,6 @@
 package com.themoon.y1.navigation
 
+import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +14,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.controllers.player.PlayerController
 import com.themoon.y1.managers.AudioPlayerManager
+import java.lang.ref.WeakReference
 
 /**
  * Handles global key intercepts (wake logic, volume overlay, UMS blocking)
@@ -71,6 +73,25 @@ class InputRouter private constructor() {
         fun adjustVolume(isUp: Boolean)
     }
 
+    // One centre push does one action, on release (see CentrePressTracker)
+    private val centrePress = CentrePressTracker()
+    // The focused view when the centre press came: it can have taken the press
+    private var centrePressView: WeakReference<View>? = null
+
+    private fun isCentreKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
+
+    /**
+     * A dropped release: the view that had the press does not get it (or did not use it). Stop its pending
+     * long press and its pressed state; Android 4.4 cancels them only in the view's own key-up of a click.
+     */
+    private fun releaseCentrePressView() {
+        val view = centrePressView?.get() ?: return
+        centrePressView = null
+        view.cancelLongPress()
+        if (view.isPressed) view.isPressed = false
+    }
+
     fun dispatchKeyEvent(
         event: KeyEvent,
         context: Context,
@@ -85,6 +106,8 @@ class InputRouter private constructor() {
     ): Boolean {
         val keyCode = event.keyCode
         val action = event.action
+        // A press kept below (wake, USB storage screen) must not pair with its release
+        if (isCentreKey(keyCode) && action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) centrePress.reset()
 
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val isScreenOn = if (android.os.Build.VERSION.SDK_INT >= 20) {
@@ -172,6 +195,18 @@ class InputRouter private constructor() {
             return true
         }
 
+        if (isCentreKey(keyCode)) {
+            // The real screen controller: MainActivity can give a wrapper (event log) that is new for each event
+            val screen = NavigationManager.getInstance().activeController
+            if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                centrePress.onPress(screen)
+                centrePressView = (context as? Activity)?.currentFocus?.let { WeakReference(it) }
+            } else if (action == KeyEvent.ACTION_UP && !centrePress.onRelease(screen)) {
+                releaseCentrePressView()
+                return true
+            }
+        }
+
         // Allow active controller to intercept raw dispatchKeyEvent if needed (when screen is on)
         if (isScreenOn && activeController?.dispatchKeyEvent(event) == true) {
             return true
@@ -195,6 +230,8 @@ class InputRouter private constructor() {
         event: KeyEvent,
         activeController: ScreenController?
     ): Boolean {
+        // A focused row did not take this press (it takes it for its own click or long press)
+        if (isCentreKey(keyCode) && event.repeatCount == 0) centrePress.onPressRouted()
         if (keyCode == 21 || keyCode == 22) {
             val delta = if (keyCode == 22) 1 else -1
             if (activeController?.onWheel(delta, event) == true) {
@@ -271,6 +308,11 @@ class InputRouter private constructor() {
         event: KeyEvent,
         activeController: ScreenController?
     ): Boolean {
+        // A focused row had the press and did not use the release (its long press acted): no click
+        if (isCentreKey(keyCode) && !centrePress.onReleaseRouted()) {
+            releaseCentrePressView()
+            return true
+        }
         if (activeController?.onKeyUp(keyCode, event) == true) {
             return true
         }
