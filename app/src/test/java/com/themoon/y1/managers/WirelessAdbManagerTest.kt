@@ -1,5 +1,7 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.core.extensions.onOffState
+import com.themoon.y1.core.extensions.withoutOnOffMark
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -45,9 +47,20 @@ class WirelessAdbManagerTest {
     @Test
     fun labelShowsAddressWhenOn() {
         val id: (String) -> String = { it }
-        assertEquals("On · 192.168.1.23:5555", WirelessAdbManager.label(5555, "192.168.1.23", id))
-        assertEquals("On · port 5555", WirelessAdbManager.label(5555, null, id))
-        assertEquals("Off", WirelessAdbManager.label(null, "192.168.1.23", id))
-        assertEquals("Wył.", WirelessAdbManager.label(null, null) { if (it == "Off") "Wył." else it })
+        fun shown(text: String) = withoutOnOffMark(text).toString()
+        assertEquals("On · 192.168.1.23:5555", shown(WirelessAdbManager.label(5555, "192.168.1.23", id)))
+        assertEquals("On · port 5555", shown(WirelessAdbManager.label(5555, null, id)))
+        assertEquals("Off", shown(WirelessAdbManager.label(null, "192.168.1.23", id)))
+        assertEquals("Wył.", shown(WirelessAdbManager.label(null, null) { if (it == "Off") "Wył." else it }))
+    }
+
+    @Test
+    fun labelHasTheOnOffMark() {
+        val id: (String) -> String = { it }
+        assertEquals(true, onOffState(WirelessAdbManager.label(5555, "192.168.1.23", id)))
+        assertEquals(true, onOffState(WirelessAdbManager.label(5555, null, id)))
+        assertEquals(false, onOffState(WirelessAdbManager.label(null, null, id)))
+        assertEquals("192.168.1.23:5555", WirelessAdbManager.address(5555, "192.168.1.23"))
+        assertEquals("port 5555", WirelessAdbManager.address(5555, null))
     }
 }

@@ -628,6 +628,10 @@ class SettingsController(
                 tvStatus?.text = WirelessAdbManager.label(port, WirelessAdbManager.wifiIp(activity), localize)
                 if ((port != null) != turnOn) {
                     Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                } else if (port != null) {
+                    // The switch does not show the address.
+                    val address = WirelessAdbManager.address(port, WirelessAdbManager.wifiIp(activity))
+                    Toast.makeText(activity, "adb connect $address", Toast.LENGTH_LONG).show()
                 }
             }
         }

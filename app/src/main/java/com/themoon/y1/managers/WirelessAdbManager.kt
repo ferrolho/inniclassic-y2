@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.util.Log
+import com.themoon.y1.core.extensions.onOff
+import com.themoon.y1.core.extensions.onOffKey
+import com.themoon.y1.core.extensions.onOffMark
 
 /**
  * Turns adb over Wi-Fi (TCP port 5555) on and off, as `adb tcpip 5555` and `adb usb` do, without a USB cable.
@@ -39,12 +42,16 @@ object WirelessAdbManager {
         if (ip == 0) null
         else "${ip and 0xFF}.${(ip shr 8) and 0xFF}.${(ip shr 16) and 0xFF}.${(ip ushr 24) and 0xFF}"
 
-    /** Row value: "On · 192.168.1.5:5555", "On · port 5555" (no Wi-Fi address) or "Off". */
-    fun label(port: Int?, ip: String?, localize: (String) -> String): String = when {
-        port == null -> localize("Off")
-        ip == null -> "${localize("On")} · port $port"
-        else -> "${localize("On")} · $ip:$port"
-    }
+    /** Address to give to `adb connect`: "192.168.1.5:5555", or "port 5555" when Wi-Fi has no address. */
+    fun address(port: Int, ip: String?): String = if (ip == null) "port $port" else "$ip:$port"
+
+    /**
+     * Row value: "On · 192.168.1.5:5555", "On · port 5555" (no Wi-Fi address) or "Off". It has the on/off mark,
+     * so that Toggle Style = Switch shows a switch (the address then shows in a message when it turns on).
+     */
+    fun label(port: Int?, ip: String?, localize: (String) -> String): String =
+        if (port == null) onOff(false, localize)
+        else "${localize(onOffKey(true))} · ${address(port, ip)}${onOffMark(true)}"
 
     private fun readProp(key: String): String? =
         try {
