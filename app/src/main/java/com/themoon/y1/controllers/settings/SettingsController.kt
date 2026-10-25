@@ -38,6 +38,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.ListEdges
 import com.themoon.y1.views.TablerIcons
+import com.themoon.y1.views.ToggleStyle
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
@@ -609,6 +610,17 @@ class SettingsController(
             buildThemeSelectorUI()
         }
         containerSettingsItems.addView(btnTheme)
+
+        var isSwitchToggleStyle = ToggleStyle.isSwitch(activity)
+        val btnToggleStyle = createSettingRow(localize("Toggle Style"), localize(ToggleStyle.labelKey(isSwitchToggleStyle)))
+        btnToggleStyle.setOnClickListener {
+            clickFeedback()
+            isSwitchToggleStyle = !isSwitchToggleStyle
+            ToggleStyle.setSwitch(activity, isSwitchToggleStyle)
+            val tvStatus = btnToggleStyle.getChildAt(1) as? TextView
+            tvStatus?.text = localize(ToggleStyle.labelKey(isSwitchToggleStyle))
+        }
+        containerSettingsItems.addView(btnToggleStyle)
 
         val btnMenuVisibility = createSettingRow(localize("Main Menu Items"), localize("Edit") + " 〉")
         btnMenuVisibility.setOnClickListener {
@@ -1619,6 +1631,7 @@ class SettingsController(
                 .remove(ClockSettings.KEY_TIME_IN_TITLE)
                 .remove("show_battery_percentage")
                 .remove("volume_limit_max")
+                .remove(ToggleStyle.PREF_KEY)
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
                 .remove(com.themoon.y1.views.IpodClassicLayout.PREF_KEY)
@@ -1640,6 +1653,7 @@ class SettingsController(
 
         mainActivity?.isSoundCheckEnabled = false
         AudioEffectManager.getInstance().applySoundCheck()
+        ToggleStyle.reload(activity)
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
         ListEdges.reload(activity)

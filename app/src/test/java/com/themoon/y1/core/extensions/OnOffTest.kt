@@ -2,6 +2,7 @@ package com.themoon.y1.core.extensions
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -20,10 +21,24 @@ class OnOffTest {
     @Test
     fun valueGoesThroughLocalize() {
         val polish = mapOf("On" to "Wł.", "Off" to "Wył.")
-        assertEquals("Wł.", onOff(true) { polish[it] ?: it })
-        assertEquals("Wył.", onOff(false) { polish[it] ?: it })
-        assertEquals("On", onOff(true) { it })
-        assertEquals("Off", onOff(false) { it })
+        assertEquals("Wł.", withoutOnOffMark(onOff(true) { polish[it] ?: it }))
+        assertEquals("Wył.", withoutOnOffMark(onOff(false) { polish[it] ?: it }))
+        assertEquals("On", withoutOnOffMark(onOff(true) { it }))
+        assertEquals("Off", withoutOnOffMark(onOff(false) { it }))
+    }
+
+    @Test
+    fun markGivesTheStateAndIsRemoved() {
+        assertEquals(true, onOffState(onOff(true) { it }))
+        assertEquals(false, onOffState(onOff(false) { it }))
+        // Values that are not from onOff(), also "Off" of a multi-value row such as Bass Boost: no state.
+        assertNull(onOffState("Off"))
+        assertNull(onOffState("Weak"))
+        assertNull(onOffState(""))
+        assertNull(onOffState(null))
+        assertEquals("Off", withoutOnOffMark("Off"))
+        assertNull(withoutOnOffMark(null))
+        assertEquals("", withoutOnOffMark(ON_MARK.toString()))
     }
 
     @Test
