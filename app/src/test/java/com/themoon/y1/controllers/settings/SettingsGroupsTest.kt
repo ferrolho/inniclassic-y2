@@ -116,4 +116,37 @@ class SettingsGroupsTest {
         assertEquals(labels.toSet(), reachable.toSet())
         assertEquals(labels.size, reachable.size)
     }
+    @Test
+    fun subScreenTitleIsTheRowThatOpenedIt() {
+        val t = SettingsGroups::subScreenTitles
+        // Controls → Vibration, then Back
+        val vib = t(emptyList(), 0, 1, "Vibration", "Settings")
+        assertEquals(listOf("Vibration"), vib)
+        assertEquals(emptyList<String>(), t(vib, 1, 0, null, "Settings"))
+        // General → Date & Time → Year, Back to Date & Time, Time Format rebuilds Date & Time at the same depth
+        val dt = t(emptyList(), 0, 1, "Date & Time", "Settings")
+        val year = t(dt, 1, 2, "Year", "Settings")
+        assertEquals(listOf("Date & Time", "Year"), year)
+        val back = t(year, 2, 1, null, "Settings")
+        assertEquals(listOf("Date & Time"), back)
+        assertEquals(listOf("Date & Time"), t(back, 1, 1, null, "Settings"))
+        // Theme list from the main menu: no row opened it
+        assertEquals(listOf("Settings"), t(emptyList(), 0, 1, null, "Settings"))
+        // A new sub-screen replaces an old title at its depth
+        assertEquals(listOf("Language"), t(listOf("Theme"), 0, 1, "Language", "Settings"))
+    }
+
+    @Test
+    fun everySubScreenSetsTheDepthBeforeItRemovesTheRows() {
+        // onDepthChanged reads the focused row (the opener), so it must run before removeAllViews()
+        val controller = source("SettingsController.kt") ?: error("SettingsController.kt not found")
+        val builders = Regex("""fun (build\w+UI)\([^)]*\) \{""").findAll(controller).map { it.groupValues[1] to it.range.last }.toList()
+        assertTrue(builders.size >= 10)
+        for ((name, start) in builders) {
+            val depth = controller.indexOf("currentSettingsDepth = ", start)
+            val remove = controller.indexOf("containerSettingsItems.removeAllViews()", start)
+            assertTrue("$name: no depth or no removeAllViews", depth > 0 && remove > 0)
+            assertTrue("$name sets the depth after removeAllViews()", depth < remove)
+        }
+    }
 }

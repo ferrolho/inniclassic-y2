@@ -87,6 +87,18 @@ object SettingsGroups {
         val loose = present.filter { groupOf(it) == TOP }.map { Entry.Row(it) }
         return TOP to groups + loose
     }
+
+    /**
+     * Titles of the open sub-screens (index 0 = depth 1), after the depth changes from [old] to [new].
+     * A deeper screen gets the label of the row that opened it ([opener]), or [fallback] if no row opened it.
+     */
+    fun subScreenTitles(stack: List<String>, old: Int, new: Int, opener: String?, fallback: String): List<String> {
+        if (new <= 0) return emptyList()
+        val deeper = new > old
+        val out = stack.take(if (deeper) old.coerceAtLeast(0) else new).toMutableList()
+        while (out.size < new) out.add(if (deeper) opener ?: fallback else fallback)
+        return out
+    }
 }
 
 /** The open group of the Settings screen, and the step that moves the finished rows into the groups. */
@@ -95,6 +107,9 @@ class SettingsGroupPages {
     var openGroup: Int = SettingsGroups.TOP
         private set
     private var groupRowIndex = 0
+    private val groupRows = HashSet<View>()
+    private var subTitles: List<String> = emptyList()
+    private var titleGeneration = 0
 
     val isOpen: Boolean get() = openGroup != SettingsGroups.TOP
 
@@ -130,6 +145,7 @@ class SettingsGroupPages {
         val (shown, entries) = SettingsGroups.page(views.keys.toList(), openGroup)
         openGroup = shown
         container.removeAllViews()
+        groupRows.clear()
         entries.forEachIndexed { index, entry ->
             when (entry) {
                 is SettingsGroups.Entry.GroupRow -> {
@@ -140,6 +156,7 @@ class SettingsGroupPages {
                         groupRowIndex = index
                         onOpenGroup()
                     }
+                    groupRows.add(row)
                     container.addView(row)
                 }
                 is SettingsGroups.Entry.Row -> {
@@ -151,8 +168,33 @@ class SettingsGroupPages {
         }
         // A second row with the same label (none today) has the key "label#i": it is in no group, so it stays on the top level.
 
-        // After changeScreen() and the screen-change listener, which write "Settings"
-        val titleText = localize(if (shown == SettingsGroups.TOP) "Settings" else SettingsGroups.GROUPS[shown].title)
-        title?.post { if (container.isShown) title.text = titleText }
+        showTitle(title, container, localize(if (shown == SettingsGroups.TOP) "Settings" else SettingsGroups.GROUPS[shown].title))
+    }
+
+    /**
+     * Call when SettingsController.currentSettingsDepth changes. A row's sub-screen (Vibration, Date & Time → Year...)
+     * shows the label of the row that opened it; the group list shows the group name ([arrange]).
+     * Each sub-screen sets the depth before it removes the rows, so the row that opened it still has the focus here.
+     */
+    fun onDepthChanged(old: Int, new: Int, container: LinearLayout, focusIndex: Int, title: TextView?, localize: (String) -> String) {
+        val opener = if (new > old) openerLabel(container, if (old == 0) focusIndex else -1) else null
+        subTitles = SettingsGroups.subScreenTitles(subTitles, old, new, opener, localize("Settings"))
+        if (new > 0) showTitle(title, container, subTitles.last())
+    }
+
+    private fun openerLabel(container: LinearLayout, focusIndex: Int): String? {
+        var v: View? = container.findFocus()
+        while (v != null && v.parent !== container) v = v.parent as? View
+        if (v == null && focusIndex in 0 until container.childCount) v = container.getChildAt(focusIndex)
+        if (v == null || v in groupRows) return null // e.g. the Theme list opened from the main menu
+        val text = ((v as? ViewGroup)?.getChildAt(0) as? TextView ?: v as? TextView)?.text?.toString()
+        return text?.takeIf { it.isNotBlank() }
+    }
+
+    /** Now, and again after changeScreen() and the screen-change listener, which write "Settings". */
+    private fun showTitle(title: TextView?, container: LinearLayout, text: String) {
+        val generation = ++titleGeneration
+        title?.text = text
+        title?.post { if (generation == titleGeneration && container.isShown) title.text = text }
     }
 }

@@ -73,6 +73,12 @@ class SettingsController(
     private val mainActivity: MainActivity? get() = activity as? MainActivity
 
     var currentSettingsDepth: Int = 0
+        set(value) {
+            val old = field
+            field = value
+            // Title: the group name on a group list, the row name on a row's sub-screen (SettingsGroups.kt)
+            groupPages.onDepthChanged(old, value, containerSettingsItems, lastSettingsFocusIndex, mainActivity?.tvStatusBarTitle, localize)
+        }
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
