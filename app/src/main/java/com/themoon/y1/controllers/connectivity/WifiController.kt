@@ -19,6 +19,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 
 /**
@@ -178,7 +179,7 @@ class WifiController(
                 if (!ssid.isNullOrEmpty() && !foundWifiNetworks.contains(ssid)) {
                     if (ssid == connectedSSID) {
                         foundWifiNetworks.add(ssid)
-                        addWifiItemToUI(ssid, result.capabilities, true)
+                        addWifiItemToUI(ssid, result.capabilities, true, strongestRssi(results, ssid))
                     }
                 }
             }
@@ -188,23 +189,24 @@ class WifiController(
                 val ssid = result.SSID
                 if (!ssid.isNullOrEmpty() && !foundWifiNetworks.contains(ssid)) {
                     foundWifiNetworks.add(ssid)
-                    addWifiItemToUI(ssid, result.capabilities, false)
+                    addWifiItemToUI(ssid, result.capabilities, false, strongestRssi(results, ssid))
                 }
             }
         }
     }
 
-    private fun addWifiItemToUI(ssid: String, capabilities: String, isConnected: Boolean) {
-        val isOpen = !capabilities.contains("WPA") && !capabilities.contains("WEP")
-        val leftIcon = if (isConnected) TablerIcons.CHECK else TablerIcons.WIFI
-        val rightIcon = if (isOpen) null else TablerIcons.LOCK
+    // A network can have more than one access point (scan result): show the strongest signal.
+    private fun strongestRssi(results: List<ScanResult>, ssid: String): Int =
+        results.filter { it.SSID == ssid }.maxOf { it.level }
 
-        // The check mark shows the connected network; the text keeps the theme colour (no green).
-        val btnWifi = if (isConnected) {
-            createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorPrimary(), ThemeManager.getTextColorPrimary())
-        } else {
-            createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
-        }
+    private fun addWifiItemToUI(ssid: String, capabilities: String, isConnected: Boolean, rssi: Int) {
+        val isOpen = !capabilities.contains("WPA") && !capabilities.contains("WEP")
+        val signalLevel = WifiSignal.level(rssi)
+
+        // Like macOS: the tick column on the left (tick on the connected network only), then the name,
+        // then the lock (secured networks) and the signal strength on the right.
+        val btnWifi = ListItemViewFactory.createChoiceRowWithRightIcons(activity, ssid, isConnected,
+            RowGlyphs.wifiSlots(!isOpen, signalLevel))
 
         btnWifi.setOnClickListener {
             clickFeedback()
