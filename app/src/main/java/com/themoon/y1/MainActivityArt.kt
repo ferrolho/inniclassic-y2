@@ -140,7 +140,8 @@ internal fun MainActivity.updateStatusBarHeadphone() {
 
 /**
  * Draws a status bar icon at its pixel size. With the iPod Classic Layout, the icon has the box of all
- * status items (as tall as the battery, same top) and the same gap; else 16 dp with the margin of activity_main.xml.
+ * status items (the cap height of the text, 1 px more at the top for these round shapes) and the same gap;
+ * else 16 dp with the margin of activity_main.xml.
  */
 private fun MainActivity.setStatusBarIcon(
     iv: android.widget.ImageView,
@@ -151,7 +152,7 @@ private fun MainActivity.setStatusBarIcon(
     val d = resources.displayMetrics.density
     val ipod = com.themoon.y1.views.IpodClassicLayout.isActive
     val heightPx = if (ipod) {
-        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
+        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ROUND_ICON_HEIGHT, d)
     } else {
         com.themoon.y1.views.IpodClassicLayout.px(16, d)
     }
@@ -174,6 +175,32 @@ private fun MainActivity.setStatusBarIcon(
         lp.bottomMargin = bottom
         lp.gravity = android.view.Gravity.CENTER_VERTICAL
         iv.layoutParams = lp
+    }
+}
+
+/**
+ * Puts the text of the right status group (the clock of "Time in Title Bar") after the battery, at the right
+ * edge, as in the macOS menu bar. The order is then icons, play/pause, battery, clock. The gap before the
+ * moved text is its old right margin (the gap to the next item); its right margin is 0.
+ * Only the first call moves views; later calls find no text before the battery.
+ */
+private fun MainActivity.moveStatusTextLast() {
+    val battery = batteryIconView ?: return
+    val group = battery.parent as? android.view.ViewGroup ?: return
+    var i = 0
+    while (i < group.indexOfChild(battery)) {
+        val v = group.getChildAt(i)
+        if (v !is android.widget.TextView) {
+            i++
+            continue
+        }
+        group.removeViewAt(i)
+        group.addView(v)
+        val lp = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams ?: continue
+        val batteryRight = (battery.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.rightMargin ?: 0
+        lp.leftMargin = (lp.rightMargin - batteryRight).coerceAtLeast(0)
+        lp.rightMargin = 0
+        v.layoutParams = lp
     }
 }
 
@@ -213,6 +240,7 @@ internal fun MainActivity.applyThemeInternal() {
         tvStatusBattery?.setShadowLayer(0f, 0f, 0f, 0)
         batteryIconView?.setColor(primary)
         batteryIconView?.setShowPercentage(isShowBatteryPercentage)
+        moveStatusTextLast()
 
         updateStatusBarBluetooth()
         updateStatusBarHeadphone()

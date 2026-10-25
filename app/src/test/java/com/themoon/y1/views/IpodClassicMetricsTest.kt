@@ -25,15 +25,21 @@ class IpodClassicMetricsTest {
 
     @Test
     fun statusItemsShareOneBox() {
-        // Battery, icons: rows 4..23 of the 30 px bar; capitals centred on y = 14 too.
+        // Battery, play/pause: rows 7..20 of the 30 px bar, the rows of the capitals; centre line y = 14.
         assertEquals(IpodClassicMetrics.BATTERY_HEIGHT, IpodClassicMetrics.STATUS_ICON_HEIGHT)
-        assertEquals(4, IpodClassicMetrics.statusItemTop())
+        assertEquals(14, IpodClassicMetrics.STATUS_ICON_HEIGHT)
+        assertEquals(7, IpodClassicMetrics.statusItemTop())
         assertEquals(14f, IpodClassicMetrics.statusCentreLine(), 0f)
         // Same top as LinearLayout CENTER_VERTICAL with a bottom margin of the line.
         assertEquals(
             (IpodClassicMetrics.STATUS_BAR_HEIGHT - IpodClassicMetrics.STATUS_ICON_HEIGHT) / 2 - IpodClassicMetrics.STATUS_BAR_RULE,
             IpodClassicMetrics.statusItemTop()
         )
+        // Round icons: 1 px more at the top (row 6), the same bottom row (20).
+        val round = IpodClassicMetrics.STATUS_ROUND_ICON_HEIGHT
+        val roundTop = (IpodClassicMetrics.STATUS_BAR_HEIGHT - round) / 2 - IpodClassicMetrics.STATUS_BAR_RULE
+        assertEquals(6, roundTop)
+        assertEquals(IpodClassicMetrics.statusItemTop() + IpodClassicMetrics.STATUS_ICON_HEIGHT, roundTop + round)
         // 19 px Nimbus Sans Bold: ascent -14, capitals 13.85 px (rows 7..20): the same centre line.
         val ascent = -14
         val top = IpodClassicMetrics.capCentredPaddingTop(2f * IpodClassicMetrics.statusCentreLine(), ascent, 13.85f)

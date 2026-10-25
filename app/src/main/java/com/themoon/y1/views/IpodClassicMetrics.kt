@@ -17,13 +17,18 @@ object IpodClassicMetrics {
     const val STATUS_TITLE_SP = 19f
     const val STATUS_PADDING_LEFT = 10
     const val STATUS_PADDING_RIGHT = 6
-    const val BATTERY_WIDTH = 39
-    const val BATTERY_HEIGHT = 20
-    // All status bar items share one box. On the iPod the play icon and the battery are both 13 px tall,
-    // so each icon is as tall as the battery, and its ink goes from the top row to the bottom row of the
-    // box (StatusIcons, IpodPlayStateView). The capitals of the text are centred on the same line.
-    const val STATUS_ICON_HEIGHT = BATTERY_HEIGHT
-    const val PLAY_ICON_WIDTH = 17
+    // All status bar items share one box with the capitals of the text: 14 px = the cap height of the
+    // 19 px title font (Nimbus Sans Bold, 13.85 px), so the space above and below the ink is the same
+    // for the text, the icons and the battery. The ink of each icon goes from the top row to the bottom
+    // row of the box (StatusIcons, IpodPlayStateView).
+    const val STATUS_ICON_HEIGHT = 14
+    // Round shapes (headphones, Wi-Fi, Bluetooth) look smaller than flat ones of the same height, as the
+    // round letters of a font. They go 1 px above the box (optical overshoot); the bottom stays on the box.
+    const val STATUS_ROUND_ICON_HEIGHT = STATUS_ICON_HEIGHT + 1
+    // The battery has a 2 px outline at this size (BatteryIconView.setThinOutline), so the digits stay legible.
+    const val BATTERY_WIDTH = 30
+    const val BATTERY_HEIGHT = STATUS_ICON_HEIGHT
+    const val PLAY_ICON_WIDTH = 12
     // Space between the ink of two items (the iPod has 5 px between the play icon and the battery).
     const val STATUS_ITEM_GAP = 8
 

@@ -7,6 +7,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -18,6 +20,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import java.util.WeakHashMap
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
@@ -146,11 +149,14 @@ object IpodClassicLayout {
                     setWidth(child, px(IpodClassicMetrics.BATTERY_WIDTH, d))
                     setHeight(child, px(IpodClassicMetrics.BATTERY_HEIGHT, d))
                     setMargins(child, 0, 0, 0, px(IpodClassicMetrics.STATUS_BAR_RULE, d))
+                    record(child, "thinOutline") { (it as BatteryIconView).setThinOutline(false) }
+                    child.setThinOutline(true)
                 }
-                // The clock or any text in the right group: the gap is measured from the ink of the last letter.
+                // The clock or any text in the right group: the gaps are measured from the ink of the letters.
                 is TextView -> {
                     styleCentredText(child, titleSize, ThemeManager.getCustomFontBold(), textBox)
-                    setMargins(child, right = (gap - rightBearing(child)).roundToInt().coerceAtLeast(0))
+                    setStatusTextMargins(child, afterBattery = batteryIndex >= 0, gap = gap)
+                    watchStatusText(child, afterBattery = batteryIndex >= 0, gap = gap)
                 }
             }
         }
@@ -279,16 +285,50 @@ object IpodClassicLayout {
             .coerceAtLeast(0)
     }
 
-    /** Space between the end of the ink of the last letter of [tv] and the end of its advance. */
-    private fun rightBearing(tv: TextView): Float {
+    /**
+     * Margins of a text in the right status group, from the ink of its letters. Text after the battery (the clock,
+     * the last item, see MainActivityArt.moveStatusTextLast): [gap] to the battery, and its last letter at the
+     * right padding like the battery when the clock is off. Text before the battery: [gap] to the next item.
+     */
+    private fun setStatusTextMargins(tv: TextView, afterBattery: Boolean, gap: Float) {
+        val (left, right) = inkBearings(tv)
+        if (afterBattery) {
+            setMargins(tv, left = (gap - left).roundToInt().coerceAtLeast(0), right = -right.roundToInt())
+        } else {
+            setMargins(tv, right = (gap - right).roundToInt().coerceAtLeast(0))
+        }
+    }
+
+    private val statusTextWatchers = WeakHashMap<TextView, TextWatcher>()
+
+    /** The clock text changes each minute, and the bearings of its first and last letters with it. */
+    private fun watchStatusText(tv: TextView, afterBattery: Boolean, gap: Float) {
+        statusTextWatchers[tv]?.let { tv.removeTextChangedListener(it) }
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (applied && isActive) setStatusTextMargins(tv, afterBattery, gap)
+            }
+        }
+        tv.addTextChangedListener(watcher)
+        statusTextWatchers[tv] = watcher
+    }
+
+    /**
+     * Space from the left edge of [tv] (wrap_content, no padding, gravity left) to the ink of its first letter,
+     * and from the ink of its last letter to the right edge. The view is the advance of the text, rounded up.
+     */
+    private fun inkBearings(tv: TextView): Pair<Float, Float> {
         val text = tv.text?.toString().orEmpty()
-        if (text.isEmpty()) return 0f
+        if (text.isEmpty()) return Pair(0f, 0f)
         // A path, because getTextBounds() rounds to whole pixels.
         val path = android.graphics.Path()
         tv.paint.getTextPath(text, 0, text.length, 0f, 0f, path)
         val bounds = android.graphics.RectF()
         path.computeBounds(bounds, true)
-        return (tv.paint.measureText(text) - bounds.right).coerceAtLeast(0f)
+        if (bounds.isEmpty) return Pair(0f, 0f)
+        return Pair(bounds.left.coerceAtLeast(0f), (ceil(tv.paint.measureText(text)) - bounds.right).coerceAtLeast(0f))
     }
 
     internal fun horizontalGravity(tv: TextView): Int {

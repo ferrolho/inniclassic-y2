@@ -98,7 +98,7 @@ class IpodPlayStateView(context: Context) : View(context) {
         const val STATE_PLAYING = 1
         const val STATE_PAUSED = 2
         const val POLL_MS = 500L
-        // 6 px bars with a 5 px space in the 17 px wide icon.
+        // 4 px bars with a 4 px space in the 12 px wide icon (6 and 5 at 17 px).
         const val PAUSE_BAR_RATIO = 0.35f
     }
 }
