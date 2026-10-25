@@ -17,6 +17,11 @@ interface ScreenController {
     /** The library cache finished loading after the screen was built: show the library data again. */
     fun onLibraryLoaded() {}
 
+    /** The theme changed while this screen shows: make it again in the new theme, with the same focus. */
+    fun onThemeChanged() {
+        onRefreshUI()
+    }
+
     fun dispatchKeyEvent(event: KeyEvent): Boolean = false
     fun onWheel(delta: Int, event: KeyEvent): Boolean = false
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = false
