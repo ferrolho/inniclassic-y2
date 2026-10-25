@@ -366,6 +366,16 @@ object ListItemViewFactory {
         focusedIconColor = focusedColor
     )
 
+    /**
+     * A row of a single-choice list (Theme, Language, EQ preset...). Each row keeps the tick column on the
+     * left, so the text does not move; only the chosen row shows the tick. Normal text and focus colours.
+     */
+    fun createCheckListButton(context: Context, text: String, isChecked: Boolean): View {
+        val row = createTablerListButton(context, TablerIcons.CHECK, text)
+        if (!isChecked) (row as ViewGroup).getChildAt(0).visibility = View.INVISIBLE
+        return row
+    }
+
     fun createTablerListButtonWithRightIcon(
         context: Context,
         iconPaths: Array<String>?,
