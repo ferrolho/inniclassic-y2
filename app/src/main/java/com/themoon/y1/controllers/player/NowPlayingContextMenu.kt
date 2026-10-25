@@ -13,6 +13,7 @@ import java.io.File
  * - Add to Playlist
  * - Browse Album / Browse Artist
  * - Show/Hide Spectrum
+ * - Show Total Time / Show Remaining Time
  */
 object NowPlayingContextMenu {
 
@@ -28,6 +29,8 @@ object NowPlayingContextMenu {
         onBrowseArtist: (artistName: String) -> Unit,
         isSpectrumShowing: Boolean,
         onToggleVisualizer: () -> Unit,
+        isTotalTimeShown: Boolean,
+        onToggleTotalTime: () -> Unit,
         localize: (String) -> String
     ) {
         WheelDialog.show(activity) {
@@ -80,6 +83,13 @@ object NowPlayingContextMenu {
                 icon = null
             ) {
                 onToggleVisualizer()
+            }
+
+            addButton(
+                text = if (isTotalTimeShown) localize("Show Remaining Time") else localize("Show Total Time"),
+                icon = null
+            ) {
+                onToggleTotalTime()
             }
 
             negativeButton(localize("Cancel"))
