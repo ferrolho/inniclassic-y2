@@ -16,6 +16,9 @@ import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.InputRouter
+import com.themoon.y1.navigation.KeyboardSubmit
+import com.themoon.y1.navigation.KeyboardTarget
+import com.themoon.y1.navigation.KeyboardTargets
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.QwertyKeyboardView
 
@@ -23,12 +26,14 @@ import com.themoon.y1.views.QwertyKeyboardView
  * Controller for the click-wheel driven On-Screen Keyboard.
  * Supports both standard QWERTY grid view and legacy linear scrollwheel strip across
  * Wi-Fi passwords, Podcast searches, Last.fm credentials, library searches, and Jellyfin setup.
+ * Each opening gives a [KeyboardTarget] in [ScreenState.WifiKeyboard]; the title, hint, submit label
+ * and submit action come from it.
  */
 class WifiKeyboardController(
     private val activity: Activity,
     override val rootView: ViewGroup,
     private val clickFeedback: () -> Unit,
-    private val onExitKeyboard: (mode: Int) -> Unit,
+    private val onExitKeyboard: (target: KeyboardTarget) -> Unit,
     private val onSubmitSearchPodcast: (keyword: String) -> Unit,
     private val onSubmitSearchLibrary: (keyword: String) -> Unit,
     private val onSubmitLastFmUsername: (username: String) -> Unit,
@@ -38,6 +43,8 @@ class WifiKeyboardController(
     private val onSubmitJellyfinPassword: (password: String) -> Unit,
     private val onSubmitJellyfinToken: (token: String) -> Unit,
     private val onConnectWifi: (ssid: String, password: String, isOpen: Boolean) -> Unit,
+    /** Text already in the field when the keyboard opens (the saved value, for the Jellyfin settings). */
+    private val initialText: (KeyboardTarget) -> String,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -56,12 +63,10 @@ class WifiKeyboardController(
 
     private val prefs = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
 
-    var currentKeyboardMode = 0
-    var targetWifiSsid = ""
-    var isTargetWifiOpen = false
+    var target: KeyboardTarget = KeyboardTarget.LibrarySearch
+        private set
     var typedText = ""
-    var pendingLastFmUsername = ""
-    var pendingJellyfinUsername = ""
+        private set
 
     private var keyboardIndex = 0
     private var isBackLongPressConsumed = false
@@ -129,9 +134,8 @@ class WifiKeyboardController(
         isBackLongPressConsumed = false
         layoutWifiKeyboard.visibility = View.VISIBLE
         if (state is ScreenState.WifiKeyboard) {
-            targetWifiSsid = state.ssid
+            openKeyboard(state.target)
         }
-        openKeyboard()
     }
 
     override fun onExit() {
@@ -144,38 +148,24 @@ class WifiKeyboardController(
         return "qwerty".equals(prefs.getString("keyboard_layout", "qwerty"), ignoreCase = true)
     }
 
-    fun openKeyboard() {
-        if (currentKeyboardMode !in 5..8) {
-            typedText = ""
-        }
+    private val isOpenWifi: Boolean
+        get() = (target as? KeyboardTarget.WifiPassword)?.isOpen == true
+
+    /** Shows the keyboard for [newTarget], with the field reset to its initial text. */
+    fun openKeyboard(newTarget: KeyboardTarget) {
+        target = newTarget
+        typedText = initialText(newTarget)
         keyboardIndex = 0
         try {
             Settings.System.putInt(activity.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 0)
         } catch (ignored: Exception) {}
 
-        when (currentKeyboardMode) {
-            1 -> tvKeyboardSsid.text = "🔍 " + localize("Search Podcast")
-            2 -> tvKeyboardSsid.text = localize("Last.fm Username")
-            3 -> tvKeyboardSsid.text = localize("Last.fm Password") + ": " + pendingLastFmUsername
-            4 -> tvKeyboardSsid.text = "🔍 " + localize("Search")
-            5 -> tvKeyboardSsid.text = localize("Server URL")
-            6 -> tvKeyboardSsid.text = localize("Username")
-            7 -> tvKeyboardSsid.text = localize("Password") + ": " + pendingJellyfinUsername
-            8 -> tvKeyboardSsid.text = localize("API Token")
-            else -> tvKeyboardSsid.text = localize("Target") + ": " + targetWifiSsid
-        }
+        tvKeyboardSsid.text = KeyboardTargets.title(newTarget, localize)
 
         if (isQwertyKeyboard()) {
             layoutKeyboardOriginal.visibility = View.GONE
             keyboardQwertyView?.visibility = View.VISIBLE
-            var actionLabel = localize("Connect")
-            when (currentKeyboardMode) {
-                1, 4 -> actionLabel = localize("Search")
-                2, 6 -> actionLabel = localize("Next")
-                3, 7, 8 -> actionLabel = localize("Login")
-                5 -> actionLabel = localize("Save")
-            }
-            keyboardQwertyView?.setSubmitActionLabel(actionLabel)
+            keyboardQwertyView?.setSubmitActionLabel(KeyboardTargets.actionLabel(newTarget, localize))
             keyboardQwertyView?.resetState()
         } else {
             layoutKeyboardOriginal.visibility = View.VISIBLE
@@ -197,25 +187,15 @@ class WifiKeyboardController(
         tvKeyNext.text = KEYBOARD_CHARS[idxNext]
         tvKeyNnext.text = KEYBOARD_CHARS[idxNnext]
 
-        if (isTargetWifiOpen && currentKeyboardMode == 0) {
-            tvKeyboardInput.text = localize("Open Network (Direct Connect)")
+        if (isOpenWifi) {
+            tvKeyboardInput.text = KeyboardTargets.hint(target, localize)
             tvKeyboardInput.setTextColor(0x77FFFFFF)
             keyboardIndex = len - 1
             tvKeyCurrent.text = KEYBOARD_CHARS[keyboardIndex]
         } else {
             if (typedText.isEmpty()) {
                 tvKeyboardInput.setTextColor(0x77FFFFFF)
-                when (currentKeyboardMode) {
-                    1 -> tvKeyboardInput.text = localize("Enter keyword...")
-                    2 -> tvKeyboardInput.text = localize("Enter Last.fm username...")
-                    3 -> tvKeyboardInput.text = localize("Enter Last.fm password...")
-                    4 -> tvKeyboardInput.text = localize("Enter search term...")
-                    5 -> tvKeyboardInput.text = "http://..."
-                    6 -> tvKeyboardInput.text = localize("Username")
-                    7 -> tvKeyboardInput.text = localize("Password")
-                    8 -> tvKeyboardInput.text = localize("API Token")
-                    else -> tvKeyboardInput.text = localize("Enter Password...")
-                }
+                tvKeyboardInput.text = KeyboardTargets.hint(target, localize)
             } else {
                 tvKeyboardInput.setTextColor(0xFFFFFFFF.toInt())
                 tvKeyboardInput.text = typedText
@@ -248,92 +228,33 @@ class WifiKeyboardController(
     }
 
     fun submitKeyboard() {
-        when (currentKeyboardMode) {
-            1 -> {
-                if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val keyword = typedText.trim()
-                onSubmitSearchPodcast(keyword)
+        val current = target
+        when (val result = KeyboardTargets.submit(current, typedText)) {
+            is KeyboardSubmit.Rejected -> {
+                Toast.makeText(activity, localize(result.message), Toast.LENGTH_SHORT).show()
             }
-            4 -> {
-                if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
-                    return
+            is KeyboardSubmit.Accepted -> {
+                // A login asks for the password next, on the same keyboard
+                result.next?.let { openKeyboard(it) }
+                val value = result.value
+                when (current) {
+                    is KeyboardTarget.WifiPassword -> onConnectWifi(current.ssid, value, current.isOpen)
+                    KeyboardTarget.PodcastSearch -> onSubmitSearchPodcast(value)
+                    KeyboardTarget.LibrarySearch -> onSubmitSearchLibrary(value)
+                    KeyboardTarget.LastFmUsername -> onSubmitLastFmUsername(value)
+                    is KeyboardTarget.LastFmPassword -> onSubmitLastFmPassword(value)
+                    KeyboardTarget.JellyfinServerUrl -> onSubmitJellyfinServerUrl(value)
+                    KeyboardTarget.JellyfinUsername -> onSubmitJellyfinUsername(value)
+                    is KeyboardTarget.JellyfinPassword -> onSubmitJellyfinPassword(value)
+                    KeyboardTarget.JellyfinToken -> onSubmitJellyfinToken(value)
                 }
-                val keyword = typedText.trim()
-                currentKeyboardMode = 0
-                onSubmitSearchLibrary(keyword)
-            }
-            2 -> {
-                if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a username."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                pendingLastFmUsername = typedText.trim()
-                currentKeyboardMode = 3
-                openKeyboard()
-                onSubmitLastFmUsername(pendingLastFmUsername)
-            }
-            3 -> {
-                if (typedText.isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a password."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val password = typedText
-                currentKeyboardMode = 0
-                onSubmitLastFmPassword(password)
-            }
-            5 -> {
-                if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val url = typedText.trim()
-                currentKeyboardMode = 0
-                onSubmitJellyfinServerUrl(url)
-            }
-            6 -> {
-                if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a username."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                pendingJellyfinUsername = typedText.trim()
-                currentKeyboardMode = 7
-                openKeyboard()
-                onSubmitJellyfinUsername(pendingJellyfinUsername)
-            }
-            7 -> {
-                val password = typedText
-                if (password.isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a password."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                currentKeyboardMode = 0
-                onSubmitJellyfinPassword(password)
-            }
-            8 -> {
-                if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val token = typedText.trim()
-                currentKeyboardMode = 0
-                onSubmitJellyfinToken(token)
-            }
-            else -> {
-                val password = typedText
-                onConnectWifi(targetWifiSsid, password, isTargetWifiOpen)
             }
         }
     }
 
     fun exitKeyboard() {
         handler.removeCallbacks(longPressBackRunnable)
-        val mode = currentKeyboardMode
-        currentKeyboardMode = 0
-        onExitKeyboard(mode)
+        onExitKeyboard(target)
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
