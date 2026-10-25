@@ -130,8 +130,58 @@ internal fun MainActivity.updateStatusBarWifi(isConnected: Boolean) {
     setStatusBarIcon(ivStatusWifi ?: return, com.themoon.y1.views.StatusIcons.Icon.WIFI, isConnected, 6)
 }
 
+/** The state of the Bluetooth status icon (one MainActivity). */
+internal object StatusBarBluetooth {
+    val state = com.themoon.y1.views.StatusBarBluetoothState()
+}
+
+/** The rune; with an audio device connected, the rune with a dot on each side. */
 internal fun MainActivity.updateStatusBarBluetooth() {
-    setStatusBarIcon(ivStatusBluetooth ?: return, com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH, true, 8)
+    setStatusBarIcon(
+        ivStatusBluetooth ?: return, com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH, true, 8,
+        StatusBarBluetooth.state.isConnected
+    )
+}
+
+/** A2DP connection broadcast for [device]: the icon gets or loses its dots. */
+internal fun MainActivity.onStatusBarA2dpState(device: android.bluetooth.BluetoothDevice?, profileState: Int) {
+    if (StatusBarBluetooth.state.onA2dpState(device?.address, profileState)) updateStatusBarBluetooth()
+}
+
+/** Bluetooth adapter broadcast: off forgets the devices; on asks the A2DP proxy for the connected devices. */
+internal fun MainActivity.onStatusBarBluetoothAdapterState(adapterState: Int) {
+    val on = adapterState == android.bluetooth.BluetoothAdapter.STATE_ON
+    if (StatusBarBluetooth.state.onAdapterState(on)) updateStatusBarBluetooth()
+    if (on) queryStatusBarBluetooth()
+}
+
+/**
+ * Asks the A2DP proxy once for the connected audio devices, then closes the proxy: at start and when Bluetooth
+ * comes on. After that, the A2DP broadcasts keep the state ([onStatusBarA2dpState]).
+ */
+internal fun MainActivity.queryStatusBarBluetooth() {
+    val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return
+    if (!adapter.isEnabled) return
+    if (!StatusBarBluetooth.state.adapterOn) StatusBarBluetooth.state.onAdapterState(true)
+    try {
+        adapter.getProfileProxy(applicationContext, object : android.bluetooth.BluetoothProfile.ServiceListener {
+            override fun onServiceConnected(profile: Int, proxy: android.bluetooth.BluetoothProfile) {
+                val devices = try {
+                    proxy.connectedDevices.mapNotNull { it?.address }
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                try {
+                    adapter.closeProfileProxy(profile, proxy)
+                } catch (_: Exception) {}
+                runOnUiThread {
+                    if (StatusBarBluetooth.state.onConnectedDevices(devices)) updateStatusBarBluetooth()
+                }
+            }
+
+            override fun onServiceDisconnected(profile: Int) {}
+        }, android.bluetooth.BluetoothProfile.A2DP)
+    } catch (_: Exception) {}
 }
 
 internal fun MainActivity.updateStatusBarHeadphone() {
@@ -147,7 +197,8 @@ private fun MainActivity.setStatusBarIcon(
     iv: android.widget.ImageView,
     icon: com.themoon.y1.views.StatusIcons.Icon,
     active: Boolean,
-    rightMarginDp: Int
+    rightMarginDp: Int,
+    connected: Boolean = false
 ) {
     val d = resources.displayMetrics.density
     val ipod = com.themoon.y1.views.IpodClassicLayout.isActive
@@ -156,7 +207,7 @@ private fun MainActivity.setStatusBarIcon(
     } else {
         com.themoon.y1.views.IpodClassicLayout.px(16, d)
     }
-    val bmp = com.themoon.y1.views.StatusIcons.render(icon, heightPx, active, isLightStatusBar())
+    val bmp = com.themoon.y1.views.StatusIcons.render(icon, heightPx, active, isLightStatusBar(), connected)
     iv.colorFilter = null
     iv.scaleType = android.widget.ImageView.ScaleType.CENTER
     iv.setImageBitmap(bmp)
