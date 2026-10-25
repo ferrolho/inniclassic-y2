@@ -64,12 +64,89 @@ object ToggleStyle {
      * Off = pale track, knob in the selected text colour.
      */
     fun colors(on: Boolean, rowSelected: Boolean, accent: Int, selectedText: Int, secondaryText: Int): SwitchColors =
+        SwitchColors(
+            trackColor(on, rowSelected, accent, selectedText, secondaryText),
+            knobColor(on, rowSelected, accent, selectedText)
+        )
+
+    /** The track colour of [colors] (no object: [SettingValueView] calls it in each animation frame). */
+    fun trackColor(on: Boolean, rowSelected: Boolean, accent: Int, selectedText: Int, secondaryText: Int): Int =
         when {
-            rowSelected && on -> SwitchColors(opaque(selectedText), opaque(accent))
-            rowSelected -> SwitchColors(withAlpha(selectedText, 0x66), opaque(selectedText))
-            on -> SwitchColors(opaque(accent), WHITE)
-            else -> SwitchColors(withAlpha(grey(secondaryText), 0x99), WHITE)
+            rowSelected && on -> opaque(selectedText)
+            rowSelected -> withAlpha(selectedText, 0x66)
+            on -> opaque(accent)
+            else -> withAlpha(grey(secondaryText), 0x99)
         }
+
+    /** The knob colour of [colors]. */
+    fun knobColor(on: Boolean, rowSelected: Boolean, accent: Int, selectedText: Int): Int =
+        when {
+            rowSelected && on -> opaque(accent)
+            rowSelected -> opaque(selectedText)
+            else -> WHITE
+        }
+
+    // Animation of a change (a click): the knob slides and the colours cross-fade. Knob position: 0 = Off, 1 = On.
+
+    /** Duration of a full Off-to-On change. */
+    const val ANIMATION_MS = 200L
+
+    /** A row that a controller removes and makes again within this time after a change continues the animation. */
+    const val REBUILD_WINDOW_MS = 1000L
+
+    /** Ease out (cubic, decelerates like the iOS switch): fast start, slow end. [t] in 0..1. */
+    fun easeOut(t: Float): Float {
+        val u = 1f - t.coerceIn(0f, 1f)
+        return 1f - u * u * u
+    }
+
+    /** The time a change from knob position [from] to [on] takes: shorter when the knob is already part of the way. */
+    fun durationMs(from: Float, on: Boolean): Long =
+        Math.round(ANIMATION_MS * Math.abs((if (on) 1f else 0f) - from)).toLong()
+
+    /** The knob position [elapsedMs] after the start of a change from position [from] to [on]. */
+    fun knobPosition(from: Float, on: Boolean, elapsedMs: Long): Float {
+        val to = if (on) 1f else 0f
+        val duration = durationMs(from, on)
+        if (elapsedMs >= duration) return to
+        if (elapsedMs <= 0L) return from
+        return from + (to - from) * easeOut(elapsedMs.toFloat() / duration)
+    }
+
+    /** [a] at [f] = 0 to [b] at [f] = 1, each ARGB channel separately (as ArgbEvaluator). */
+    fun blend(a: Int, b: Int, f: Float): Int {
+        if (f <= 0f) return a
+        if (f >= 1f) return b
+        var out = 0
+        var shift = 24
+        while (shift >= 0) {
+            val ca = (a ushr shift) and 0xFF
+            val cb = (b ushr shift) and 0xFF
+            out = out or (Math.round(ca + (cb - ca) * f) shl shift)
+            shift -= 8
+        }
+        return out
+    }
+
+    private class Removed(val position: Float, val timeMs: Long)
+    private val removed = HashMap<String, Removed>()
+
+    /** A switch row left the screen (its list is made again, or the screen closed): keep its knob position for a short time. */
+    fun rememberRemoved(key: String, position: Float, nowMs: Long) {
+        val it = removed.entries.iterator()
+        while (it.hasNext()) if (nowMs - it.next().value.timeMs > REBUILD_WINDOW_MS) it.remove()
+        removed[key] = Removed(position, nowMs)
+    }
+
+    /**
+     * For a new row with the same [key]: the knob position of the removed row, if it was removed less than
+     * [REBUILD_WINDOW_MS] ago and did not show [on]. Then the new row animates from there. Else null.
+     */
+    fun takeRemoved(key: String, on: Boolean, nowMs: Long): Float? {
+        val r = removed.remove(key) ?: return null
+        if (nowMs - r.timeMs > REBUILD_WINDOW_MS) return null
+        return if (r.position == (if (on) 1f else 0f)) null else r.position
+    }
 
     private const val WHITE = 0xFFFFFFFF.toInt()
 
