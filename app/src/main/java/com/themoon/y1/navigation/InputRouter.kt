@@ -24,6 +24,11 @@ class InputRouter private constructor() {
     var backDebounceUntil: Long = 0L
         private set
 
+    // Play/Pause presses that this router handles itself (screens without their own handling)
+    private var isPlayPauseTracked = false
+    private var isScreenOffPlayPauseDown = false
+    private var isScreenOffStopDone = false
+
     fun suppressBackUntilRelease(debounceMs: Long = 350L) {
         isBackSuppressed = true
         backDebounceUntil = System.currentTimeMillis() + debounceMs
@@ -99,11 +104,29 @@ class InputRouter private constructor() {
                     keyCode == 88
 
             if (isMediaKey) {
+                if (isPlayPauseKey(keyCode)) {
+                    // Short press plays or pauses on release; a hold stops
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        if (event.repeatCount == 0) {
+                            isScreenOffPlayPauseDown = true
+                            isScreenOffStopDone = false
+                        } else if (event.isLongPress && isScreenOffPlayPauseDown && !isScreenOffStopDone) {
+                            isScreenOffStopDone = true
+                            com.themoon.y1.managers.AudioPlayerManager.getInstance().stopMusic()
+                        }
+                    } else if (action == KeyEvent.ACTION_UP) {
+                        if (isScreenOffPlayPauseDown && !isScreenOffStopDone && !event.isCanceled) {
+                            com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
+                        }
+                        isScreenOffPlayPauseDown = false
+                        isScreenOffStopDone = false
+                    }
+                    return true
+                }
                 if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                     when (keyCode) {
                         KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack()
                         KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack()
-                        else -> com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
                     }
                 }
                 return true
@@ -190,8 +213,13 @@ class InputRouter private constructor() {
             (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE || keyCode == 85) {
-            AudioPlayerManager.getInstance().playOrPauseMusic()
+        if (isPlayPauseKey(keyCode)) {
+            // Play/pause on release, so that a hold can stop instead (see onKeyLongPress)
+            if (event.repeatCount == 0) {
+                isPlayPauseTracked = true
+                MainActivity.instance?.isMediaLongPressConsumed = false
+                event.startTracking()
+            }
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
@@ -224,6 +252,18 @@ class InputRouter private constructor() {
             isBackSuppressed = false
             return true
         }
+        if (isPlayPauseKey(keyCode) && isPlayPauseTracked) {
+            isPlayPauseTracked = false
+            val main = MainActivity.instance
+            if (main?.isMediaLongPressConsumed == true || (event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) != 0) {
+                main?.isMediaLongPressConsumed = false
+                return true
+            }
+            if (!event.isCanceled) {
+                AudioPlayerManager.getInstance().playOrPauseMusic()
+            }
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
             val main = (activeController?.rootView?.context as? MainActivity) ?: MainActivity.instance
             if (main?.isLongPressConsumed == true) {
@@ -246,8 +286,23 @@ class InputRouter private constructor() {
         event: KeyEvent,
         activeController: ScreenController?
     ): Boolean {
-        return activeController?.onKeyLongPress(keyCode, event) == true
+        if (activeController?.onKeyLongPress(keyCode, event) == true) {
+            return true
+        }
+        // Screens without their own Play/Pause hold: hold = Stop
+        if (isPlayPauseKey(keyCode) && isPlayPauseTracked) {
+            val main = MainActivity.instance
+            main?.isMediaLongPressConsumed = true
+            main?.clickFeedback()
+            AudioPlayerManager.getInstance().stopMusic()
+            return true
+        }
+        return false
     }
+
+    private fun isPlayPauseKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+            keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE || keyCode == 85
 
     companion object {
         @Volatile
