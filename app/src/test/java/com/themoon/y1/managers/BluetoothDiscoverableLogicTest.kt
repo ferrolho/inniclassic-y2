@@ -1,7 +1,9 @@
 package com.themoon.y1.managers
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BluetoothDiscoverableLogicTest {
@@ -21,7 +23,7 @@ class BluetoothDiscoverableLogicTest {
 
     @Test
     fun remainingTimeIsRoundedUpToTheNextSecond() {
-        assertEquals("5:00", BluetoothDiscoverableLogic.formatRemaining(300_000L))
+        assertEquals("2:00", BluetoothDiscoverableLogic.formatRemaining(120_000L))
         assertEquals("1:45", BluetoothDiscoverableLogic.formatRemaining(105_000L))
         assertEquals("1:45", BluetoothDiscoverableLogic.formatRemaining(104_001L))
         assertEquals("0:01", BluetoothDiscoverableLogic.formatRemaining(200L))
@@ -30,8 +32,17 @@ class BluetoothDiscoverableLogicTest {
     }
 
     @Test
-    fun durationIsFiveMinutes() {
-        assertEquals("5:00", BluetoothDiscoverableLogic.formatRemaining(BluetoothDiscoverableLogic.DURATION_S * 1000L))
+    fun durationIsTwoMinutes() {
+        assertEquals(120, BluetoothDiscoverableLogic.DURATION_S)
+        assertEquals("2:00", BluetoothDiscoverableLogic.formatRemaining(BluetoothDiscoverableLogic.DURATION_S * 1000L))
+    }
+
+    @Test
+    fun discoverableWithoutOurTimerMustTurnOff() {
+        assertTrue(BluetoothDiscoverableLogic.mustTurnOff(discoverable = true, timerRunning = false))
+        assertFalse(BluetoothDiscoverableLogic.mustTurnOff(discoverable = true, timerRunning = true))
+        assertFalse(BluetoothDiscoverableLogic.mustTurnOff(discoverable = false, timerRunning = false))
+        assertFalse(BluetoothDiscoverableLogic.mustTurnOff(discoverable = false, timerRunning = true))
     }
 
     @Test
@@ -50,16 +61,17 @@ class BluetoothDiscoverableLogicTest {
     }
 
     @Test
-    fun namePressGivesY2ThenTheSavedName() {
-        assertEquals("Y2", BluetoothDiscoverableLogic.nameAfterPress("MT6582", null))
-        assertEquals("Y2", BluetoothDiscoverableLogic.nameAfterPress(null, null))
-        assertEquals("MT6582", BluetoothDiscoverableLogic.nameAfterPress("Y2", "MT6582"))
+    fun namePressGivesInnioasisY2ThenTheSavedName() {
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameAfterPress("MT6582", null))
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameAfterPress("Y2", "MT6582"))
+        assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameAfterPress(null, null))
+        assertEquals("MT6582", BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", "MT6582"))
     }
 
     @Test
-    fun namePressOnY2WithoutSavedNameChangesNothing() {
-        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Y2", null))
-        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Y2", ""))
-        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Y2", "Y2"))
+    fun namePressOnInnioasisY2WithoutSavedNameChangesNothing() {
+        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", null))
+        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", ""))
+        assertNull(BluetoothDiscoverableLogic.nameAfterPress("Innioasis Y2", "Innioasis Y2"))
     }
 }

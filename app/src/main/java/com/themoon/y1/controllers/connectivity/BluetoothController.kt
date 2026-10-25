@@ -275,7 +275,7 @@ class BluetoothController(
             val current = try { ba.name } catch (e: Exception) { null }
             val newName = BluetoothDiscoverableLogic.nameAfterPress(current, prefs.getString(KEY_SAVED_NAME, null))
                 ?: return@setOnClickListener
-            if (newName == BluetoothDiscoverableLogic.SHORT_NAME && !current.isNullOrBlank()) {
+            if (newName == BluetoothDiscoverableLogic.DEVICE_NAME && !current.isNullOrBlank()) {
                 prefs.edit().putString(KEY_SAVED_NAME, current).apply()
             }
             if (ba.setName(newName)) {

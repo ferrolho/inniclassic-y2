@@ -17,6 +17,10 @@ import android.util.Log
  * Uses the hidden BluetoothAdapter.setScanMode by reflection: in the Y2 Bluetooth.apk it needs only the
  * BLUETOOTH permission (ACTION_REQUEST_DISCOVERABLE opens a system dialog that needs a touch screen).
  * The timer is ours: the stack does not always end discoverable mode by itself (Settings uses an alarm too).
+ *
+ * The Y2 is discoverable ONLY after a press on the Discoverable row. If it becomes discoverable in another way
+ * (for example: the Y2 Bluetooth.apk starts in discoverable mode with no time limit when the stored discoverable
+ * timeout is 0, see AdapterProperties.onBluetoothReady), this class sets it back to connectable at once.
  */
 object BluetoothDiscoverableManager {
     private const val TAG = "BtDiscoverable"
@@ -36,19 +40,33 @@ object BluetoothDiscoverableManager {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             // Read the current mode, not the extra: an old broadcast must not stop a new timer.
-            if (intent.action == BluetoothAdapter.ACTION_SCAN_MODE_CHANGED && !isDiscoverable()) cancelTimer()
+            if (intent.action != BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED) enforce()
             listener?.invoke()
         }
     }
 
+    /** Call once at app start. */
     fun init(context: Context) {
         if (registered) return
         val filter = IntentFilter().apply {
             addAction(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
             addAction(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED)
         }
         context.applicationContext.registerReceiver(receiver, filter)
         registered = true
+        enforce()
+    }
+
+    /** Stops our timer when the Y2 is not discoverable, and stops discoverable mode that our timer did not start. */
+    private fun enforce() {
+        val discoverable = isDiscoverable()
+        if (!discoverable) {
+            cancelTimer()
+        } else if (BluetoothDiscoverableLogic.mustTurnOff(discoverable, endAtMs > 0L)) {
+            Log.w(TAG, "Discoverable without a press on the row: turning it off")
+            setDiscoverable(false)
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -65,24 +83,20 @@ object BluetoothDiscoverableManager {
     fun setDiscoverable(on: Boolean): Boolean {
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
         val durationS = BluetoothDiscoverableLogic.DURATION_S
+        cancelTimer()
+        // Start the timer before the call: the SCAN_MODE_CHANGED broadcast must see it.
+        if (on) endAtMs = SystemClock.elapsedRealtime() + durationS * 1000L
+        val mode = if (on) BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE else BluetoothAdapter.SCAN_MODE_CONNECTABLE
         val ok = try {
-            if (on) {
-                adapter.javaClass.getMethod("setScanMode", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
-                    .invoke(adapter, BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE, durationS) as? Boolean ?: false
-            } else {
-                adapter.javaClass.getMethod("setScanMode", Int::class.javaPrimitiveType)
-                    .invoke(adapter, BluetoothAdapter.SCAN_MODE_CONNECTABLE) as? Boolean ?: false
-            }
+            // Always give a non-zero timeout: the stack stores it, and with 0 it starts discoverable at the next power on.
+            adapter.javaClass.getMethod("setScanMode", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                .invoke(adapter, mode, durationS) as? Boolean ?: false
         } catch (e: Exception) {
             Log.e(TAG, "setScanMode failed (on=$on)", e.cause ?: e)
             false
         }
         Log.w(TAG, "setScanMode(on=$on, ${durationS}s): $ok")
-        cancelTimer()
-        if (on && ok) {
-            endAtMs = SystemClock.elapsedRealtime() + durationS * 1000L
-            handler.postDelayed(turnOff, durationS * 1000L)
-        }
+        if (on && ok) handler.postDelayed(turnOff, durationS * 1000L) else cancelTimer()
         listener?.invoke()
         return ok
     }
