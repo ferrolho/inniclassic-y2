@@ -214,6 +214,7 @@ class MediaLibraryManager private constructor() {
                 var genre = "Unknown Genre"
                 var albumArtist: String? = null
                 var composer: String? = null
+                var compilation = false
                 var trackNum = 0
 
                 try {
@@ -225,6 +226,7 @@ class MediaLibraryManager private constructor() {
                     var g: String? = null
                     var aa: String? = null
                     var cp: String? = null
+                    var cpl: String? = null
                     var trackStr: String? = null
 
                     val apm = AudioPlayerManager.getInstance()
@@ -238,6 +240,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else if (lower.endsWith(".flac")) {
                         val tags = apm.extractFlacMetadata(f, false)
                         if (tags[0] != null) t = tags[0] as? String
@@ -248,6 +251,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else if (lower.endsWith(".m4a") || lower.endsWith(".m4b")) {
                         val tags = apm.extractAlacMetadata(f, false)
                         if (tags[0] != null) t = tags[0] as? String
@@ -258,6 +262,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else if (lower.endsWith(".ogg")) {
                         val tags = apm.extractOggVorbisMetadata(f, false)
                         if (tags[0] != null) t = tags[0] as? String
@@ -268,6 +273,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else {
                         var mmr: android.media.MediaMetadataRetriever? = null
                         var fis: java.io.FileInputStream? = null
@@ -284,6 +290,7 @@ class MediaLibraryManager private constructor() {
                             g = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_GENRE)
                             aa = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
                             cp = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPOSER)
+                            cpl = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPILATION)
                         } catch (_: Throwable) {
                         } finally {
                             try { fis?.close() } catch (_: Throwable) {}
@@ -319,6 +326,7 @@ class MediaLibraryManager private constructor() {
                     if (!g.isNullOrBlank()) genre = g
                     albumArtist = if (!aa.isNullOrBlank()) aa else artist
                     if (!cp.isNullOrBlank()) composer = cp
+                    compilation = com.themoon.y1.models.Compilations.parseFlag(cpl)
 
                     if (!trackStr.isNullOrEmpty()) {
                         trackNum = try {
@@ -329,6 +337,7 @@ class MediaLibraryManager private constructor() {
                 } catch (_: Throwable) {}
 
                 val song = SongItem(f, title, artist, album, year, genre, albumArtist, composer)
+                song.compilationTag = compilation
                 targetList.add(song)
                 existingPaths.add(fileKey)
                 existingPaths.add(f.absolutePath)
@@ -409,6 +418,8 @@ class MediaLibraryManager private constructor() {
                 val trackNum = trackNumberMap[song.file.absolutePath] ?: 0
                 w.write(",\"trackNum\":")
                 w.write(trackNum.toString())
+                // Only for compilation tracks: a missing field reads as false (also in caches from before).
+                if (song.compilationTag) w.write(",\"compilation\":true")
                 w.write("}")
             }
         }
@@ -472,6 +483,7 @@ class MediaLibraryManager private constructor() {
                     o.optString("albumArtist", ""),
                     o.optString("composer", "")
                 )
+                song.compilationTag = o.optBoolean("compilation", false)
                 target.add(song)
                 trackNumberMap[f.absolutePath] = o.optInt("trackNum", 0)
             } catch (ignored: Throwable) {}
