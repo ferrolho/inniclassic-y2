@@ -6,16 +6,16 @@ import com.themoon.y1.navigation.LetterJump
 /**
  * iPod speed scrolling in Cover Flow. On a fast wheel turn (the same as in the lists, [LetterJump.WheelSpeed]),
  * the wheel moves through the artist letters of the albums and the letter box shows the letter. The covers do
- * not move. When the wheel slows down, or stops for [SETTLE_DELAY_MS], Cover Flow goes to the first album of
- * that letter.
+ * not move. When the wheel slows down, or stops for [SETTLE_DELAY_MS], the covers scroll past fast to the first
+ * album of that letter ([Ui.goTo]).
  */
 class CoverFlowLetterJump(private val albums: List<SongItem>, private val ui: Ui) {
 
     interface Ui {
         fun showLetter(letter: String)
         fun hideLetter()
-        /** Goes to album [index]; [direction] is the direction of the last letter step. */
-        fun goTo(index: Int, direction: Int)
+        /** End of a letter jump: goes to album [index]. */
+        fun goTo(index: Int)
         fun click()
         fun postDelayed(task: Runnable, delayMs: Long)
         fun cancel(task: Runnable)
@@ -27,7 +27,6 @@ class CoverFlowLetterJump(private val albums: List<SongItem>, private val ui: Ui
     private var lettersSize = -1
     /** The first album of the letter in the box; -1 when there is no letter jump. */
     private var target = -1
-    private var direction = 0
     private var letterShown = false
     private val settleTask = Runnable { settle() }
 
@@ -49,7 +48,6 @@ class CoverFlowLetterJump(private val albums: List<SongItem>, private val ui: Ui
         val next = index.jump(if (target >= 0) target else current, dir)
         if (next >= 0) {
             target = next
-            direction = dir
             ui.click()
         } else if (target < 0) {
             target = current // no letter that way: show the letter of this album
@@ -80,11 +78,15 @@ class CoverFlowLetterJump(private val albums: List<SongItem>, private val ui: Ui
         return letters
     }
 
+    /**
+     * The end of a letter jump: the only place that calls [Ui.goTo]. Now it comes from a slow wheel step and
+     * from [settleTask] (the wheel stops); a touch release can also call it.
+     */
     private fun settle() {
         ui.cancel(settleTask)
         val album = target
         target = -1
-        if (album >= 0) ui.goTo(album, direction)
+        if (album >= 0) ui.goTo(album)
     }
 
     companion object {

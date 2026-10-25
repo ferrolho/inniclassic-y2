@@ -13,12 +13,12 @@ class CoverFlowLetterJumpTest {
     private class FakeUi : CoverFlowLetterJump.Ui {
         val shown = mutableListOf<String>()
         var hidden = 0
-        var wentTo: Pair<Int, Int>? = null
+        var wentTo: Int? = null
         var clicks = 0
         var pending: Runnable? = null
         override fun showLetter(letter: String) { shown += letter }
         override fun hideLetter() { hidden++ }
-        override fun goTo(index: Int, direction: Int) { wentTo = index to direction }
+        override fun goTo(index: Int) { wentTo = index }
         override fun click() { clicks++ }
         override fun postDelayed(task: Runnable, delayMs: Long) { pending = task }
         override fun cancel(task: Runnable) { if (pending === task) pending = null }
@@ -53,7 +53,7 @@ class CoverFlowLetterJumpTest {
         assertEquals(3, ui.clicks)
         assertNull(ui.wentTo) // the covers wait for the end of the turn
         ui.pending!!.run() // the wheel stops
-        assertEquals(6 to 1, ui.wentTo)
+        assertEquals(6, ui.wentTo)
         assertEquals(0, ui.hidden) // the box fades by itself
     }
 
@@ -63,7 +63,7 @@ class CoverFlowLetterJumpTest {
         val jump = CoverFlowLetterJump(albums, ui)
         fastTurn(jump, -1, 0, current = 9) // from E back to D
         assertTrue(jump.onStep(-1, 400, 9)) // slow: the step goes to D, not one album further
-        assertEquals(6 to -1, ui.wentTo)
+        assertEquals(6, ui.wentTo)
         assertEquals(1, ui.hidden)
         assertNull(ui.pending)
         assertFalse(jump.onStep(-1, 600, 6)) // then album by album again
@@ -76,7 +76,7 @@ class CoverFlowLetterJumpTest {
         fastTurn(jump, 1, 0, current = 9)
         assertEquals(listOf("E"), ui.shown)
         ui.pending!!.run()
-        assertEquals(9 to 0, ui.wentTo) // the album in the centre: Cover Flow does not move
+        assertEquals(9, ui.wentTo) // the album in the centre: Cover Flow does not move
     }
 
     @Test
