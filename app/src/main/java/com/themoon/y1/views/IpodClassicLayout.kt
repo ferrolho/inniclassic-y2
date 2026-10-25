@@ -128,10 +128,12 @@ object IpodClassicLayout {
         // The 1 px line spans the full width, past the padding.
         setClipToPadding(bar, false, true)
 
-        val bodyHeight = (IpodClassicMetrics.STATUS_BAR_HEIGHT - IpodClassicMetrics.STATUS_BAR_RULE) * d
+        // The capitals are centred on the centre line of the icons and the battery.
+        val textBox = 2f * IpodClassicMetrics.statusCentreLine() * d
         val titleSize = IpodClassicMetrics.STATUS_TITLE_SP * d
+        val gap = IpodClassicMetrics.STATUS_ITEM_GAP * d
         main.findViewById<TextView>(R.id.tv_status_clock)?.let {
-            styleCentredText(it, titleSize, ThemeManager.getCustomFontBold(), bodyHeight)
+            styleCentredText(it, titleSize, ThemeManager.getCustomFontBold(), textBox)
         }
 
         val group = main.findViewById<LinearLayout>(R.id.layout_status_right_group) ?: return
@@ -145,16 +147,22 @@ object IpodClassicLayout {
                     setHeight(child, px(IpodClassicMetrics.BATTERY_HEIGHT, d))
                     setMargins(child, 0, 0, 0, px(IpodClassicMetrics.STATUS_BAR_RULE, d))
                 }
-                // The status bar title and any clock or text added to the right group.
-                is TextView -> styleCentredText(child, titleSize, ThemeManager.getCustomFontBold(), bodyHeight)
+                // The clock or any text in the right group: the gap is measured from the ink of the last letter.
+                is TextView -> {
+                    styleCentredText(child, titleSize, ThemeManager.getCustomFontBold(), textBox)
+                    setMargins(child, right = (gap - rightBearing(child)).roundToInt().coerceAtLeast(0))
+                }
             }
         }
 
+        // The play/pause icon has the box (height, top) and the gap of the other status icons.
         if (group.findViewWithTag<View>(TAG_PLAY_ICON) == null && batteryIndex >= 0) {
-            val size = px(IpodClassicMetrics.PLAY_ICON_SIZE, d)
-            val lp = LinearLayout.LayoutParams(size, size).apply {
+            val lp = LinearLayout.LayoutParams(
+                px(IpodClassicMetrics.PLAY_ICON_WIDTH, d),
+                px(IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
+            ).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                rightMargin = px(IpodClassicMetrics.PLAY_ICON_GAP, d)
+                rightMargin = gap.roundToInt()
                 bottomMargin = px(IpodClassicMetrics.STATUS_BAR_RULE, d)
             }
             group.addView(IpodPlayStateView(main).apply { tag = TAG_PLAY_ICON }, batteryIndex, lp)
@@ -269,6 +277,18 @@ object IpodClassicLayout {
         path.computeBounds(bounds, true)
         return IpodClassicMetrics.capCentredPaddingTop(boxHeight, paint.fontMetricsInt.ascent, -bounds.top)
             .coerceAtLeast(0)
+    }
+
+    /** Space between the end of the ink of the last letter of [tv] and the end of its advance. */
+    private fun rightBearing(tv: TextView): Float {
+        val text = tv.text?.toString().orEmpty()
+        if (text.isEmpty()) return 0f
+        // A path, because getTextBounds() rounds to whole pixels.
+        val path = android.graphics.Path()
+        tv.paint.getTextPath(text, 0, text.length, 0f, 0f, path)
+        val bounds = android.graphics.RectF()
+        path.computeBounds(bounds, true)
+        return (tv.paint.measureText(text) - bounds.right).coerceAtLeast(0f)
     }
 
     internal fun horizontalGravity(tv: TextView): Int {

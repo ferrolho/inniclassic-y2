@@ -11,6 +11,7 @@ import android.view.ViewTreeObserver
 import com.themoon.y1.MainActivity
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.AudioPlayerManager
+import kotlin.math.roundToInt
 
 /** The iPod's blue play (▶) or pause (‖) state icon, shown left of the battery. Hidden when nothing is loaded. */
 class IpodPlayStateView(context: Context) : View(context) {
@@ -19,7 +20,7 @@ class IpodPlayStateView(context: Context) : View(context) {
     private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1f
-        color = 0xFF1A5DB0.toInt()
+        color = StatusIcons.EDGE
     }
     private val path = Path()
 
@@ -63,7 +64,7 @@ class IpodPlayStateView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        fill.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), 0xFFA6D6FF.toInt(), 0xFF1F70D6.toInt(), Shader.TileMode.CLAMP)
+        fill.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), StatusIcons.FILL_TOP, StatusIcons.FILL_BOTTOM, Shader.TileMode.CLAMP)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -72,16 +73,19 @@ class IpodPlayStateView(context: Context) : View(context) {
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
         path.reset()
+        // The ink fills the view from edge to edge, like the other status icons (StatusIcons): the 1 px
+        // edge is centred 0.5 px inside the view.
         when (state) {
             STATE_PLAYING -> {
-                path.moveTo(w * 0.08f, h * 0.06f)
-                path.lineTo(w * 0.94f, h * 0.5f)
-                path.lineTo(w * 0.08f, h * 0.94f)
+                path.moveTo(0.5f, 0.5f)
+                path.lineTo(w - 0.5f, h / 2f)
+                path.lineTo(0.5f, h - 0.5f)
                 path.close()
             }
             STATE_PAUSED -> {
-                path.addRect(w * 0.14f, h * 0.08f, w * 0.42f, h * 0.92f, Path.Direction.CW)
-                path.addRect(w * 0.58f, h * 0.08f, w * 0.86f, h * 0.92f, Path.Direction.CW)
+                val bar = (w * PAUSE_BAR_RATIO).roundToInt().toFloat()
+                path.addRect(0.5f, 0.5f, bar - 0.5f, h - 0.5f, Path.Direction.CW)
+                path.addRect(w - bar + 0.5f, 0.5f, w - 0.5f, h - 0.5f, Path.Direction.CW)
             }
             else -> return
         }
@@ -94,6 +98,8 @@ class IpodPlayStateView(context: Context) : View(context) {
         const val STATE_PLAYING = 1
         const val STATE_PAUSED = 2
         const val POLL_MS = 500L
+        // 6 px bars with a 5 px space in the 17 px wide icon.
+        const val PAUSE_BAR_RATIO = 0.35f
     }
 }
 
