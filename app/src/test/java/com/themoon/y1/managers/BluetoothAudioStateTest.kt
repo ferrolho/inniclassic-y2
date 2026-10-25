@@ -1,23 +1,23 @@
-package com.themoon.y1.views
+package com.themoon.y1.managers
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class StatusBarBluetoothStateTest {
-    private val connected = StatusBarBluetoothState.STATE_CONNECTED
+class BluetoothAudioStateTest {
+    private val connected = BluetoothAudioState.STATE_CONNECTED
     private val disconnected = 0
     private val connecting = 1
     private val disconnecting = 3
 
     @Test
     fun startsWithTheRuneOnly() {
-        assertFalse(StatusBarBluetoothState().isConnected)
+        assertFalse(BluetoothAudioState().isConnected)
     }
 
     @Test
     fun connectedDeviceAddsTheDotsAndDisconnectRemovesThem() {
-        val s = StatusBarBluetoothState()
+        val s = BluetoothAudioState()
         assertFalse(s.onAdapterState(true))
         assertFalse(s.onA2dpState("AA", connecting))
         assertFalse(s.isConnected)
@@ -32,7 +32,7 @@ class StatusBarBluetoothStateTest {
 
     @Test
     fun staysConnectedUntilTheLastDeviceDisconnects() {
-        val s = StatusBarBluetoothState()
+        val s = BluetoothAudioState()
         s.onAdapterState(true)
         s.onA2dpState("AA", connected)
         assertFalse(s.onA2dpState("BB", connected))
@@ -44,7 +44,7 @@ class StatusBarBluetoothStateTest {
 
     @Test
     fun adapterOffForgetsTheDevices() {
-        val s = StatusBarBluetoothState()
+        val s = BluetoothAudioState()
         s.onAdapterState(true)
         s.onA2dpState("AA", connected)
         assertTrue(s.onAdapterState(false))
@@ -58,7 +58,7 @@ class StatusBarBluetoothStateTest {
 
     @Test
     fun queryAtStartReplacesTheList() {
-        val s = StatusBarBluetoothState()
+        val s = BluetoothAudioState()
         assertFalse(s.onConnectedDevices(emptyList()))
         assertTrue(s.onConnectedDevices(listOf("AA", "BB")))
         assertTrue(s.adapterOn)
@@ -69,8 +69,29 @@ class StatusBarBluetoothStateTest {
 
     @Test
     fun broadcastWithoutADeviceStillCounts() {
-        val s = StatusBarBluetoothState()
+        val s = BluetoothAudioState()
         assertTrue(s.onA2dpState(null, connected))
         assertTrue(s.onA2dpState(null, disconnected))
+    }
+
+    @Test
+    fun listTicksEachConnectedDeviceAlsoWithoutTheListProxy() {
+        val s = BluetoothAudioState()
+        // After an app restart the list has no A2DP proxy (null): the query at start gives the devices.
+        assertFalse(s.listShowsConnected("AA", null))
+        s.onConnectedDevices(listOf("AA", "BB"))
+        assertTrue(s.listShowsConnected("AA", null))
+        assertTrue(s.listShowsConnected("BB", disconnected))
+        assertFalse(s.listShowsConnected("CC", null))
+        assertFalse(s.listShowsConnected(null, null))
+        // The proxy of the list can also say connected.
+        assertTrue(s.listShowsConnected("CC", connected))
+        // Disconnect broadcast: no tick.
+        s.onA2dpState("AA", disconnected)
+        assertFalse(s.listShowsConnected("AA", null))
+        // Bluetooth off: no ticks.
+        s.onAdapterState(false)
+        assertFalse(s.listShowsConnected("BB", null))
+        assertTrue(s.connectedAddresses.isEmpty())
     }
 }

@@ -130,30 +130,29 @@ internal fun MainActivity.updateStatusBarWifi(isConnected: Boolean) {
     setStatusBarIcon(ivStatusWifi ?: return, com.themoon.y1.views.StatusIcons.Icon.WIFI, isConnected, 6)
 }
 
-/** The state of the Bluetooth status icon (one MainActivity). */
-internal object StatusBarBluetooth {
-    val state = com.themoon.y1.views.StatusBarBluetoothState()
-}
-
 /** The rune; with an audio device connected, the rune with a dot on each side. */
 internal fun MainActivity.updateStatusBarBluetooth() {
     setStatusBarIcon(
         ivStatusBluetooth ?: return, com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH, true, 8,
-        StatusBarBluetooth.state.isConnected
+        com.themoon.y1.managers.BluetoothAudioState.shared.isConnected
     )
 }
 
-/** A2DP connection broadcast for [device]: the icon gets or loses its dots. */
+/** A2DP connection broadcast for [device]: the icon gets or loses its dots (MainActivity then draws the list again). */
 internal fun MainActivity.onStatusBarA2dpState(device: android.bluetooth.BluetoothDevice?, profileState: Int) {
-    if (StatusBarBluetooth.state.onA2dpState(device?.address, profileState)) updateStatusBarBluetooth()
+    if (com.themoon.y1.managers.BluetoothAudioState.shared.onA2dpState(device?.address, profileState)) updateStatusBarBluetooth()
 }
 
 /** Bluetooth adapter broadcast: off forgets the devices; on asks the A2DP proxy for the connected devices. */
 internal fun MainActivity.onStatusBarBluetoothAdapterState(adapterState: Int) {
     val on = adapterState == android.bluetooth.BluetoothAdapter.STATE_ON
-    if (StatusBarBluetooth.state.onAdapterState(on)) updateStatusBarBluetooth()
+    if (com.themoon.y1.managers.BluetoothAudioState.shared.onAdapterState(on)) updateStatusBarBluetooth()
     if (on) queryStatusBarBluetooth()
 }
+
+private fun MainActivity.isBluetoothListShown(): Boolean =
+    com.themoon.y1.navigation.NavigationManager.getInstance().currentState is com.themoon.y1.navigation.ScreenState.Bluetooth ||
+        currentScreenState == MainActivity.STATE_BLUETOOTH
 
 /**
  * Asks the A2DP proxy once for the connected audio devices, then closes the proxy: at start and when Bluetooth
@@ -162,7 +161,7 @@ internal fun MainActivity.onStatusBarBluetoothAdapterState(adapterState: Int) {
 internal fun MainActivity.queryStatusBarBluetooth() {
     val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return
     if (!adapter.isEnabled) return
-    if (!StatusBarBluetooth.state.adapterOn) StatusBarBluetooth.state.onAdapterState(true)
+    if (!com.themoon.y1.managers.BluetoothAudioState.shared.adapterOn) com.themoon.y1.managers.BluetoothAudioState.shared.onAdapterState(true)
     try {
         adapter.getProfileProxy(applicationContext, object : android.bluetooth.BluetoothProfile.ServiceListener {
             override fun onServiceConnected(profile: Int, proxy: android.bluetooth.BluetoothProfile) {
@@ -175,7 +174,11 @@ internal fun MainActivity.queryStatusBarBluetooth() {
                     adapter.closeProfileProxy(profile, proxy)
                 } catch (_: Exception) {}
                 runOnUiThread {
-                    if (StatusBarBluetooth.state.onConnectedDevices(devices)) updateStatusBarBluetooth()
+                    val audio = com.themoon.y1.managers.BluetoothAudioState.shared
+                    val before = audio.connectedAddresses
+                    if (audio.onConnectedDevices(devices)) updateStatusBarBluetooth()
+                    // The Bluetooth list ticks the connected devices: draw it again if it is open.
+                    if (audio.connectedAddresses != before && isBluetoothListShown()) bluetoothController.startBluetoothScan()
                 }
             }
 

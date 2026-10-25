@@ -1,20 +1,34 @@
-package com.themoon.y1.views
+package com.themoon.y1.managers
 
 /**
- * The state of the Bluetooth status icon: the adapter is on, and which audio (A2DP) devices are connected.
- * With one or more connected devices the icon is the rune with two dots ([isConnected]), like the Android icon.
+ * The Bluetooth audio (A2DP) devices that are connected, for the status bar icon and the Bluetooth list.
+ * With one or more connected devices the status icon is the rune with two dots ([isConnected]), like the Android
+ * icon, and the list shows a tick on each connected device ([listShowsConnected]).
  *
  * MainActivity gives it the A2DP connection broadcasts and, at start and when Bluetooth comes on, the list of
- * connected devices from the A2DP proxy. Each method returns true when [isConnected] changed, so the caller draws
- * the icon again only then. No Android dependencies, for the unit tests.
+ * connected devices from the A2DP proxy. So it is correct also after an app restart, when the app did not make the
+ * connection itself. Each method returns true when [isConnected] changed, so the caller draws the icon again only
+ * then. No Android dependencies, for the unit tests. One instance: [shared].
  */
-class StatusBarBluetoothState {
+class BluetoothAudioState {
     private val connected = LinkedHashSet<String>()
 
     var adapterOn = false
         private set
 
     val isConnected: Boolean get() = adapterOn && connected.isNotEmpty()
+
+    /** The addresses of the connected devices (a copy). */
+    val connectedAddresses: Set<String> get() = if (adapterOn) LinkedHashSet(connected) else emptySet()
+
+    fun isDeviceConnected(address: String?): Boolean = adapterOn && address != null && address in connected
+
+    /**
+     * The decision for a row of the Bluetooth list: connected if this state has the device, or if the A2DP proxy of
+     * the list says so ([proxyState] = BluetoothA2dp.getConnectionState, null when the list has no proxy).
+     */
+    fun listShowsConnected(address: String?, proxyState: Int?): Boolean =
+        isDeviceConnected(address) || proxyState == STATE_CONNECTED
 
     /** Bluetooth on or off. Off (or turning on) forgets all devices: the A2DP query gives them again. */
     fun onAdapterState(on: Boolean): Boolean = change {
@@ -54,5 +68,9 @@ class StatusBarBluetoothState {
         /** BluetoothProfile.STATE_CONNECTED. */
         const val STATE_CONNECTED = 2
         private const val UNKNOWN_DEVICE = "?"
+
+        /** The state of the app (one MainActivity): the status bar and the Bluetooth list use it. */
+        @JvmStatic
+        val shared = BluetoothAudioState()
     }
 }
