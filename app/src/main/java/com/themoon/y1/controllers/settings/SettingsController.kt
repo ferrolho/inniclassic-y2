@@ -1162,43 +1162,31 @@ class SettingsController(
         focusBtn?.requestFocus() ?: containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
+    /** Volume Limit: the loudest volume step (1..30, see VolumeSteps), or Off. */
     private fun buildVolumeLimitSettingsUI() {
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        var volumeLimitMax = prefs.getInt("volume_limit_max", -1)
+        val volumeLimitMax = prefs.getInt(com.themoon.y1.managers.VolumeSteps.PREF_LIMIT, -1)
         var focusBtn: Button? = null
 
         val btnOff = createListButton(localize("Off"))
         btnOff.gravity = Gravity.CENTER
         btnOff.setOnClickListener {
             clickFeedback()
-            volumeLimitMax = -1
-            prefs.edit().putInt("volume_limit_max", -1).commit()
+            setVolumeLimit(-1)
             buildSettingsUI()
         }
         containerSettingsItems.addView(btnOff)
         if (volumeLimitMax < 0) focusBtn = btnOff
 
-        for (i in 1..maxVol) {
+        for (i in 1..com.themoon.y1.managers.VolumeSteps.STEPS) {
             val level = i
             val btn = createListButton(level.toString())
             btn.gravity = Gravity.CENTER
             btn.setOnClickListener {
                 clickFeedback()
-                volumeLimitMax = level
-                prefs.edit().putInt("volume_limit_max", level).commit()
-                val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                if (cur > level) {
-                    SafeVolumeBypasser.setStreamVolumeWithBypass(
-                        activity,
-                        audioManager,
-                        AudioManager.STREAM_MUSIC,
-                        level,
-                        0
-                    )
-                }
+                setVolumeLimit(level)
                 buildSettingsUI()
             }
             containerSettingsItems.addView(btn)
@@ -1206,6 +1194,11 @@ class SettingsController(
         }
 
         focusBtn?.requestFocus() ?: containerSettingsItems.getChildAt(0)?.requestFocus()
+    }
+
+    private fun setVolumeLimit(limitStep: Int) {
+        prefs.edit().putInt(com.themoon.y1.managers.VolumeSteps.PREF_LIMIT, limitStep).commit()
+        mainActivity?.setVolumeLimit(limitStep)
     }
 
     private fun buildLegalSettingsUI() {
@@ -1476,6 +1469,7 @@ class SettingsController(
         mainActivity?.isTimeInTitleBar = false
         mainActivity?.is24HourFormat = false
         mainActivity?.batteryIconView?.setShowPercentage(false)
+        mainActivity?.setVolumeLimit(-1)
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
         buildSettingsUI()
