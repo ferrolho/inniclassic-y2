@@ -446,6 +446,19 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnAlbumTilt)
 
+        val isIpodLayout = prefs.getBoolean(com.themoon.y1.views.IpodClassicLayout.PREF_KEY, false)
+        val btnIpodLayout = createSettingRow(
+            localize("iPod Classic Layout"),
+            com.themoon.y1.core.extensions.onOff(isIpodLayout, localize)
+        )
+        btnIpodLayout.setOnClickListener {
+            clickFeedback()
+            // IpodClassicLayout listens for this key and restyles the static views; the rows are rebuilt here.
+            prefs.edit().putBoolean(com.themoon.y1.views.IpodClassicLayout.PREF_KEY, !isIpodLayout).commit()
+            buildSettingsUI()
+        }
+        containerSettingsItems.addView(btnIpodLayout)
+
         val speedLabels = arrayOf("1.0x (Normal)", "1.2x (Fast)", "1.5x (Faster)", "2.0x (Very Fast)")
         val speedValues = floatArrayOf(1.0f, 1.2f, 1.5f, 2.0f)
         val currentSpd = AudioPlayerManager.getInstance().getCurrentSpeed()
@@ -1579,6 +1592,7 @@ class SettingsController(
                 .remove("volume_limit_max")
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
+                .remove(com.themoon.y1.views.IpodClassicLayout.PREF_KEY)
                 .remove("album_tilt_enabled")
                 .remove("backlight_timer_index")
                 .remove("screen_off_control")
