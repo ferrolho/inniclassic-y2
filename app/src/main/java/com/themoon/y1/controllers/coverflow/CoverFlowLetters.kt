@@ -8,7 +8,10 @@ import com.themoon.y1.navigation.LetterJump
  * ([CoverFlowOrder.sortName] of [CoverFlowOrder.artistOf]), without accents. Digits, symbols and blank names
  * are "#", which sorts before "A". Make it one time for each album list.
  */
-class CoverFlowLetters private constructor(private val letters: List<String>) {
+class CoverFlowLetters private constructor(
+    /** The letter of each album, in Cover Flow order. */
+    val letters: List<String>
+) {
 
     val size: Int get() = letters.size
 

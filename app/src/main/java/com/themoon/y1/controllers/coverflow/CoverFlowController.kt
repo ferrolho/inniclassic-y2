@@ -53,7 +53,7 @@ class CoverFlowController(
     private var coverFlowDirectionChangeTime = 0L
     private var lastCoverFlowWheelTime = 0L
 
-    // Speed scrolling: a fast wheel turn moves through the artist letters (see CoverFlowLetterJump).
+    // Speed scrolling: after a fast wheel turn, the wheel moves through the artist letters (see CoverFlowLetterJump).
     private val letterJump = CoverFlowLetterJump(uniqueAlbumList, object : CoverFlowLetterJump.Ui {
         override fun showLetter(letter: String) { MainActivity.instance?.showJumpLetter(letter) }
         override fun hideLetter() { MainActivity.instance?.hideFastScrollLetter() }
@@ -663,6 +663,8 @@ class CoverFlowController(
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Letter mode: a centre press only ends it; Back and Play/Pause end it, then work as usual.
+        if (letterJump.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount)) return true
         if (event.action == KeyEvent.ACTION_DOWN && (event.keyCode == 21 || event.keyCode == 22)) {
             handleCoverFlowWheelInput(event.keyCode, event)
             return true

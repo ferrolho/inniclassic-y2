@@ -1,6 +1,7 @@
 package com.themoon.y1.controllers.coverflow
 
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.navigation.LetterJump
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -51,22 +52,65 @@ class CoverFlowLetterJumpTest {
         assertTrue(jump.onStep(1, 250, 1))
         assertEquals(listOf("B", "C", "D"), ui.shown)
         assertEquals(3, ui.clicks)
-        assertNull(ui.wentTo) // the covers wait for the end of the turn
-        ui.pending!!.run() // the wheel stops
+        assertNull(ui.wentTo) // the covers wait for the end of letter mode
+        ui.pending!!.run() // no wheel step for LetterJump.IDLE_END_MS
         assertEquals(6, ui.wentTo)
-        assertEquals(0, ui.hidden) // the box fades by itself
+        assertEquals(1, ui.hidden) // the box fades at the end
     }
 
     @Test
-    fun slowStepEndsTheJumpAndHidesTheBox() {
+    fun slowStepsMoveOneLetterEachAndTheBoxStays() {
         val ui = FakeUi()
         val jump = CoverFlowLetterJump(albums, ui)
         fastTurn(jump, -1, 0, current = 9) // from E back to D
-        assertTrue(jump.onStep(-1, 400, 9)) // slow: the step goes to D, not one album further
-        assertEquals(6, ui.wentTo)
+        assertTrue(jump.onStep(-1, 500, 9)) // slow: one more letter, to C
+        assertTrue(jump.onStep(-1, 1100, 9)) // slower: to B
+        assertEquals(listOf("D", "C", "B"), ui.shown)
+        assertEquals(0, ui.hidden)
+        assertNull(ui.wentTo)
+        assertTrue(jump.onStep(1, 1300, 9)) // the other way: back to C
+        assertEquals("C", ui.shown.last())
+        ui.pending!!.run()
+        assertEquals(4, ui.wentTo)
+        assertFalse(jump.onStep(-1, 2500, 4)) // then album by album again
+    }
+
+    @Test
+    fun aLateStepAfterTheIdleTimeEndsLetterModeFirst() {
+        val ui = FakeUi()
+        val jump = CoverFlowLetterJump(albums, ui)
+        fastTurn(jump, 1, 0, current = 1) // last step at 150 ms
+        // The idle timer did not run (busy main thread), and a step comes later than the idle time.
+        assertFalse(jump.onStep(1, 150 + LetterJump.IDLE_END_MS, 1))
+        assertEquals(2, ui.wentTo)
+        assertEquals(1, ui.hidden)
+    }
+
+    @Test
+    fun centrePressEndsLetterModeAndOpensNothing() {
+        val ui = FakeUi()
+        val jump = CoverFlowLetterJump(albums, ui)
+        assertFalse(jump.onKey(CENTRE, isDown = true, repeatCount = 0)) // not in letter mode: opens the album
+        assertFalse(jump.onKey(CENTRE, isDown = false, repeatCount = 0))
+        fastTurn(jump, 1, 0, current = 1)
+        assertTrue(jump.onKey(CENTRE, isDown = true, repeatCount = 0))
+        assertEquals(2, ui.wentTo)
         assertEquals(1, ui.hidden)
         assertNull(ui.pending)
-        assertFalse(jump.onStep(-1, 600, 6)) // then album by album again
+        assertTrue(jump.onKey(CENTRE, isDown = false, repeatCount = 0)) // the release opens nothing
+        assertFalse(jump.onKey(CENTRE, isDown = true, repeatCount = 0)) // the next press opens the album
+    }
+
+    @Test
+    fun backAndPlayEndLetterModeAndWorkAsUsual() {
+        for (key in listOf(BACK, PLAY_PAUSE)) {
+            val ui = FakeUi()
+            val jump = CoverFlowLetterJump(albums, ui)
+            fastTurn(jump, 1, 0, current = 3)
+            assertFalse(jump.onKey(key, isDown = true, repeatCount = 0))
+            assertEquals(4, ui.wentTo)
+            assertEquals(1, ui.hidden)
+        }
     }
 
     @Test
@@ -86,7 +130,15 @@ class CoverFlowLetterJumpTest {
         fastTurn(jump, 1, 0, current = 0)
         jump.reset()
         assertNull(ui.pending)
+        assertEquals(1, ui.hidden)
         assertFalse(jump.onStep(1, 1000, 0))
         assertNull(ui.wentTo)
+    }
+
+    private companion object {
+        // android.view.KeyEvent codes
+        const val BACK = 4
+        const val CENTRE = 23
+        const val PLAY_PAUSE = 85
     }
 }
