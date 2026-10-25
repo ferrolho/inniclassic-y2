@@ -108,11 +108,13 @@ class BrowserController(
     private var browserCoverPaneSetUp: Boolean = false
     private val uiHandler = Handler(Looper.getMainLooper())
 
-    private val wheelSpeed = LetterJump.WheelSpeed()
+    private val letterMode = LetterJump.Mode()
+    private val letterIdleTask = Runnable { endLetterJump() }
     private var rowLettersKey: Any? = null
     private var rowLetters: List<String?>? = null
-    /** The letter of the current letter jump (fast wheel turn); null when the wheel steps row by row. */
+    /** The letter in the letter box during letter mode; null when the wheel steps row by row. */
     var jumpLetter: String? = null
+        private set
 
     companion object {
         private const val FOLDER_ROW_CHUNK_SIZE = 25
@@ -200,7 +202,7 @@ class BrowserController(
 
     override fun onExit() {
         hideBrowserCoverPane()
-        jumpLetter = null
+        endLetterJump()
         hzIndexScroll?.visibility = View.GONE
         isAudiobookLibraryMode = false
     }
@@ -1464,30 +1466,51 @@ class BrowserController(
     }
 
     /**
-     * Speed scrolling. On a fast wheel turn in an alphabetical list, focuses the first row of the next or
-     * previous letter with [focusRow], shows the letter box and returns true. Else returns false, and the
-     * wheel steps one row. [listKey] changes when the rows change; [rowTexts] gives the text of each row.
+     * Speed scrolling ([LetterJump.Mode]). In letter mode, focuses with [focusRow] the first row of the next or
+     * previous letter, shows the letter box and returns true. Else returns false, and the wheel steps one row.
+     * [from] is the focused row, [listKey] changes when the rows change, [rowTexts] gives the text of each row.
      */
     private fun letterJump(delta: Int, event: KeyEvent, from: Int, listKey: Any, rowTexts: () -> List<String?>, focusRow: (Int) -> Unit): Boolean {
-        if (!wheelSpeed.onStep(delta, event.eventTime)) {
-            if (jumpLetter != null) MainActivity.instance?.hideFastScrollLetter()
-            return false
+        if (letterMode.isIdle(event.eventTime)) endLetterJump() // the idle timer did not run yet
+        val step = letterMode.onStep(delta, event.eventTime, from) {
+            if (listKey != rowLettersKey) {
+                rowLetters = LetterJump.lettersFor(rowTexts())
+                rowLettersKey = listKey
+            }
+            rowLetters
         }
-        if (listKey != rowLettersKey) {
-            rowLetters = LetterJump.lettersFor(rowTexts())
-            rowLettersKey = listKey
-        }
-        val letters = rowLetters ?: return false
-        val target = LetterJump.target(letters, from, delta)
-        val letter = letters[if (target >= 0) target else from] ?: return true
-        jumpLetter = letter // before the focus moves: the focused row shows the letter box
-        if (target >= 0) {
-            focusRow(target)
+        if (step == LetterJump.Step.ROW) return false
+        jumpLetter = rowLetters?.getOrNull(letterMode.row) // before the focus moves: the focused row shows the letter box
+        if (step == LetterJump.Step.LETTER) {
+            focusRow(letterMode.row)
             clickFeedback()
         }
-        MainActivity.instance?.showFastScrollLetter(letter)
+        jumpLetter?.let { MainActivity.instance?.showJumpLetter(it) }
+        uiHandler.removeCallbacks(letterIdleTask)
+        uiHandler.postDelayed(letterIdleTask, LetterJump.IDLE_END_MS)
         return true
     }
+
+    /**
+     * Ends letter mode (idle wheel, a key, another screen). The list is already at the first row of the letter;
+     * the letter box fades out.
+     */
+    fun endLetterJump() {
+        uiHandler.removeCallbacks(letterIdleTask)
+        letterMode.end()
+        if (jumpLetter == null) return
+        jumpLetter = null
+        MainActivity.instance?.hideFastScrollLetter()
+    }
+
+    /** In letter mode, a centre press only ends it; Back and Play/Pause end it and then work as usual. */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        when (letterMode.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount)) {
+            LetterJump.Press.PASS -> false
+            LetterJump.Press.DROP -> true
+            LetterJump.Press.END -> { endLetterJump(); true }
+            LetterJump.Press.END_AND_PASS -> { endLetterJump(); false }
+        }
 
     /** The text of a ListView row: a category name or a song title; null for "All Songs" and other special rows. */
     private fun listRowText(item: Any?): String? = when (item) {
