@@ -19,6 +19,8 @@ import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.managers.BluetoothDiscoverableLogic
+import com.themoon.y1.managers.BluetoothDiscoverableManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
@@ -59,6 +61,16 @@ class BluetoothController(
     // Bluetooth proxy reference
     private var globalA2dp: BluetoothProfile? = null
 
+    // Discoverable row: its value updates each second while the screen shows.
+    private var discoverableValue: TextView? = null
+    private val tickHandler = Handler(Looper.getMainLooper())
+    private val tick = object : Runnable {
+        override fun run() {
+            updateDiscoverableValue()
+            tickHandler.postDelayed(this, 1000)
+        }
+    }
+
     private fun updateScanButtonFocus(hasFocus: Boolean) {
         if (hasFocus) {
             btnScanBt.background = ListItemViewFactory.createFocusedButtonBackground(activity)
@@ -80,17 +92,23 @@ class BluetoothController(
             clickFeedback()
             startBluetoothScan()
         }
+        BluetoothDiscoverableManager.init(activity)
     }
 
     override fun onEnter(state: ScreenState) {
         layoutBluetoothMode.visibility = View.VISIBLE
         updateScanButtonFocus(btnScanBt.hasFocus())
         startBluetoothScan()
+        BluetoothDiscoverableManager.listener = { updateDiscoverableValue() }
+        tickHandler.removeCallbacks(tick)
+        tickHandler.post(tick)
     }
 
     override fun onExit() {
         layoutBluetoothMode.visibility = View.GONE
         cancelDiscovery()
+        tickHandler.removeCallbacks(tick)
+        BluetoothDiscoverableManager.listener = null
     }
 
     override fun onRefreshUI() {
@@ -182,6 +200,8 @@ class BluetoothController(
             return
         }
 
+        addDiscoverableRows(ba)
+
         // Paired devices header
         val tvPaired = TextView(activity).apply {
             text = "━ " + localize("PAIRED DEVICES") + " ━"
@@ -232,6 +252,54 @@ class BluetoothController(
         }
 
         restoreBluetoothFocus(targetFocusIndex)
+    }
+
+    /** Discoverable (On for a limited time, so a car can find the Y2) and Name rows, below Bluetooth Power. */
+    @SuppressLint("MissingPermission")
+    private fun addDiscoverableRows(ba: BluetoothAdapter) {
+        val rowDiscoverable = createSettingRow(localize("Discoverable"), discoverableText())
+        discoverableValue = rowDiscoverable.getChildAt(1) as? TextView
+        rowDiscoverable.setOnClickListener {
+            clickFeedback()
+            val on = !BluetoothDiscoverableManager.isDiscoverable()
+            if (!BluetoothDiscoverableManager.setDiscoverable(on)) {
+                Toast.makeText(activity, localize("Cannot change Discoverable mode."), Toast.LENGTH_SHORT).show()
+            }
+            updateDiscoverableValue()
+        }
+        containerBtItems.addView(rowDiscoverable)
+
+        val name = try { ba.name } catch (e: Exception) { null }
+        val rowName = createSettingRow(localize("Name"), name ?: "")
+        rowName.setOnClickListener {
+            clickFeedback()
+            val prefs = activity.getSharedPreferences(NAME_PREFS, Context.MODE_PRIVATE)
+            val current = try { ba.name } catch (e: Exception) { null }
+            val newName = BluetoothDiscoverableLogic.nameAfterPress(current, prefs.getString(KEY_SAVED_NAME, null))
+                ?: return@setOnClickListener
+            if (newName == BluetoothDiscoverableLogic.DEVICE_NAME && !current.isNullOrBlank()) {
+                prefs.edit().putString(KEY_SAVED_NAME, current).apply()
+            }
+            if (ba.setName(newName)) {
+                (rowName.getChildAt(1) as? TextView)?.text = newName
+            } else {
+                Toast.makeText(activity, localize("Cannot change the Bluetooth name."), Toast.LENGTH_SHORT).show()
+            }
+        }
+        containerBtItems.addView(rowName)
+    }
+
+    private fun discoverableText(): String = BluetoothDiscoverableLogic.value(
+        BluetoothDiscoverableManager.isDiscoverable(),
+        BluetoothDiscoverableManager.remainingMs(),
+        localize
+    )
+
+    private fun updateDiscoverableValue() {
+        val tv = discoverableValue ?: return
+        if (tv.parent?.parent != containerBtItems) return
+        val text = discoverableText()
+        if (tv.text.toString() != text) tv.text = text
     }
 
     @SuppressLint("MissingPermission")
@@ -630,5 +698,10 @@ class BluetoothController(
     override fun onBackPressed(): Boolean {
         onNavigateBack()
         return true
+    }
+
+    companion object {
+        private const val NAME_PREFS = "bluetooth_name"
+        private const val KEY_SAVED_NAME = "saved_name"
     }
 }
