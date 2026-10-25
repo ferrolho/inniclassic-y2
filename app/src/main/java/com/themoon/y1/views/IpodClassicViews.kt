@@ -2,12 +2,10 @@ package com.themoon.y1.views
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
-import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.ViewTreeObserver
 import com.themoon.y1.MainActivity
@@ -101,12 +99,15 @@ class IpodPlayStateView(context: Context) : View(context) {
 
 /**
  * The 1 px dark line at the bottom of the iPod status bar. It hides itself when the status bar has a
- * transparent background (Cover Flow, video player).
+ * transparent background (video player). Before each frame it also keeps the status bar at the full
+ * width ([IpodClassicLayout.keepStatusBarFull]); it is in the status bar only while the iPod layout is on.
  */
 class IpodStatusRuleView(context: Context) : View(context) {
     private val preDraw = ViewTreeObserver.OnPreDrawListener {
-        val bg = (parent as? View)?.background
-        val transparent = bg == null || (bg is ColorDrawable && Color.alpha(bg.color) == 0)
+        val bar = parent as? View
+        // A changed bar is drawn in the next frame, so this frame is skipped.
+        if (IpodClassicLayout.keepStatusBarFull(bar)) return@OnPreDrawListener false
+        val transparent = IpodClassicLayout.isTransparent(bar?.background)
         val vis = if (transparent || !IpodClassicLayout.isActive) INVISIBLE else VISIBLE
         if (visibility != vis) visibility = vis
         true

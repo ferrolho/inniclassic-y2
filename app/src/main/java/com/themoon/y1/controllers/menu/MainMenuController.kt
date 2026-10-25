@@ -24,6 +24,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.CustomAnalogClockView
+import com.themoon.y1.views.IpodClassicLayout
 import com.themoon.y1.views.IpodClassicLists
 import com.themoon.y1.views.WidgetBatteryBarView
 import java.util.Locale
@@ -398,12 +399,14 @@ class MainMenuController(
                     val animContainer = FrameLayout(activity)
                     val dm = activity.resources.displayMetrics
                     val leftPx = (el.x * density).toInt()
+                    // The iPod Classic Layout puts the cover below the full-width status bar (IpodClassicLists.menuElements).
+                    val topPx = if (IpodClassicLayout.isActive) (el.y * density).toInt() else 0
                     val contW = dm.widthPixels - leftPx
-                    val contH = dm.heightPixels
+                    val contH = dm.heightPixels - topPx
 
                     val coverLp = FrameLayout.LayoutParams(contW, contH).apply {
                         leftMargin = leftPx
-                        topMargin = 0
+                        topMargin = topPx
                     }
                     animContainer.layoutParams = coverLp
                     animContainer.clipChildren = true

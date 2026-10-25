@@ -416,7 +416,7 @@ class SettingsController(
         val isIpodLayout = prefs.getBoolean(com.themoon.y1.views.IpodClassicLayout.PREF_KEY, false)
         val btnIpodLayout = createSettingRow(
             localize("iPod Classic Layout"),
-            if (isIpodLayout) localize("ON") else localize("OFF")
+            localize(if (isIpodLayout) "On" else "Off")
         )
         btnIpodLayout.setOnClickListener {
             clickFeedback()
