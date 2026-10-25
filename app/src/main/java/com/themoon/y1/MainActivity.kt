@@ -714,22 +714,42 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }
     }
 
+    private val volumeIndexHandler = Handler(Looper.getMainLooper())
+    private var lastVolumeIndexWriteMs = 0L
+
+    /** Sets one index and gain of a [VolumeSteps.indexSchedule]. Lowers the louder of the two first, so no short peak comes between them. */
+    private fun writeVolumeChange(change: VolumeSteps.IndexChange) {
+        val current = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { -1 }
+        val gainFirst = change.index > current
+        if (gainFirst) VirtualVolumeManager.getInstance().setMasterGain(change.gain)
+        if (change.index != current) {
+            try {
+                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC, change.index, 0)
+            } catch (_: Exception) {}
+            lastVolumeIndexWriteMs = android.os.SystemClock.uptimeMillis()
+        }
+        if (!gainFirst) VirtualVolumeManager.getInstance().setMasterGain(change.gain)
+    }
+
     private fun applyVolumeStep(step: Int, output: AudioOutput, showOverlay: Boolean) {
         val target = step.coerceIn(0, VIRTUAL_VOLUME_STEPS)
         currentVirtualVolume = target
         volumeMemory.save(output, target)
         val sysMaxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val setting = VolumeSteps.settingFor(target, VolumeCurves.forOutput(output), sysMaxVol)
-        val oldIndex = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { -1 }
-        // Lower the louder of the two first, so that no short peak comes between the two changes.
-        val gainFirst = setting.index > oldIndex
-        if (gainFirst) VirtualVolumeManager.getInstance().setMasterGain(setting.gain)
+        val curve = VolumeCurves.forOutput(output)
+        val setting = VolumeSteps.settingFor(target, curve, sysMaxVol)
         lastTargetVolume = setting.index
         lastTargetVolumeTime = System.currentTimeMillis()
-        try {
-            SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC, setting.index, 0)
-        } catch (_: Exception) {}
-        if (!gainFirst) VirtualVolumeManager.getInstance().setMasterGain(setting.gain)
+        val fromIndex = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { 0 }
+        val plan = VolumeSteps.indexSchedule(
+            fromIndex, target, curve, sysMaxVol, android.os.SystemClock.uptimeMillis() - lastVolumeIndexWriteMs
+        )
+        volumeIndexHandler.removeCallbacksAndMessages(null)
+        var atMs = 0L
+        for (change in plan) {
+            atMs += change.delayMs
+            if (atMs == 0L) writeVolumeChange(change) else volumeIndexHandler.postDelayed({ writeVolumeChange(change) }, atMs)
+        }
         if (showOverlay) showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS)
     }
 

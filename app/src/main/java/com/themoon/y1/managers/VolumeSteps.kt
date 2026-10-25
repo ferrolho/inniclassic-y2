@@ -61,11 +61,20 @@ object VolumeCurves {
         )
     )
 
-    /** TODO-measure: wired headset/headphones. Same as A2DP until we measure it on the device. */
-    val WIRED = A2DP
+    /**
+     * Wired jack, from the ROM code on 2026-10-25 (`records/mtk-volume-tables-2026-10-25.md` in our notes):
+     * the vendor audio HAL sends the music index directly to the Cirrus CS43131 DAC (PCM volume),
+     * 2 dB per index. Values are relative to index 15, like A2DP: index 15…1 = 0, -2, … -28 dB
+     * (absolute -3 … -31 dB re DAC full scale). The MediaTek NVRAM table is not used on this output.
+     */
+    val WIRED = VolumeCurve(DoubleArray(16) { i -> if (i == 0) NOT_USED else -2.0 * (15 - i) })
 
-    /** TODO-measure: speaker. Same as A2DP until we measure it on the device. */
-    val SPEAKER = A2DP
+    /**
+     * Speaker: the same CS43131 path and table as [WIRED] (the speaker amplifier gets its signal from the DAC).
+     * Note: in speaker mode the driver writes 0x090004 = 0x05 (PCM channel select Left-Left), so the speaker
+     * probably plays the left channel only. Nothing to do here; it changes the level of stereo music, not the steps.
+     */
+    val SPEAKER = WIRED
 
     fun forOutput(output: AudioOutput): VolumeCurve = when (output) {
         AudioOutput.A2DP -> A2DP
@@ -91,9 +100,18 @@ object VolumeSteps {
     const val PREF_VERSION = "volume_prefs_version"
     const val VERSION = 2
 
+    /**
+     * The Y2 kernel (CS43131 driver) ignores a volume decrease of more than one index when it comes less than
+     * 200 ms after the previous change. Thus the index goes down one index at a time, at least this far apart.
+     */
+    const val MIN_DECREASE_GAP_MS = 220L
+
     private const val EPSILON = 1e-9
 
     data class Setting(val index: Int, val gain: Float)
+
+    /** One write: set the Android [index] and the software [gain] [delayMs] after the previous write. */
+    data class IndexChange(val index: Int, val gain: Float, val delayMs: Long)
 
     fun targetDb(step: Int): Double = TOP_DB - (STEPS - step) * STEP_DB
 
@@ -111,6 +129,42 @@ object VolumeSteps {
         }
         val rest = (target - curve.dbAt(index)).coerceAtMost(0.0)
         return Setting(index, 10.0.pow(rest / 20.0).toFloat())
+    }
+
+    /**
+     * The writes that take the Android index from [fromIndex] to the index of [step].
+     * - Up (or no change): one write at once.
+     * - Down: the gain goes to the level of the step at once (first write, index not changed), then the index
+     *   goes down one index at a time, [MIN_DECREASE_GAP_MS] apart (the first one also that far after the last
+     *   index write, [msSinceLastWrite]). At each write the gain makes up for the higher index, so the level
+     *   stays at the step and only the hardware/software split changes.
+     * This also covers a fast wheel: two decreases never come less than [MIN_DECREASE_GAP_MS] apart.
+     */
+    fun indexSchedule(
+        fromIndex: Int,
+        step: Int,
+        curve: VolumeCurve,
+        sysMaxIndex: Int = curve.maxIndex,
+        msSinceLastWrite: Long = Long.MAX_VALUE
+    ): List<IndexChange> {
+        val final = settingFor(step, curve, sysMaxIndex)
+        val start = fromIndex.coerceAtMost(minOf(curve.maxIndex, sysMaxIndex).coerceAtLeast(1))
+        if (start <= final.index) return listOf(IndexChange(final.index, final.gain, 0L))
+        val out = ArrayList<IndexChange>()
+        out.add(IndexChange(start, gainAt(step, start, curve), 0L))
+        var delay = (MIN_DECREASE_GAP_MS - msSinceLastWrite).coerceIn(0L, MIN_DECREASE_GAP_MS)
+        for (k in start - 1 downTo final.index) {
+            out.add(IndexChange(k, if (k == final.index) final.gain else gainAt(step, k, curve), delay))
+            delay = MIN_DECREASE_GAP_MS
+        }
+        return out
+    }
+
+    /** The gain that gives the level of [step] at Android [index] (≤ 1.0; 0 for mute). */
+    private fun gainAt(step: Int, index: Int, curve: VolumeCurve): Float {
+        if (step <= 0 || index <= 0) return 0f
+        val rest = (targetDb(step.coerceAtMost(STEPS)) - curve.dbAt(index)).coerceAtMost(0.0)
+        return 10.0.pow(rest / 20.0).toFloat()
     }
 
     /** The loudest step that is not louder than Android [index]: for the first start of an output. */
