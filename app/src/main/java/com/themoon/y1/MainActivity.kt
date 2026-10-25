@@ -78,6 +78,12 @@ import com.themoon.y1.managers.PowerBacklightManager
 import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
 import com.themoon.y1.managers.VirtualVolumeManager
+import com.themoon.y1.managers.AudioOutput
+import com.themoon.y1.managers.SafeVolumeBypasser
+import com.themoon.y1.managers.VolumeCurves
+import com.themoon.y1.managers.VolumeMemory
+import com.themoon.y1.managers.VolumeSteps
+import com.themoon.y1.managers.VolumeStore
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.models.TvSeries
 import com.themoon.y1.models.VideoItem
@@ -128,7 +134,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         const val BROWSER_FAVORITES = 5
         const val BROWSER_PODCASTS = 6
 
-        const val VIRTUAL_VOLUME_STEPS = 30
+        const val VIRTUAL_VOLUME_STEPS = VolumeSteps.STEPS
 
         var instance: MainActivity? = null
 
@@ -380,6 +386,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
         BluetoothAvrcpManager.getInstance(this).init()
+        restoreVolumeForOutput(force = true)
 
         var playbackRestored = false
         if (ExternalSdMountMonitor.hasSecondarySlot() && !ExternalSdMountMonitor.isSecondaryReady()) {
@@ -668,37 +675,109 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         return super.dispatchTouchEvent(event)
     }
 
+    /** The volume step of each output, in AppPrefs (see [VolumeSteps]). */
+    private val volumeMemory: VolumeMemory by lazy {
+        VolumeMemory(object : VolumeStore {
+            override fun contains(key: String) = prefs.contains(key)
+            override fun getInt(key: String, default: Int) = prefs.getInt(key, default)
+            override fun putInt(key: String, value: Int) {
+                prefs.edit().putInt(key, value).apply()
+            }
+        }).also { it.migrate() }
+    }
+
+    /** The output of the current volume step; null before the first [restoreVolumeForOutput]. */
+    var currentAudioOutput: AudioOutput? = null
+    private val audioOutputHandler = Handler(Looper.getMainLooper())
+    private val audioOutputCheckTask = Runnable { restoreVolumeForOutput() }
+
+    fun detectAudioOutput(): AudioOutput = try {
+        @Suppress("DEPRECATION")
+        AudioOutput.current(audioManager.isWiredHeadsetOn, audioManager.isBluetoothA2dpOn)
+    } catch (_: Exception) {
+        AudioOutput.SPEAKER
+    }
+
+    /**
+     * Sets the saved step of the output that plays now, when the output changed (or always with [force]).
+     * Each output keeps its own step, as Android does with its index.
+     */
+    fun restoreVolumeForOutput(force: Boolean = false) {
+        val output = detectAudioOutput()
+        if (!force && output == currentAudioOutput) return
+        currentAudioOutput = output
+        volumeLimitMax = volumeMemory.limitStep()
+        val step = volumeMemory.stepFor(output) { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) }
+        applyVolumeStep(step, output, showOverlay = false)
+    }
+
+    /** After a plug or A2DP event, checks the output again a few times: Android changes the route with a delay. */
+    fun scheduleAudioOutputCheck() {
+        audioOutputHandler.removeCallbacks(audioOutputCheckTask)
+        for (delayMs in longArrayOf(300L, 1200L, 3000L)) {
+            audioOutputHandler.postDelayed(audioOutputCheckTask, delayMs)
+        }
+    }
+
     override fun adjustVolume(isUp: Boolean) {
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        if (currentVirtualVolume < 0) {
-            val curSys = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            currentVirtualVolume = VirtualVolumeManager.systemToVirtualVolume(curSys, maxVol, currentVirtualVolume)
-        }
-        val target = if (isUp) {
-            (currentVirtualVolume + 1).coerceAtMost(VIRTUAL_VOLUME_STEPS)
-        } else {
-            (currentVirtualVolume - 1).coerceAtLeast(0)
-        }
-        setVolumeLevel(AudioManager.STREAM_MUSIC, target, maxVol)
+        restoreVolumeForOutput()
+        val current = currentVirtualVolume.coerceAtLeast(0)
+        val target = if (isUp) current + 1 else current - 1
+        setVolumeLevel(VolumeSteps.clamp(target, volumeLimitMax))
         clickFeedback()
     }
 
-    fun setVolumeLevel(targetVirtualVol: Int) {
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        setVolumeLevel(AudioManager.STREAM_MUSIC, targetVirtualVol, maxVol)
+    fun setVolumeLevel(targetVirtualVol: Int, showOverlay: Boolean = true) {
+        val output = currentAudioOutput ?: detectAudioOutput().also { currentAudioOutput = it }
+        applyVolumeStep(targetVirtualVol, output, showOverlay)
     }
 
-    fun setVolumeLevel(stream: Int, targetVirtualVol: Int, sysMaxVol: Int) {
-        currentVirtualVolume = targetVirtualVol
-        val gain = VirtualVolumeManager.virtualToSoftwareGain(targetVirtualVol)
-        VirtualVolumeManager.getInstance().setMasterGain(gain)
-        val sysTarget = VirtualVolumeManager.virtualToSystemVolume(targetVirtualVol, sysMaxVol)
-        lastTargetVolume = sysTarget
+    /** Sets the Volume Limit (a step; -1 = off) and lowers the volume to it when necessary. */
+    fun setVolumeLimit(limitStep: Int) {
+        volumeLimitMax = limitStep
+        prefs.edit().putInt(VolumeSteps.PREF_LIMIT, limitStep).apply()
+        if (limitStep > 0 && currentVirtualVolume > limitStep) {
+            setVolumeLevel(limitStep, showOverlay = false)
+        }
+    }
+
+    private val volumeIndexHandler = Handler(Looper.getMainLooper())
+    private var lastVolumeIndexWriteMs = 0L
+
+    /** Sets one index and gain of a [VolumeSteps.indexSchedule]. Lowers the louder of the two first, so no short peak comes between them. */
+    private fun writeVolumeChange(change: VolumeSteps.IndexChange) {
+        val current = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { -1 }
+        val gainFirst = change.index > current
+        if (gainFirst) VirtualVolumeManager.getInstance().setMasterGain(change.gain)
+        if (change.index != current) {
+            try {
+                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC, change.index, 0)
+            } catch (_: Exception) {}
+            lastVolumeIndexWriteMs = android.os.SystemClock.uptimeMillis()
+        }
+        if (!gainFirst) VirtualVolumeManager.getInstance().setMasterGain(change.gain)
+    }
+
+    private fun applyVolumeStep(step: Int, output: AudioOutput, showOverlay: Boolean) {
+        val target = step.coerceIn(0, VIRTUAL_VOLUME_STEPS)
+        currentVirtualVolume = target
+        volumeMemory.save(output, target)
+        val sysMaxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val curve = VolumeCurves.forOutput(output)
+        val setting = VolumeSteps.settingFor(target, curve, sysMaxVol)
+        lastTargetVolume = setting.index
         lastTargetVolumeTime = System.currentTimeMillis()
-        try {
-            audioManager.setStreamVolume(stream, sysTarget, 0)
-        } catch (_: Exception) {}
-        showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS)
+        val fromIndex = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { 0 }
+        val plan = VolumeSteps.indexSchedule(
+            fromIndex, target, curve, sysMaxVol, android.os.SystemClock.uptimeMillis() - lastVolumeIndexWriteMs
+        )
+        volumeIndexHandler.removeCallbacksAndMessages(null)
+        var atMs = 0L
+        for (change in plan) {
+            atMs += change.delayMs
+            if (atMs == 0L) writeVolumeChange(change) else volumeIndexHandler.postDelayed({ writeVolumeChange(change) }, atMs)
+        }
+        if (showOverlay) showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS)
     }
 
     fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int) {
@@ -1099,6 +1178,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     if (state == 1) {
                         updateStatusBarHeadphone()
                     }
+                    scheduleAudioOutputCheck()
                 }
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
                     val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
@@ -1168,6 +1248,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     }
                     if (profileState == BluetoothProfile.STATE_CONNECTED || profileState == BluetoothProfile.STATE_DISCONNECTED) {
                         bluetoothController.isBtConnectingState = false
+                        scheduleAudioOutputCheck()
                         if (NavigationManager.getInstance().currentState is ScreenState.Bluetooth || currentScreenState == STATE_BLUETOOTH) {
                             window.decorView.postDelayed({
                                 bluetoothController.startBluetoothScan()
