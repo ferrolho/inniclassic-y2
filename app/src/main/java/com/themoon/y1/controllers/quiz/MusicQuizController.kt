@@ -570,8 +570,7 @@ class MusicQuizController(
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            val current = activity.currentFocus
-            current?.performClick()
+            // The focused button clicks on release. A click here also came with each key repeat of a hold.
             return true
         }
 
