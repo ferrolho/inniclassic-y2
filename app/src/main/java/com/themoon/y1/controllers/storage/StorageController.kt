@@ -61,7 +61,7 @@ class StorageController(
         tvStorageHeader?.text = localize("About")
         tvStorageHeader?.setTextColor(ThemeManager.getTextColorPrimary())
 
-        val rowName = createSettingRow(localize("Name"), "iPod")
+        val rowName = createSettingRow(localize("Name"), "Y2")
         rowName.setOnClickListener { clickFeedback() }
         containerStorageItems.addView(rowName)
 
