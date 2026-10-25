@@ -179,4 +179,38 @@ object TablerIcons {
         }
         return bmp
     }
+
+    /**
+     * The [WIFI] icon with [level] (0..3) arcs in [color], like the Wi-Fi list of macOS: the dot is always full,
+     * the other arcs are faint ([WIFI_FAINT_ALPHA_PERCENT] of the alpha of [color]: still visible on black and on
+     * the highlighted row). Each path is drawn separately (no Path.op: it can hang Android 4.4).
+     */
+    fun renderWifiSignal(level: Int, sizePx: Int, color: Int): Bitmap {
+        val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val faintColor = faintColor(color)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2.0f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        canvas.scale(sizePx / 24f, sizePx / 24f)
+        // WIFI[0] is the dot, WIFI[1..3] are the arcs from small to large.
+        for ((i, svgPath) in WIFI.withIndex()) {
+            paint.color = if (i <= level) color else faintColor
+            try {
+                val p: Path? = PathParser.createPathFromPathData(svgPath)
+                if (p != null) canvas.drawPath(p, paint)
+            } catch (_: Throwable) {
+            }
+        }
+        return bmp
+    }
+
+    /** Alpha of the unfilled arcs of [renderWifiSignal], in percent of the icon colour's alpha. */
+    const val WIFI_FAINT_ALPHA_PERCENT = 40
+
+    internal fun faintColor(color: Int): Int =
+        (((color ushr 24) * WIFI_FAINT_ALPHA_PERCENT / 100) shl 24) or (color and 0x00FFFFFF)
 }
