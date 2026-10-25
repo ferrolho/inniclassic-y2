@@ -15,10 +15,10 @@ class WifiSignalIconTest {
 
     @Test
     fun faintArcsKeepTheColourWithLessAlpha() {
-        assertTrue(TablerIcons.WIFI_FAINT_ALPHA_PERCENT in 35..45)
-        val faint = TablerIcons.faintColor(darkText)
+        assertTrue(RowGlyphs.WIFI_FAINT_ALPHA_PERCENT in 35..45)
+        val faint = RowGlyphs.faintColor(darkText)
         assertEquals(darkText and 0x00FFFFFF, faint and 0x00FFFFFF)
-        assertEquals(255 * TablerIcons.WIFI_FAINT_ALPHA_PERCENT / 100, faint ushr 24)
+        assertEquals(255 * RowGlyphs.WIFI_FAINT_ALPHA_PERCENT / 100, faint ushr 24)
     }
 
     @Test
@@ -30,7 +30,7 @@ class WifiSignalIconTest {
             Triple(white, highlight, 1.5),  // highlighted row, both themes
         )
         for ((color, bg, minContrast) in cases) {
-            val faint = over(TablerIcons.faintColor(color), bg)
+            val faint = over(RowGlyphs.faintColor(color), bg)
             val full = over(color, bg)
             val onBg = contrast(faint, bg)
             val toFull = contrast(faint, full)

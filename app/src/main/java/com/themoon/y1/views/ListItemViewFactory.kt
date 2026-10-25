@@ -1,7 +1,6 @@
 package com.themoon.y1.views
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.ClipDrawable
 import android.graphics.drawable.ColorDrawable
@@ -453,41 +452,31 @@ object ListItemViewFactory {
 
     /**
      * A row of the Wi-Fi and Bluetooth lists, like macOS: a tick column on the left (the tick shows only on the
-     * chosen row, so the text does not move), the name, then status icons on the right (lock, signal, device type).
-     * The tick column has the same size as the single-choice lists. Each icon is drawn by `render(sizePx, color)`,
-     * in the primary text colour (as macOS: black or white, not grey), and in the focused text colour on the
-     * focused row. The icons are 20 dp: the glyphs (~17 px of the 24-unit Tabler box) are about the cap height of
-     * the row text.
+     * chosen row, so the text does not move), the name, then status glyphs in fixed slots on the right (lock, signal,
+     * device type; [RowGlyphsView]). The tick column has the same size as the single-choice lists. The glyphs are as
+     * tall as the capital letters of the name and on its baseline, in the primary text colour (as macOS: black or
+     * white, not grey), and in the focused text colour on the focused row.
      */
     fun createChoiceRowWithRightIcons(
         context: Context,
         text: String,
         isChecked: Boolean,
-        rightIcons: List<(sizePx: Int, color: Int) -> Bitmap>
+        slots: List<RowGlyphs.Slot>
     ): View {
         val row = createTablerListButtonWithRightIcon(context, TablerIcons.CHECK, text) as LinearLayout
         if (!isChecked) row.getChildAt(0).visibility = View.INVISIBLE
 
-        val d = context.resources.displayMetrics.density
-        val iconSize = (RIGHT_ICON_SIZE_DP * d).toInt()
-        val iconViews = rightIcons.map { render ->
-            ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
-                    leftMargin = (6f * d).toInt()
-                }
-                setImageBitmap(render(iconSize, ThemeManager.getTextColorPrimary()))
-            }.also { row.addView(it) }
+        val glyphs = RowGlyphsView(context, slots).apply {
+            textView = row.getChildAt(1) as TextView
+            color = ThemeManager.getTextColorPrimary()
         }
+        row.addView(glyphs)
 
         val rowFocusListener = row.onFocusChangeListener
         row.setOnFocusChangeListener { v, hasFocus ->
             rowFocusListener?.onFocusChange(v, hasFocus)
-            val color = if (hasFocus) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary()
-            iconViews.forEachIndexed { i, iv -> iv.setImageBitmap(rightIcons[i](iconSize, color)) }
+            glyphs.color = if (hasFocus) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary()
         }
         return row
     }
-
-    /** Size of the status icons on the right of the Wi-Fi and Bluetooth rows ([createChoiceRowWithRightIcons]). */
-    const val RIGHT_ICON_SIZE_DP = 20f
 }

@@ -2,7 +2,6 @@ package com.themoon.y1.controllers.connectivity
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiInfo
@@ -19,6 +18,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 
 /**
@@ -205,10 +205,8 @@ class WifiController(
 
         // Like macOS: the tick column on the left (tick on the connected network only), then the name,
         // then the lock (secured networks) and the signal strength on the right.
-        val rightIcons = mutableListOf<(Int, Int) -> Bitmap>()
-        if (!isOpen) rightIcons.add { size, color -> TablerIcons.render(TablerIcons.LOCK, size, color) }
-        rightIcons.add { size, color -> TablerIcons.renderWifiSignal(signalLevel, size, color) }
-        val btnWifi = ListItemViewFactory.createChoiceRowWithRightIcons(activity, ssid, isConnected, rightIcons)
+        val btnWifi = ListItemViewFactory.createChoiceRowWithRightIcons(activity, ssid, isConnected,
+            RowGlyphs.wifiSlots(!isOpen, signalLevel))
 
         btnWifi.setOnClickListener {
             clickFeedback()

@@ -22,6 +22,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 import java.lang.reflect.Method
 
@@ -351,8 +352,8 @@ class BluetoothController(
     }
 
     private fun createDeviceRow(name: String, devIcon: Array<String>, isConnected: Boolean): View =
-        ListItemViewFactory.createChoiceRowWithRightIcons(activity, name, isConnected,
-            listOf { size, color -> TablerIcons.render(devIcon, size, color) })
+        ListItemViewFactory.createChoiceRowWithRightIcons(activity, name, isConnected, RowGlyphs.deviceSlots(
+            if (devIcon === TablerIcons.HEADPHONES) RowGlyphs.Kind.HEADPHONES else RowGlyphs.Kind.BLUETOOTH))
 
     fun onDiscoveryFinished() {
         btnScanBt.text = localize("Scan Complete (Retry)")
