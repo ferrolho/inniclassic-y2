@@ -16,7 +16,8 @@ import kotlin.math.roundToInt
  * The status bar icons (headphones, Wi-Fi, Bluetooth), drawn in the style of the iPod play/pause icon
  * ([IpodPlayStateView]): a blue gradient from top to bottom with a 1 px dark blue edge.
  * An inactive icon (Wi-Fi on but not connected) is the same shape, empty, with an edge in the battery
- * outline colour. The icons are drawn as paths at the final pixel size, so they stay sharp.
+ * outline colour. The icons are drawn as paths at the final pixel size, so they stay sharp. The ink of each
+ * icon fills its bitmap from the top row to the bottom row, so icons of one height share one box.
  */
 object StatusIcons {
     enum class Icon { HEADPHONES, WIFI, BLUETOOTH }
@@ -126,7 +127,8 @@ object StatusIcons {
         val cupTop = h - 0.5f - cupH
         val r = (right - left - bandW) / 2f
         val cx = w / 2f
-        val cy = maxOf(0.5f + bandW / 2f + r, cupTop + 1.5f * u)
+        // The band touches the top of the box and the cups its bottom, like the ink of the other icons.
+        val cy = 0.5f + bandW / 2f + r
 
         val arc = Path().apply {
             moveTo(cx - r, cupTop + 2f * u)

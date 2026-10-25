@@ -139,8 +139,8 @@ internal fun MainActivity.updateStatusBarHeadphone() {
 }
 
 /**
- * Draws a status bar icon at its pixel size. With the iPod Classic Layout, the icon has the size, the
- * vertical position and the gap of the play/pause icon; else 16 dp with the margin of activity_main.xml.
+ * Draws a status bar icon at its pixel size. With the iPod Classic Layout, the icon has the box of all
+ * status items (as tall as the battery, same top) and the same gap; else 16 dp with the margin of activity_main.xml.
  */
 private fun MainActivity.setStatusBarIcon(
     iv: android.widget.ImageView,
@@ -151,7 +151,7 @@ private fun MainActivity.setStatusBarIcon(
     val d = resources.displayMetrics.density
     val ipod = com.themoon.y1.views.IpodClassicLayout.isActive
     val heightPx = if (ipod) {
-        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.PLAY_ICON_SIZE, d)
+        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
     } else {
         com.themoon.y1.views.IpodClassicLayout.px(16, d)
     }
@@ -162,7 +162,7 @@ private fun MainActivity.setStatusBarIcon(
 
     val lp = iv.layoutParams as? android.widget.LinearLayout.LayoutParams ?: return
     val right = com.themoon.y1.views.IpodClassicLayout.px(
-        if (ipod) com.themoon.y1.views.IpodClassicMetrics.PLAY_ICON_GAP else rightMarginDp, d
+        if (ipod) com.themoon.y1.views.IpodClassicMetrics.STATUS_ITEM_GAP else rightMarginDp, d
     )
     val bottom = if (ipod) com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_BAR_RULE, d) else 0
     if (lp.width != bmp.width || lp.height != bmp.height || lp.rightMargin != right || lp.bottomMargin != bottom ||
