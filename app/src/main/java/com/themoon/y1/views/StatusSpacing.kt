@@ -55,6 +55,15 @@ object StatusSpacing {
         return floatArrayOf(left / n, right / n)
     }
 
+    /**
+     * Optical bearings of a status icon. With [sideDots] (the rune of a connected device: a dot left and right at
+     * mid-height, at the bitmap edges) both sides count as flat (0): the dot fills the middle rows, which are empty
+     * in the rune alone, so the gap from the fan to the left dot (and from the right dot to play/pause) is the gap
+     * of a flat side. Without that, the bearings of the rune alone would bring the fan close to the left dot.
+     */
+    fun iconBearings(pixels: IntArray, width: Int, rowTop: Int, rowBottom: Int, sideDots: Boolean): FloatArray =
+        if (sideDots) floatArrayOf(0f, 0f) else bearings(pixels, width, rowTop, rowBottom)
+
     /** Ink gap between an item with the optical bearing [rightOfFirst] and the next item with [leftOfNext]. */
     fun gap(rightOfFirst: Float, leftOfNext: Float): Int =
         max(MIN_GAP, (TARGET - rightOfFirst - leftOfNext).roundToInt())

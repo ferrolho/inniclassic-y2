@@ -225,11 +225,12 @@ private fun MainActivity.setStatusBarIcon(
     val bottom = if (ipod) com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_BAR_RULE, d) else 0
     if (ipod) {
         // The optical bearings of the new bitmap; updateStatusItemGaps() sets the right margin.
-        val pixels = IntArray(bmp.width * bmp.height)
-        bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+        val sideDots = icon == com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH && connected
+        val pixels = if (sideDots) IntArray(0) else IntArray(bmp.width * bmp.height)
+        if (!sideDots) bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, bmp.height)
         val box = com.themoon.y1.views.StatusIcons.boxInBitmap(icon, heightPx, boxPx)
-        statusBearings[iv] = com.themoon.y1.views.StatusSpacing.bearings(
-            pixels, bmp.width, box.first.toInt(), box.second.toInt()
+        statusBearings[iv] = com.themoon.y1.views.StatusSpacing.iconBearings(
+            pixels, bmp.width, box.first.toInt(), box.second.toInt(), sideDots
         )
     } else {
         statusBearings.remove(iv)
