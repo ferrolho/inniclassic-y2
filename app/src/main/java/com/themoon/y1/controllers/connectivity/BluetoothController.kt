@@ -9,8 +9,11 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.os.Handler
+import android.graphics.Path
+import android.graphics.RectF
 import android.os.Looper
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -270,7 +273,22 @@ class BluetoothController(
                 setTextColor(value.currentTextColor)
             }
             includeFontPadding = false
-            setPadding(0, 0, (8 * activity.resources.displayMetrics.density).toInt(), 0)
+            val padRight = (8 * activity.resources.displayMetrics.density).toInt()
+            val rowHeight = row.layoutParams?.height ?: 0
+            if (rowHeight > 0) {
+                // Put the centre of the digits on the centre line of the row, like the row title and the switch,
+                // in all themes: full row height, gravity TOP, and a top padding from the font (cap height of "H").
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                gravity = Gravity.TOP or Gravity.END
+                val path = Path()
+                paint.getTextPath("H", 0, 1, 0f, 0f, path)
+                val bounds = RectF()
+                path.computeBounds(bounds, true)
+                val top = BluetoothDiscoverableLogic.capCentredPaddingTop(rowHeight, paint.fontMetricsInt.ascent, -bounds.top)
+                setPadding(0, top, padRight, 0)
+            } else {
+                setPadding(0, 0, padRight, 0)
+            }
             visibility = View.GONE
         }
         row.addView(time, 1)

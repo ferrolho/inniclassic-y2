@@ -61,4 +61,12 @@ class BluetoothDiscoverableLogicTest {
         assertEquals("Innioasis Y2", BluetoothDiscoverableLogic.nameToSet(null))
         assertNull(BluetoothDiscoverableLogic.nameToSet("Innioasis Y2"))
     }
+
+    @Test
+    fun timeTextIsCentredOnTheCapHeight() {
+        // 38 px row, ascent -19, cap height 15: padding 7.5 -> 8, baseline 27, caps 12..27, centre 19.5.
+        assertEquals(8, BluetoothDiscoverableLogic.capCentredPaddingTop(38, -19, 15f))
+        assertEquals(10, BluetoothDiscoverableLogic.capCentredPaddingTop(48, -20, 12f))
+        assertEquals(0, BluetoothDiscoverableLogic.capCentredPaddingTop(10, -30, 10f))
+    }
 }

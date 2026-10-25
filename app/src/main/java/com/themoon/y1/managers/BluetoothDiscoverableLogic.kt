@@ -28,6 +28,14 @@ object BluetoothDiscoverableLogic {
     fun timeLeftText(discoverable: Boolean, remainingMs: Long?): String? =
         if (!discoverable || remainingMs == null) null else formatRemaining(remainingMs)
 
+    /**
+     * Top padding that puts the centre of the capital letters (and digits) on the centre of a box of [boxHeight]
+     * px, with gravity TOP and includeFontPadding = false (baseline at paddingTop - [ascent]).
+     * Same rule as the row titles of the iPod Classic layout.
+     */
+    fun capCentredPaddingTop(boxHeight: Int, ascent: Int, capHeight: Float): Int =
+        Math.round(boxHeight / 2f + ascent + capHeight / 2f).coerceAtLeast(0)
+
     /** The name to give the adapter, or null if it already has [DEVICE_NAME]. */
     fun nameToSet(current: String?): String? = if (current == DEVICE_NAME) null else DEVICE_NAME
 }
