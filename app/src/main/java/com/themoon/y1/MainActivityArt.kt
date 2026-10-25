@@ -126,33 +126,55 @@ internal fun MainActivity.isLightStatusBar(): Boolean {
 }
 
 internal fun MainActivity.updateStatusBarWifi(isConnected: Boolean) {
-    val iv = ivStatusWifi ?: return
-    iv.colorFilter = null
-    val density = resources.displayMetrics.density
-    val iconSizePx = (18 * density).toInt()
-    val light = isLightStatusBar()
-    val color = if (isConnected) {
-        if (light) 0xFF006425.toInt() else 0xFF34C759.toInt()
-    } else {
-        if (light) 0xFF9E4800.toInt() else 0xFFFFB300.toInt()
-    }
-    iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.WIFI, iconSizePx, color))
+    // Not connected: the same icon, empty.
+    setStatusBarIcon(ivStatusWifi ?: return, com.themoon.y1.views.StatusIcons.Icon.WIFI, isConnected, 6)
 }
 
 internal fun MainActivity.updateStatusBarBluetooth() {
-    val iv = ivStatusBluetooth ?: return
-    val density = resources.displayMetrics.density
-    val iconSizePx = (16 * density).toInt()
-    val color = ThemeManager.getTextColorPrimary()
-    iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.BLUETOOTH, iconSizePx, color))
+    setStatusBarIcon(ivStatusBluetooth ?: return, com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH, true, 8)
 }
 
 internal fun MainActivity.updateStatusBarHeadphone() {
-    val iv = ivStatusHeadphone ?: return
-    val density = resources.displayMetrics.density
-    val iconSizePx = (16 * density).toInt()
-    val color = ThemeManager.getTextColorPrimary()
-    iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.HEADPHONES, iconSizePx, color))
+    setStatusBarIcon(ivStatusHeadphone ?: return, com.themoon.y1.views.StatusIcons.Icon.HEADPHONES, true, 6)
+}
+
+/**
+ * Draws a status bar icon at its pixel size. With the iPod Classic Layout, the icon has the size, the
+ * vertical position and the gap of the play/pause icon; else 16 dp with the margin of activity_main.xml.
+ */
+private fun MainActivity.setStatusBarIcon(
+    iv: android.widget.ImageView,
+    icon: com.themoon.y1.views.StatusIcons.Icon,
+    active: Boolean,
+    rightMarginDp: Int
+) {
+    val d = resources.displayMetrics.density
+    val ipod = com.themoon.y1.views.IpodClassicLayout.isActive
+    val heightPx = if (ipod) {
+        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.PLAY_ICON_SIZE, d)
+    } else {
+        com.themoon.y1.views.IpodClassicLayout.px(16, d)
+    }
+    val bmp = com.themoon.y1.views.StatusIcons.render(icon, heightPx, active, isLightStatusBar())
+    iv.colorFilter = null
+    iv.scaleType = android.widget.ImageView.ScaleType.CENTER
+    iv.setImageBitmap(bmp)
+
+    val lp = iv.layoutParams as? android.widget.LinearLayout.LayoutParams ?: return
+    val right = com.themoon.y1.views.IpodClassicLayout.px(
+        if (ipod) com.themoon.y1.views.IpodClassicMetrics.PLAY_ICON_GAP else rightMarginDp, d
+    )
+    val bottom = if (ipod) com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_BAR_RULE, d) else 0
+    if (lp.width != bmp.width || lp.height != bmp.height || lp.rightMargin != right || lp.bottomMargin != bottom ||
+        lp.gravity != android.view.Gravity.CENTER_VERTICAL
+    ) {
+        lp.width = bmp.width
+        lp.height = bmp.height
+        lp.rightMargin = right
+        lp.bottomMargin = bottom
+        lp.gravity = android.view.Gravity.CENTER_VERTICAL
+        iv.layoutParams = lp
+    }
 }
 
 internal fun MainActivity.applyThemeInternal() {
