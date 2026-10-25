@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Rebuild and sign Bluetooth.apk for Innioasis Y2 (MT6582 / Android 4.4.2)
 #
+# Not needed for normal builds: when tools/rom_assets/Bluetooth.apk is absent,
+# scripts/build-rom.sh installs the original Innioasis Bluetooth.apk + Bluetooth.odex of the
+# same build (from the y1-community y2-ata ROM, SHA-256 pinned) in /system/app, and keeps the
+# stock MtkBt.apk (same signature). Use this script only for a rebuilt AOSP Bluetooth.apk.
+#
 # Background:
 # The stock y2-test base ROM stripped /system/app/Bluetooth.apk and Bluetooth.odex.
 # Standard AOSP KitKat 4.4.4 Bluetooth.apk has several JNI divergences with MediaTek's

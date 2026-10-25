@@ -16,6 +16,12 @@ The `LOGO` partition (boot splash, 3 MB, `MT6572_Android_scatter.txt` partition 
 
 The `system.img`/`rom.zip` builds through v1.3.2 shipped a **Rockbox**-branded `logo.bin` instead of either of the above — a leftover from the source device the original 12-partition set was captured from (its history: stock firmware → Rockbox → this launcher). It was a valid, correctly-structured `LOGO` partition, so it flashed and displayed fine, just with Rockbox's splash instead of anything InniClassic- or Innioasis-branded.
 
+## `Bluetooth.apk` — not in the repo
+
+The Y2 base ROM (`y2-test`) has no `Bluetooth.apk`, so Bluetooth cannot turn on (#21). The original Innioasis `Bluetooth.apk` + `Bluetooth.odex` are proprietary and signed with the Innioasis key, so they are not kept here. Instead, `scripts/build-rom.sh y2` downloads the y1-community [`y2-ata`](https://github.com/y1-community/y2-ata-rom/releases/tag/y2-ata) `rom_y2.zip`, checks its SHA-256, takes `/app/Bluetooth.apk` + `/app/Bluetooth.odex` from its `original_system.img` (same Innioasis build as the base, fingerprint `1779084676`), checks their SHA-256 and installs them in `/system/app`. They have the same signature as the stock `MtkBt.apk`, which stays. Set `Y2_BT_ROM_ZIP=/path/to/rom_y2.zip` to use a local copy of the zip.
+
+If you put a rebuilt `Bluetooth.apk` here (see [`tools/rebuild_bluetooth_apk.sh`](../rebuild_bluetooth_apk.sh)), the script installs it in `/system/priv-app` instead, together with a re-signed `MtkBt.apk` if one is here too.
+
 ## Format notes
 
 MTK `LOGO` partition, fully reverse-engineered for the single-frame case by comparing the stock and Rockbox samples above (both real, working, animated 39-frame logos) and by building + round-trip-verifying our own single-frame file against the same parsing logic. Not a public spec, verify byte 0-511, but the frame data recipe below is confirmed by round-tripping our own generated file back through the exact same decoder.
