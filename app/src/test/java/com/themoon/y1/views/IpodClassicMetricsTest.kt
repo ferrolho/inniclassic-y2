@@ -25,8 +25,13 @@ class IpodClassicMetricsTest {
 
     @Test
     fun statusItemsShareOneBox() {
-        // Battery, play/pause: rows 7..20 of the 30 px bar, the rows of the capitals; centre line y = 14.
-        assertEquals(IpodClassicMetrics.BATTERY_HEIGHT, IpodClassicMetrics.STATUS_ICON_HEIGHT)
+        // Play/pause: rows 7..20 of the 30 px bar, the rows of the capitals; centre line y = 14.
+        // Battery: 1 px more above and below (rows 6..21), the same centre line.
+        assertEquals(IpodClassicMetrics.BATTERY_HEIGHT, IpodClassicMetrics.STATUS_ICON_HEIGHT + 2)
+        val batteryTop = (IpodClassicMetrics.STATUS_BAR_HEIGHT - IpodClassicMetrics.BATTERY_HEIGHT) / 2 -
+            IpodClassicMetrics.STATUS_BAR_RULE
+        assertEquals(IpodClassicMetrics.statusItemTop() - 1, batteryTop)
+        assertEquals(IpodClassicMetrics.statusCentreLine(), batteryTop + IpodClassicMetrics.BATTERY_HEIGHT / 2f, 0f)
         assertEquals(14, IpodClassicMetrics.STATUS_ICON_HEIGHT)
         assertEquals(7, IpodClassicMetrics.statusItemTop())
         assertEquals(14f, IpodClassicMetrics.statusCentreLine(), 0f)

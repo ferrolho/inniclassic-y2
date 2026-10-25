@@ -26,8 +26,11 @@ object IpodClassicMetrics {
     // round letters of a font. They go 1 px above the box (optical overshoot); the bottom stays on the box.
     const val STATUS_ROUND_ICON_HEIGHT = STATUS_ICON_HEIGHT + 1
     // The battery has a 2 px outline at this size (BatteryIconView.setThinOutline), so the digits stay legible.
+    // Its thin grey outline looks shorter than the bold blue icons: it goes 1 px above and below the box
+    // (optical overshoot), on the same centre line.
     const val BATTERY_WIDTH = 30
-    const val BATTERY_HEIGHT = STATUS_ICON_HEIGHT
+    const val BATTERY_OVERSHOOT = 1
+    const val BATTERY_HEIGHT = STATUS_ICON_HEIGHT + 2 * BATTERY_OVERSHOOT
     const val PLAY_ICON_WIDTH = 12
     // Space between the ink of two items (the iPod has 5 px between the play icon and the battery).
     const val STATUS_ITEM_GAP = 8

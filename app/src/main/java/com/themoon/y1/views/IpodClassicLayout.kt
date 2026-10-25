@@ -318,17 +318,26 @@ object IpodClassicLayout {
     /**
      * Space from the left edge of [tv] (wrap_content, no padding, gravity left) to the ink of its first letter,
      * and from the ink of its last letter to the right edge. The view is the advance of the text, rounded up.
+     * The text is drawn with the paint of the view into a small bitmap and the ink columns are read: the outline of
+     * the font (Paint.getTextPath) can be up to 1 px narrower than the drawn (hinted) letters, and the last
+     * letter was cut at the right edge of the group. Called at each text change (once a minute), not per frame.
      */
     private fun inkBearings(tv: TextView): Pair<Float, Float> {
         val text = tv.text?.toString().orEmpty()
         if (text.isEmpty()) return Pair(0f, 0f)
-        // A path, because getTextBounds() rounds to whole pixels.
-        val path = android.graphics.Path()
-        tv.paint.getTextPath(text, 0, text.length, 0f, 0f, path)
-        val bounds = android.graphics.RectF()
-        path.computeBounds(bounds, true)
-        if (bounds.isEmpty) return Pair(0f, 0f)
-        return Pair(bounds.left.coerceAtLeast(0f), (ceil(tv.paint.measureText(text)) - bounds.right).coerceAtLeast(0f))
+        val paint = android.graphics.Paint(tv.paint)
+        val fm = paint.fontMetricsInt
+        val advance = ceil(paint.measureText(text)).toInt()
+        val pad = 4
+        val w = advance + 2 * pad
+        val h = (fm.bottom - fm.top).coerceAtLeast(1)
+        val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(bmp).drawText(text, pad.toFloat(), (-fm.top).toFloat(), paint)
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+        bmp.recycle()
+        val cols = StatusSpacing.inkColumns(pixels, w) ?: return Pair(0f, 0f)
+        return Pair((cols[0] - pad).toFloat(), (pad + advance - 1 - cols[1]).toFloat())
     }
 
     internal fun horizontalGravity(tv: TextView): Int {

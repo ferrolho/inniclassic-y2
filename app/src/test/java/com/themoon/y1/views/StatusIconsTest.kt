@@ -3,7 +3,6 @@ package com.themoon.y1.views
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 import kotlin.math.sin
 
 class StatusIconsTest {
@@ -15,11 +14,11 @@ class StatusIconsTest {
         assertEquals(21, StatusIcons.widthFor(StatusIcons.Icon.WIFI, 15))
         assertEquals(15, StatusIcons.widthFor(StatusIcons.Icon.HEADPHONES, 15))
         assertEquals(12, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15))
-        assertEquals(14, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15, connected = true))
+        assertEquals(15, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15, connected = true))
         assertEquals(22, StatusIcons.widthFor(StatusIcons.Icon.WIFI, 16))
         assertEquals(16, StatusIcons.widthFor(StatusIcons.Icon.HEADPHONES, 16))
-        assertEquals(13, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16))
-        assertEquals(16, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16, connected = true))
+        assertEquals(14, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16))
+        assertEquals(15, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16, connected = true))
     }
 
     @Test
@@ -95,25 +94,26 @@ class StatusIconsTest {
 
     @Test
     fun runeIsAsTallAsTheIconWithASharpStemAndOpenHoles() {
-        // The status bar uses 17 (iPod layout) and 18 px; below 14 px the holes close.
-        for (h in 14..40) {
+        // The status bar uses 17 (iPod layout) and 18 px; below 16 px the holes get small.
+        for (h in 16..40) {
             for (connected in listOf(false, true)) {
                 val l = StatusIcons.bluetoothLayout(h, connected)
-                // Ink from the top row to the bottom row, like the Wi-Fi fan (the shape grows by grow / 2).
-                assertEquals(0f, l.y(2f) - l.grow / 2f, eps)
-                assertEquals(h.toFloat(), l.y(22f) + l.grow / 2f, eps)
+                // Ink from the top row to the bottom row (the core grows by the edge).
+                assertEquals(0f, l.y(2f) - l.edge, eps)
+                assertEquals(h.toFloat(), l.y(22f) + l.edge, eps)
                 // Stem x 11..13 of the viewBox: whole pixels, on pixel edges.
                 assertEquals(0f, l.stemLeft % 1f, eps)
                 assertEquals(0f, l.stem % 1f, eps)
-                assertEquals(l.stemLeft, l.x(11f) - l.grow / 2f, eps)
-                assertEquals(l.stemLeft + l.stem, l.x(13f) + l.grow / 2f, eps)
-                assertTrue(l.grow >= 0f)
-                // The triangle holes (1.88 units wide) keep their size: only the outline grows.
+                assertEquals(l.stemLeft, l.x(11f) - l.edge, eps)
+                assertEquals(l.stemLeft + l.stem, l.x(13f) + l.edge, eps)
+                // A visible dark edge, about the 1 px edge of the fan (0.5 px on each side of its outline).
+                assertTrue("h=$h", l.edge >= 0.5f && l.edge <= 1.5f)
+                // The triangle holes (1.88 units wide) stay open: only the outline grows.
                 assertTrue("h=$h", 1.88f * l.scale > 1.25f)
                 // The ink is in the bitmap.
                 assertTrue(l.stemLeft - l.inkLeft >= -eps && l.stemLeft + l.inkRight <= l.width + eps)
                 if (!connected) {
-                    assertTrue("h=$h", l.stemLeft - l.inkLeft < 1f && l.width - (l.stemLeft + l.inkRight) < 1f)
+                    assertTrue("h=$h", l.stemLeft - l.inkLeft < 1f + eps && l.width - (l.stemLeft + l.inkRight) < 1f + eps)
                     assertEquals(0, l.dotX.size)
                 }
             }
@@ -122,16 +122,17 @@ class StatusIconsTest {
 
     @Test
     fun connectedDotsAreAtTheMaterialPlacesOnPixelCentres() {
-        for (h in 14..40) {
+        for (h in 16..40) {
             val l = StatusIcons.bluetoothLayout(h, connected = true)
             assertEquals(2, l.dotX.size)
             assertEquals(h / 2f, l.dotY, eps)
-            // Dot diameter = 1.5 x the stem (3 px at 15 px), like the Material diamonds.
-            assertEquals(1.5f * l.stem, 2f * l.dotRadius, eps)
+            // Dot diameter = the stem with its edge (3 px), like the Material diamonds.
+            assertEquals(l.stem, 2f * l.dotRadius, eps)
             for (x in l.dotX) assertEquals(0.5f, x % 1f, eps)
             // Within 1 px of x = 5 and x = 19 of the viewBox.
-            assertTrue(abs(l.dotX[0] - l.x(5f)) <= 1f)
-            assertTrue(abs(l.dotX[1] - l.x(19f)) <= 1f)
+            // Within 1 px of x = 5 and x = 19 of the viewBox, never nearer to the rune.
+            assertTrue(l.dotX[0] <= l.x(5f) && l.x(5f) - l.dotX[0] <= 1f)
+            assertTrue(l.dotX[1] >= l.x(19f) && l.dotX[1] - l.x(19f) <= 1f)
             assertTrue(l.dotX[0] < l.stemLeft && l.dotX[1] > l.stemLeft + l.stem)
             // In the bitmap, the outer dots touch its edges (within 1 px).
             assertTrue(l.dotX[0] - l.dotRadius >= -eps && l.dotX[0] - l.dotRadius < 1f)
@@ -143,13 +144,15 @@ class StatusIconsTest {
     fun bluetoothAtTheIpodHeight() {
         // 17 px = 15 px and the overshoot.
         val off = StatusIcons.bluetoothLayout(17, connected = false)
-        assertEquals(2f, off.stem, eps)
-        assertEquals(6f, off.stemLeft, eps)
+        assertEquals(3f, off.stem, eps)
+        assertEquals(5f, off.stemLeft, eps)
+        assertEquals(12, off.width)
         val on = StatusIcons.bluetoothLayout(17, connected = true)
         assertEquals(6f, on.stemLeft, eps)
+        assertEquals(15, on.width)
         assertEquals(1.5f, on.dotRadius, eps)
         assertEquals(1.5f, on.dotX[0], eps)
-        assertEquals(12.5f, on.dotX[1], eps)
+        assertEquals(13.5f, on.dotX[1], eps)
         assertEquals(8.5f, on.dotY, eps)
     }
 }

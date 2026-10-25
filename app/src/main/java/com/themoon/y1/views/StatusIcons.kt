@@ -28,8 +28,8 @@ import kotlin.math.sqrt
  * same height in each icon.
  *
  * The Wi-Fi fan has the proportions of the macOS symbol (SF Symbol "wifi"). The Bluetooth rune is the filled Material
- * icon (as on Android) with a 2 px stem; its tips go 1 px above and below the fan (optical overshoot: pointed shapes
- * look shorter). With an audio device connected it has the two dots of the Material "bluetooth_connected" icon.
+ * icon (as on Android) with a 2 px stem and the dark edge of the fan; its tips go 1 px above and below the fan (optical
+ * overshoot: pointed shapes look shorter). With an audio device connected it has the two dots of the Material "bluetooth_connected" icon.
  *
  * The geometry functions ([wifiGeometry], [bluetoothLayout]) have no Android dependencies,
  * so the unit tests can check them.
@@ -74,8 +74,9 @@ object StatusIcons {
     // Centres of the dots of "bluetooth_connected" (diamonds at x 5 and 19, y 12).
     private const val MATERIAL_DOT_LEFT = 5f
     private const val MATERIAL_DOT_RIGHT = 19f
-    // Stem width / height: 2 px at the status bar heights (17 and 18 px with the overshoot).
+    // Stem width / height: 2 px at the status bar heights (17 and 18 px with the overshoot), and the edge.
     const val RUNE_STEM = 0.135f
+    const val RUNE_EDGE = 1f
 
     /** The gradient of all status icons, from the top to the bottom of the status item box (y in the bitmap). */
     fun gradient(boxTop: Float, boxBottom: Float): LinearGradient =
@@ -136,18 +137,19 @@ object StatusIcons {
     )
 
     /**
-     * The Material rune in a bitmap [heightPx] tall. The rune is scaled by [scale] and grown by [grow] px (a stroke
-     * of that width around the filled shape), so that its ink is [heightPx] tall and its stem [stem] whole pixels
-     * wide, from [stemLeft] (a pixel edge): the stem is sharp. With [connected], a dot of [dotRadius] left and right
-     * at mid-height, at the places of the Material icon, on pixel centres. The ink touches the left and right edges
-     * of the bitmap (within one pixel, for the pixel grid).
+     * The Material rune in a bitmap [heightPx] tall, in the style of the fan: a dark edge [edge] px wide around a
+     * core with the gradient. The core is the Material shape scaled by [scale]; the edge is the core grown by [edge]
+     * (a stroke of the outline only: the triangle holes keep their size and stay open). The ink is [heightPx] tall
+     * and its stem [stem] whole pixels wide from [stemLeft] (a pixel edge): the stem is sharp. With [connected], a dot
+     * of [dotRadius] left and right at mid-height, at the places of the Material icon (not nearer to the rune), on
+     * pixel centres. The ink touches the left and right edges of the bitmap (within one pixel).
      */
     class BluetoothLayout(
         val width: Int,
         val stemLeft: Float,
         val stem: Float,
         val scale: Float,
-        val grow: Float,
+        val edge: Float,
         /** Ink left and right of [stemLeft]. */
         val inkLeft: Float,
         val inkRight: Float,
@@ -156,25 +158,26 @@ object StatusIcons {
         val dotX: FloatArray,
         val dotY: Float
     ) {
-        /** Point (x, y) of the Material viewBox in the bitmap. */
-        fun x(u: Float): Float = stemLeft + grow / 2f + (u - MATERIAL_STEM_LEFT) * scale
-        fun y(v: Float): Float = grow / 2f + (v - MATERIAL_TOP) * scale
+        /** Point (x, y) of the Material viewBox in the bitmap (on the core). */
+        fun x(u: Float): Float = stemLeft + edge + (u - MATERIAL_STEM_LEFT) * scale
+        fun y(v: Float): Float = edge + (v - MATERIAL_TOP) * scale
     }
 
     fun bluetoothLayout(heightPx: Int, connected: Boolean): BluetoothLayout {
         val h = heightPx.toFloat()
-        // At least h / 10 (= the bars of the shape at this scale), so that the shape only grows.
-        val stem = max(max(1f, (RUNE_STEM * h).roundToInt().toFloat()), ceil(h / 10f - 1e-4f))
-        // Ink height: (20 - 2) * scale + stem = h; stem: 2 * scale + grow = stem.
+        // The stem of the shape (at least h / 10, the bars of the shape at this scale) and 1 px of edge.
+        val stem = max(max(1f, (RUNE_STEM * h).roundToInt().toFloat()), ceil(h / 10f - 1e-4f)) + RUNE_EDGE
+        // Ink height: (20 - 2) * scale + stem = h; ink stem: 2 * scale + 2 * edge = stem.
         val scale = (h - stem) / (MATERIAL_HEIGHT - MATERIAL_BAR)
-        val grow = stem - MATERIAL_BAR * scale
-        // The arm ends and the right tips are 90° corners: their miter goes grow/2 * sqrt(2) past the corner.
-        val miter = grow / 2f * sqrt(2f)
-        val inkLeft = (MATERIAL_STEM_LEFT - MATERIAL_ARM_END) * scale - grow / 2f + miter
-        val inkRight = grow / 2f + (MATERIAL_TIP - MATERIAL_STEM_LEFT) * scale + miter
-        val dotRadius = 0.75f * stem
-        val dl = floor(grow / 2f + (MATERIAL_DOT_LEFT - MATERIAL_STEM_LEFT) * scale) + 0.5f
-        val dr = floor(grow / 2f + (MATERIAL_DOT_RIGHT - MATERIAL_STEM_LEFT) * scale) + 0.5f
+        val edge = (stem - MATERIAL_BAR * scale) / 2f
+        // The arm ends and the right tips are 90° corners: their miter goes edge * sqrt(2) past the corner.
+        val miter = edge * sqrt(2f)
+        val inkLeft = (MATERIAL_STEM_LEFT - MATERIAL_ARM_END) * scale - edge + miter
+        val inkRight = edge + (MATERIAL_TIP - MATERIAL_STEM_LEFT) * scale + miter
+        val dotRadius = stem / 2f
+        // Pixel centres, rounded away from the rune.
+        val dl = floor(edge + (MATERIAL_DOT_LEFT - MATERIAL_STEM_LEFT) * scale - 0.5f) + 0.5f
+        val dr = ceil(edge + (MATERIAL_DOT_RIGHT - MATERIAL_STEM_LEFT) * scale - 0.5f) + 0.5f
         var left = inkLeft
         var right = inkRight
         if (connected) {
@@ -184,7 +187,7 @@ object StatusIcons {
         val stemLeft = ceil(left - 1e-4f)
         val width = ceil(stemLeft + right - 1e-4f).toInt()
         val dots = if (connected) floatArrayOf(stemLeft + dl, stemLeft + dr) else FloatArray(0)
-        return BluetoothLayout(width, stemLeft, stem, scale, grow, inkLeft, inkRight, dotRadius, dots, h / 2f)
+        return BluetoothLayout(width, stemLeft, stem, scale, edge, inkLeft, inkRight, dotRadius, dots, h / 2f)
     }
 
     /** Width in pixels of [icon] drawn [heightPx] tall. */
@@ -308,9 +311,10 @@ object StatusIcons {
     }
 
     /**
-     * The filled rune (even-odd: the two triangles are holes; not Path.op) with the status icon [shader], grown by
-     * a stroke of the outline only (the holes keep their size), and the dots of a connected device.
-     * [inactiveColor] = grey.
+     * The filled rune (even-odd: the two triangles are holes; not Path.op): the edge colour on the core grown by the
+     * edge (a stroke of the outline only, so the holes stay open), then the core with the status icon [shader].
+     * The dots: the edge colour, then the gradient 0.5 px inside (as the 1 px edge of the fan). [inactiveColor] =
+     * grey, without the gradient.
      */
     private fun drawBluetooth(canvas: Canvas, layout: BluetoothLayout, shader: Shader, inactiveColor: Int?) {
         fun path(polys: List<FloatArray>) = Path().apply {
@@ -325,20 +329,29 @@ object StatusIcons {
                 close()
             }
         }
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val core = path(MATERIAL_RUNE.toList())
+        val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            if (inactiveColor != null) color = inactiveColor else this.shader = shader
+            color = inactiveColor ?: EDGE
         }
-        canvas.drawPath(path(MATERIAL_RUNE.toList()), paint)
-        if (layout.grow > 0f) {
+        canvas.drawPath(core, dark)
+        if (layout.edge > 0f) {
             // A separate stroke, not FILL_AND_STROKE: the result does not depend on how Skia combines the two.
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = layout.grow
-            paint.strokeJoin = Paint.Join.MITER
-            canvas.drawPath(path(listOf(MATERIAL_RUNE[0])), paint)
-            paint.style = Paint.Style.FILL
+            dark.style = Paint.Style.STROKE
+            dark.strokeWidth = 2f * layout.edge
+            dark.strokeJoin = Paint.Join.MITER
+            canvas.drawPath(path(listOf(MATERIAL_RUNE[0])), dark)
+            dark.style = Paint.Style.FILL
         }
-        for (x in layout.dotX) canvas.drawCircle(x, layout.dotY, layout.dotRadius, paint)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            this.shader = shader
+        }
+        if (inactiveColor == null) canvas.drawPath(core, fill)
+        for (x in layout.dotX) {
+            canvas.drawCircle(x, layout.dotY, layout.dotRadius, dark)
+            if (inactiveColor == null) canvas.drawCircle(x, layout.dotY, layout.dotRadius - 0.5f, fill)
+        }
     }
 
     /** A head band and two ear cups (they overlap; render() hides the edges inside). */

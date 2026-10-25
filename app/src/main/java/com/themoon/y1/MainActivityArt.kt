@@ -222,19 +222,74 @@ private fun MainActivity.setStatusBarIcon(
     iv.setImageBitmap(bmp)
 
     val lp = iv.layoutParams as? android.widget.LinearLayout.LayoutParams ?: return
-    val right = com.themoon.y1.views.IpodClassicLayout.px(
-        if (ipod) com.themoon.y1.views.IpodClassicMetrics.STATUS_ITEM_GAP else rightMarginDp, d
-    )
     val bottom = if (ipod) com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_BAR_RULE, d) else 0
-    if (lp.width != bmp.width || lp.height != bmp.height || lp.rightMargin != right || lp.bottomMargin != bottom ||
+    if (ipod) {
+        // The optical bearings of the new bitmap; updateStatusItemGaps() sets the right margin.
+        val pixels = IntArray(bmp.width * bmp.height)
+        bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+        val box = com.themoon.y1.views.StatusIcons.boxInBitmap(icon, heightPx, boxPx)
+        statusBearings[iv] = com.themoon.y1.views.StatusSpacing.bearings(
+            pixels, bmp.width, box.first.toInt(), box.second.toInt()
+        )
+    } else {
+        statusBearings.remove(iv)
+        lp.rightMargin = com.themoon.y1.views.IpodClassicLayout.px(rightMarginDp, d)
+    }
+    if (lp.width != bmp.width || lp.height != bmp.height || lp.bottomMargin != bottom ||
         lp.gravity != android.view.Gravity.CENTER_VERTICAL
     ) {
         lp.width = bmp.width
         lp.height = bmp.height
-        lp.rightMargin = right
         lp.bottomMargin = bottom
         lp.gravity = android.view.Gravity.CENTER_VERTICAL
-        iv.layoutParams = lp
+    }
+    iv.layoutParams = lp
+    if (ipod) updateStatusItemGaps()
+}
+
+/** Optical bearings (left, right) of the status icons, from their bitmaps (StatusSpacing). */
+private val statusBearings = java.util.WeakHashMap<android.view.View, FloatArray>()
+private val statusGapListeners = java.util.WeakHashMap<android.view.View, Boolean>()
+
+/**
+ * iPod Classic Layout: sets the gap after each visible status item (icons, play/pause) to the next visible one, from
+ * their optical bearings (StatusSpacing), so the spaces look equal. Items without bearings (play/pause, battery) are
+ * flat: 8 px. The gap from the battery to the clock is the text's own. A layout listener on the group runs it again
+ * when an item shows or hides; it changes the margins only when they are different, so it stops after one pass.
+ */
+internal fun MainActivity.updateStatusItemGaps() {
+    if (!com.themoon.y1.views.IpodClassicLayout.isActive) return
+    val battery = batteryIconView ?: return
+    val group = battery.parent as? android.view.ViewGroup ?: return
+    if (statusGapListeners[group] == null) {
+        statusGapListeners[group] = true
+        group.viewTreeObserver.addOnGlobalLayoutListener { updateStatusItemGaps() }
+    }
+    val d = resources.displayMetrics.density
+    val end = group.indexOfChild(battery)
+    var i = 0
+    while (i < end) {
+        val v = group.getChildAt(i)
+        if (v.visibility == android.view.View.GONE || v is android.widget.TextView) {
+            i++
+            continue
+        }
+        var j = i + 1
+        while (j < end) {
+            val n = group.getChildAt(j)
+            if (n.visibility != android.view.View.GONE && n !is android.widget.TextView) break
+            j++
+        }
+        val next = if (j < end) group.getChildAt(j) else battery
+        val right = statusBearings[v]?.get(1) ?: 0f
+        val left = statusBearings[next]?.get(0) ?: 0f
+        val gap = com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.StatusSpacing.gap(right / d, left / d), d)
+        val lp = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+        if (lp != null && lp.rightMargin != gap) {
+            lp.rightMargin = gap
+            v.layoutParams = lp
+        }
+        i = j
     }
 }
 

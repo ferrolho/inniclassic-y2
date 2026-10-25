@@ -132,10 +132,11 @@ class BatteryIconView @JvmOverloads constructor(
             )
         }
 
-        // With the 3 px outline: inset 2, padding 4 and 3.5 (the original values).
+        // With the 3 px outline: inset 2, padding 4 and 3.5 (the original values). The 2 px outline is on whole
+        // pixels (inset 1), so it is sharp and as heavy as the edges of the blue icons.
         val outline = if (thinOutline) 2f else 3f
         paintStroke.strokeWidth = outline
-        val inset = outline / 2f + 0.5f
+        val inset = if (thinOutline) outline / 2f else outline / 2f + 0.5f
         rectShell.set(inset, inset, shellWidth - inset, h - inset)
         canvas.drawRoundRect(rectShell, pillRadius, pillRadius, paintStroke)
 
