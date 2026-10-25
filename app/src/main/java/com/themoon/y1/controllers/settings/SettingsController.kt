@@ -22,6 +22,7 @@ import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
@@ -318,14 +319,14 @@ class SettingsController(
         val isShuffleMode = prefs.getBoolean("shuffle", false)
         val btnShuffle = createSettingRow(
             localize("Shuffle Mode"),
-            if (isShuffleMode) localize("ON") else localize("OFF")
+            onOff(isShuffleMode, localize)
         )
         btnShuffle.setOnClickListener {
             clickFeedback()
             toggleShuffleMode()
             val tvStatus = btnShuffle.getChildAt(1) as? TextView
             val newShuffle = prefs.getBoolean("shuffle", false)
-            tvStatus?.text = if (newShuffle) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newShuffle, localize)
         }
         containerSettingsItems.addView(btnShuffle)
 
@@ -372,14 +373,14 @@ class SettingsController(
         var isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
         val btnSoundCheck = createSettingRow(
             localize("Sound Check"),
-            if (isSoundCheckEnabled) localize("ON") else localize("OFF")
+            onOff(isSoundCheckEnabled, localize)
         )
         btnSoundCheck.setOnClickListener {
             clickFeedback()
             isSoundCheckEnabled = !isSoundCheckEnabled
             prefs.edit().putBoolean("sound_check_enabled", isSoundCheckEnabled).commit()
             val tvStatus = btnSoundCheck.getChildAt(1) as? TextView
-            tvStatus?.text = if (isSoundCheckEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isSoundCheckEnabled, localize)
             AudioEffectManager.getInstance().applySoundCheck()
         }
         containerSettingsItems.addView(btnSoundCheck)
@@ -387,28 +388,28 @@ class SettingsController(
         val videoStretchFill = prefs.getBoolean("video_stretch_fill", false)
         val btnVideoFill = createSettingRow(
             localize("Fill Video Screen"),
-            if (videoStretchFill) localize("ON") else localize("OFF")
+            onOff(videoStretchFill, localize)
         )
         btnVideoFill.setOnClickListener {
             clickFeedback()
             val newState = !prefs.getBoolean("video_stretch_fill", false)
             prefs.edit().putBoolean("video_stretch_fill", newState).commit()
             val tvStatus = btnVideoFill.getChildAt(1) as? TextView
-            tvStatus?.text = if (newState) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newState, localize)
         }
         containerSettingsItems.addView(btnVideoFill)
 
         var isAlbumTiltEnabled = prefs.getBoolean("album_tilt_enabled", true)
         val btnAlbumTilt = createSettingRow(
             localize("Album Cover Tilt"),
-            if (isAlbumTiltEnabled) localize("ON") else localize("OFF")
+            onOff(isAlbumTiltEnabled, localize)
         )
         btnAlbumTilt.setOnClickListener {
             clickFeedback()
             isAlbumTiltEnabled = !isAlbumTiltEnabled
             prefs.edit().putBoolean("album_tilt_enabled", isAlbumTiltEnabled).commit()
             val tvStatus = btnAlbumTilt.getChildAt(1) as? TextView
-            tvStatus?.text = if (isAlbumTiltEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isAlbumTiltEnabled, localize)
             applyAlbumTiltSetting()
         }
         containerSettingsItems.addView(btnAlbumTilt)
@@ -443,7 +444,7 @@ class SettingsController(
         var isSoundEffectEnabled = prefs.getBoolean("sound", true)
         val btnSound = createSettingRow(
             localize("Button Sound"),
-            if (isSoundEffectEnabled) localize("ON") else localize("OFF")
+            onOff(isSoundEffectEnabled, localize)
         )
         btnSound.setOnClickListener {
             isSoundEffectEnabled = !isSoundEffectEnabled
@@ -451,7 +452,7 @@ class SettingsController(
             applySoundSetting()
             clickFeedback()
             val tvStatus = btnSound.getChildAt(1) as? TextView
-            tvStatus?.text = if (isSoundEffectEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isSoundEffectEnabled, localize)
         }
         containerSettingsItems.addView(btnSound)
 
@@ -465,7 +466,7 @@ class SettingsController(
         var isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
         val btnScreenOffCtrl = createSettingRow(
             localize("Screen-Off Control"),
-            if (isScreenOffControlEnabled) localize("ON") else localize("OFF")
+            onOff(isScreenOffControlEnabled, localize)
         )
         btnScreenOffCtrl.setOnClickListener {
             clickFeedback()
@@ -473,21 +474,21 @@ class SettingsController(
             prefs.edit().putBoolean("screen_off_control", isScreenOffControlEnabled).commit()
             mainActivity?.isScreenOffControlEnabled = isScreenOffControlEnabled
             val tvStatus = btnScreenOffCtrl.getChildAt(1) as? TextView
-            tvStatus?.text = if (isScreenOffControlEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isScreenOffControlEnabled, localize)
         }
         containerSettingsItems.addView(btnScreenOffCtrl)
 
         var isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
         val btnUsbPrompt = createSettingRow(
             localize("Ask on USB Connect"),
-            if (isUsbPromptEnabled) localize("ON") else localize("OFF")
+            onOff(isUsbPromptEnabled, localize)
         )
         btnUsbPrompt.setOnClickListener {
             clickFeedback()
             isUsbPromptEnabled = !isUsbPromptEnabled
             prefs.edit().putBoolean("usb_storage_prompt", isUsbPromptEnabled).commit()
             val tvStatus = btnUsbPrompt.getChildAt(1) as? TextView
-            tvStatus?.text = if (isUsbPromptEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isUsbPromptEnabled, localize)
         }
         containerSettingsItems.addView(btnUsbPrompt)
 
@@ -547,14 +548,14 @@ class SettingsController(
         var isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
         val btnLoopScrollToggle = createSettingRow(
             localize("Wheel Loop Scroll"),
-            if (isLoopScrollOn) localize("ON") else localize("OFF")
+            onOff(isLoopScrollOn, localize)
         )
         btnLoopScrollToggle.setOnClickListener {
             clickFeedback()
             isLoopScrollOn = !isLoopScrollOn
             prefs.edit().putBoolean("loop_scroll_on", isLoopScrollOn).commit()
             val tvStatus = btnLoopScrollToggle.getChildAt(1) as? TextView
-            tvStatus?.text = if (isLoopScrollOn) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isLoopScrollOn, localize)
         }
         containerSettingsItems.addView(btnLoopScrollToggle)
 
@@ -637,14 +638,14 @@ class SettingsController(
         var isAutoFetchEnabled = prefs.getBoolean("auto_fetch", false)
         val btnAutoFetch = createSettingRow(
             localize("Auto Fetch Album Art"),
-            if (isAutoFetchEnabled) localize("ON") else localize("OFF")
+            onOff(isAutoFetchEnabled, localize)
         )
         btnAutoFetch.setOnClickListener {
             clickFeedback()
             isAutoFetchEnabled = !isAutoFetchEnabled
             prefs.edit().putBoolean("auto_fetch", isAutoFetchEnabled).commit()
             val tvStatus = btnAutoFetch.getChildAt(1) as? TextView
-            tvStatus?.text = if (isAutoFetchEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isAutoFetchEnabled, localize)
         }
         containerSettingsItems.addView(btnAutoFetch)
 
@@ -672,14 +673,14 @@ class SettingsController(
         val scrobbler = LastFmScrobbler.getInstance(activity)
         val btnScrobbleToggle = createSettingRow(
             localize("Sync Scrobbles to Last.fm"),
-            if (scrobbler.isEnabled()) localize("ON") else localize("OFF")
+            onOff(scrobbler.isEnabled(), localize)
         )
         btnScrobbleToggle.setOnClickListener {
             clickFeedback()
             val newState = !scrobbler.isEnabled()
             scrobbler.setEnabled(newState)
             val tvStatus = btnScrobbleToggle.getChildAt(1) as? TextView
-            tvStatus?.text = if (newState) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newState, localize)
         }
         containerSettingsItems.addView(btnScrobbleToggle)
 
@@ -715,7 +716,7 @@ class SettingsController(
         val isShowPct = mainActivity?.isShowBatteryPercentage ?: prefs.getBoolean("show_battery_percentage", false)
         val btnBatteryPct = createSettingRow(
             localize("Battery Percentage"),
-            if (isShowPct) localize("ON") else localize("OFF")
+            onOff(isShowPct, localize)
         )
         btnBatteryPct.setOnClickListener {
             clickFeedback()
@@ -723,7 +724,7 @@ class SettingsController(
             mainActivity?.isShowBatteryPercentage = newPct
             prefs.edit().putBoolean("show_battery_percentage", newPct).commit()
             val tvStatus = btnBatteryPct.getChildAt(1) as? TextView
-            tvStatus?.text = if (newPct) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newPct, localize)
             mainActivity?.batteryIconView?.setShowPercentage(newPct)
         }
         containerSettingsItems.addView(btnBatteryPct)
@@ -942,13 +943,13 @@ class SettingsController(
         var isVibrationEnabled = prefs.getBoolean("vibrate", true)
         val btnToggle = createSettingRow(
             localize("Vibration Power"),
-            if (isVibrationEnabled) localize("ON") else localize("OFF")
+            onOff(isVibrationEnabled, localize)
         )
         btnToggle.setOnClickListener {
             isVibrationEnabled = !isVibrationEnabled
             clickFeedback()
             val tv = btnToggle.getChildAt(1) as? TextView
-            tv?.text = if (isVibrationEnabled) localize("ON") else localize("OFF")
+            tv?.text = onOff(isVibrationEnabled, localize)
             try {
                 prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit()
                 Settings.System.putInt(
@@ -1031,7 +1032,7 @@ class SettingsController(
         var isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", true)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
-            if (isTimeInTitleBar) localize("ON") else localize("OFF")
+            onOff(isTimeInTitleBar, localize)
         )
         rowTitleClock.setOnClickListener {
             clickFeedback()
@@ -1039,7 +1040,7 @@ class SettingsController(
             mainActivity?.isTimeInTitleBar = isTimeInTitleBar
             prefs.edit().putBoolean("time_in_title_bar", isTimeInTitleBar).commit()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
-            tvStatus?.text = if (isTimeInTitleBar) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isTimeInTitleBar, localize)
         }
         containerSettingsItems.addView(rowTitleClock)
 
