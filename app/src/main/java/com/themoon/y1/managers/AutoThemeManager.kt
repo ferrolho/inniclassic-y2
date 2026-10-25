@@ -166,8 +166,8 @@ object AutoThemeManager {
         val row = createTablerListButton(
             if (isSelected) TablerIcons.CHECK else null,
             localize("Auto"),
-            if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-            if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+            ThemeManager.getTextColorPrimary(),
+            ThemeManager.getListButtonFocusedTextColor()
         )
         row.setOnClickListener {
             clickFeedback()
