@@ -24,6 +24,7 @@ class BatteryIconView @JvmOverloads constructor(
     private var isCharging = false
     private var color = 0xFF1C1C1E.toInt()
     private var showPercentage = false
+    private var thinOutline = false
 
     private val paintFill: Paint
     private val paintStroke: Paint
@@ -79,6 +80,17 @@ class BatteryIconView @JvmOverloads constructor(
         invalidate()
     }
 
+    /**
+     * A 2 px outline (not 3 px) and 20 % larger digits, for a small battery (14 px tall in the iPod Classic
+     * Layout status bar): the digits keep more room inside the outline.
+     */
+    fun setThinOutline(thin: Boolean) {
+        if (thinOutline != thin) {
+            thinOutline = thin
+            invalidate()
+        }
+    }
+
     fun setColor(color: Int) {
         if (this.color != color) {
             this.color = color
@@ -120,15 +132,19 @@ class BatteryIconView @JvmOverloads constructor(
             )
         }
 
-        rectShell.set(2f, 2f, shellWidth - 2f, h - 2f)
+        // With the 3 px outline: inset 2, padding 4 and 3.5 (the original values).
+        val outline = if (thinOutline) 2f else 3f
+        paintStroke.strokeWidth = outline
+        val inset = outline / 2f + 0.5f
+        rectShell.set(inset, inset, shellWidth - inset, h - inset)
         canvas.drawRoundRect(rectShell, pillRadius, pillRadius, paintStroke)
 
         val terminalHeight = h * 0.4f
-        rectTerminal.set(shellWidth, (h - terminalHeight) / 2f, w - 2f, (h + terminalHeight) / 2f)
+        rectTerminal.set(shellWidth, (h - terminalHeight) / 2f, w - inset, (h + terminalHeight) / 2f)
         canvas.drawRoundRect(rectTerminal, 2f, 2f, paintTerminal)
 
-        val padX = 4f
-        val padY = 3.5f
+        val padX = outline + 1f
+        val padY = outline + 0.5f
         val maxFillWidth = shellWidth - (padX * 2f)
         val currentFillWidth = maxFillWidth * (level / 100f)
 
@@ -150,7 +166,7 @@ class BatteryIconView @JvmOverloads constructor(
             }
 
             val text = level.toString()
-            val baseTextSize = if (isCharging) (h * 0.50f) else (h * 0.58f)
+            val baseTextSize = (if (isCharging) (h * 0.50f) else (h * 0.58f)) * (if (thinOutline) 1.2f else 1f)
             paintText.textSize = baseTextSize
 
             val maxContentWidth = shellWidth - (padX * 2f)
