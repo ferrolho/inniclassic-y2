@@ -174,7 +174,7 @@ class BluetoothController(
         containerBtItems.addView(btnToggle)
 
         if (!isOn) {
-            btnScanBt.text = localize("Bluetooth is OFF")
+            btnScanBt.text = localize("Bluetooth is off")
             (btnScanBt.parent as? ViewGroup)?.removeView(btnScanBt)
             containerBtItems.addView(btnScanBt)
             restoreBluetoothFocus(targetFocusIndex)
