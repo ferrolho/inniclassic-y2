@@ -7,11 +7,13 @@
 #
 # Type a|b — Y1 stock bases from rockbox-y1.
 # Type y2  — base ROM from y2-test release (Solar Y2 pack), strip Solar
-#            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk, and
-#            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT).
+#            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk,
+#            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT), and add the stock
+#            Bluetooth.apk + Bluetooth.odex (the base has none, see Y2_BT_* below).
 #
-# Optional override:
+# Optional overrides:
 #   Y2_BASE_URL=https://.../rom_y2.zip ./scripts/build-rom.sh y2 out.zip
+#   Y2_BT_ROM_ZIP=/path/to/y2-ata/rom_y2.zip ./scripts/build-rom.sh y2 out.zip
 set -euo pipefail
 
 TYPE=""
@@ -24,11 +26,23 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORK_DIR=""
 MOUNT_SYS=""
 MOUNT_USER=""
+MOUNT_BT=""
 
 LAUNCHER_REPO="${LAUNCHER_REPO:-JonaszPotoniec/inniclassic-y2}"
 
 # Published Y2 base (Solar-built pack for stripping + InniClassic install).
 Y2_BASE_URL="${Y2_BASE_URL:-https://github.com/ryan-specter/jj_auto/releases/download/y2-test/rom_y2.zip}"
+
+# The y2-test base has no Bluetooth.apk, so Bluetooth cannot turn on. Take the original
+# /system/app/Bluetooth.apk + Bluetooth.odex of the same Innioasis build (fingerprint
+# .../1779084676) from original_system.img in the y1-community y2-ata ROM. They are signed
+# with the same key as the stock MtkBt.apk and the odex matches the base framework.
+# Used only when tools/rom_assets/Bluetooth.apk is not provided.
+Y2_BT_ROM_URL="https://github.com/y1-community/y2-ata-rom/releases/download/y2-ata/rom_y2.zip"
+Y2_BT_ROM_ZIP="${Y2_BT_ROM_ZIP:-}"  # optional local copy of that zip (skips the download)
+Y2_BT_ROM_SHA256="b000a543a2faca29b852db6ecc0499e7a0406ac88edac4ba9bf438365d53a584"
+Y2_BT_APK_SHA256="064855fd299e54d30e114b4d441e1f14657e62b4325cfed5e5c7b9a652e81b37"
+Y2_BT_ODEX_SHA256="f543c2842589e70f6d4582e8992e2ccf1f2e0e1fa19b454fabf039b5f8e08fc2"
 
 usage() {
     cat >&2 <<EOF
@@ -88,6 +102,9 @@ cleanup() {
     if [ -n "$MOUNT_USER" ] && mountpoint -q "$MOUNT_USER" 2>/dev/null; then
         sudo umount "$MOUNT_USER" || true
     fi
+    if [ -n "$MOUNT_BT" ] && mountpoint -q "$MOUNT_BT" 2>/dev/null; then
+        sudo umount "$MOUNT_BT" || true
+    fi
     if [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
         rm -rf "$WORK_DIR"
     fi
@@ -128,6 +145,7 @@ require_cmd unzip
 require_cmd zip
 require_cmd cmp
 require_cmd sudo
+require_cmd sha256sum
 
 resolve_latest_launcher_tag() {
     local release_url tag
@@ -172,6 +190,49 @@ download_launcher_apk() {
     apk_url="https://github.com${apk_url}"
     echo "Downloading $(basename "$apk_url") from release ${tag}"
     curl -fsSL -o "$dest" "$apk_url"
+}
+
+sha256_of() {
+    sha256sum "$1" | awk '{ print $1 }'
+}
+
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+    local actual
+
+    actual="$(sha256_of "$file")"
+    [ "$actual" = "$expected" ] || die "SHA-256 mismatch for $file: got $actual, expected $expected"
+}
+
+# Copy the stock Bluetooth.apk + Bluetooth.odex (see Y2_BT_* above) into $1.
+fetch_y2_stock_bluetooth() {
+    local dest="$1"
+    local rom_zip="$WORK_DIR/y2_ata_rom.zip"
+    local img="$WORK_DIR/original_system.img"
+
+    if [ -n "$Y2_BT_ROM_ZIP" ]; then
+        echo "==> Using local y2-ata ROM for Bluetooth.apk: $Y2_BT_ROM_ZIP"
+        rom_zip="$Y2_BT_ROM_ZIP"
+    else
+        echo "==> Downloading y2-ata ROM for the stock Bluetooth.apk"
+        echo "    $Y2_BT_ROM_URL"
+        curl -fsSL -L -o "$rom_zip" "$Y2_BT_ROM_URL"
+    fi
+    verify_sha256 "$rom_zip" "$Y2_BT_ROM_SHA256"
+    unzip -q -o "$rom_zip" original_system.img -d "$WORK_DIR"
+    [ -n "$Y2_BT_ROM_ZIP" ] || rm -f "$rom_zip"
+
+    MOUNT_BT="$WORK_DIR/mount_bt"
+    mkdir -p "$MOUNT_BT" "$dest"
+    sudo mount -t ext4 -o loop,ro "$img" "$MOUNT_BT"
+    cp "$MOUNT_BT/app/Bluetooth.apk" "$MOUNT_BT/app/Bluetooth.odex" "$dest/"
+    sudo umount "$MOUNT_BT"
+    MOUNT_BT=""
+    rm -f "$img"
+
+    verify_sha256 "$dest/Bluetooth.apk" "$Y2_BT_APK_SHA256"
+    verify_sha256 "$dest/Bluetooth.odex" "$Y2_BT_ODEX_SHA256"
 }
 
 # Remove Solar packages / helpers / config (used when base is a Solar Y2 pack).
@@ -320,8 +381,17 @@ audit_rom_contents() {
             errors=$((errors + 1))
         fi
 
-        if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ] && [ ! -f "$sys_mount/priv-app/Bluetooth.apk" ]; then
-            echo "audit fail: /system/priv-app/Bluetooth.apk missing (asset was provided but not installed)" >&2
+        if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ]; then
+            if [ ! -f "$sys_mount/priv-app/Bluetooth.apk" ]; then
+                echo "audit fail: /system/priv-app/Bluetooth.apk missing (asset was provided but not installed)" >&2
+                errors=$((errors + 1))
+            fi
+        elif [ ! -f "$sys_mount/app/Bluetooth.apk" ] || [ ! -f "$sys_mount/app/Bluetooth.odex" ]; then
+            echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex missing (Bluetooth cannot turn on)" >&2
+            errors=$((errors + 1))
+        elif [ "$(sha256_of "$sys_mount/app/Bluetooth.apk")" != "$Y2_BT_APK_SHA256" ] \
+            || [ "$(sha256_of "$sys_mount/app/Bluetooth.odex")" != "$Y2_BT_ODEX_SHA256" ]; then
+            echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex is not the stock pair" >&2
             errors=$((errors + 1))
         fi
 
@@ -382,6 +452,7 @@ BASE_DIR="$WORK_DIR/base"
 MOUNT_SYS="$BASE_DIR/mount_sys"
 MOUNT_USER="$BASE_DIR/mount_user"
 LAUNCHER_APK="$WORK_DIR/launcher.apk"
+BT_DIR="$WORK_DIR/bluetooth"
 
 mkdir -p "$BASE_DIR" "$MOUNT_SYS" "$MOUNT_USER"
 
@@ -432,6 +503,10 @@ fi
 
 [ -f "$BASE_DIR/system.img" ] || die "system.img not found after extracting base ROM"
 [ -f "$BASE_DIR/userdata.img" ] || die "userdata.img not found after extracting base ROM"
+
+if [ "$TYPE" = "y2" ] && [ ! -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ]; then
+    fetch_y2_stock_bluetooth "$BT_DIR"
+fi
 
 # Replace boot logo on Y1 builds if logo_inniclassic.bin is present
 if [ "$TYPE" != "y2" ] && [ -f "$REPO_ROOT/tools/rom_assets/logo_inniclassic.bin" ]; then
@@ -537,9 +612,19 @@ if [ "$TYPE" = "y2" ]; then
         sudo cp -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" "$MOUNT_SYS/priv-app/Bluetooth.apk"
         sudo chmod 644 "$MOUNT_SYS/priv-app/Bluetooth.apk"
         sudo chown root:root "$MOUNT_SYS/priv-app/Bluetooth.apk"
+    else
+        echo "==> Installing stock Bluetooth.apk + Bluetooth.odex in /system/app"
+        sudo mkdir -p "$MOUNT_SYS/app"
+        for bt_file in Bluetooth.apk Bluetooth.odex; do
+            sudo cp -f "$BT_DIR/$bt_file" "$MOUNT_SYS/app/$bt_file"
+            sudo chmod 644 "$MOUNT_SYS/app/$bt_file"
+            sudo chown root:root "$MOUNT_SYS/app/$bt_file"
+        done
     fi
 
-    if [ -f "$REPO_ROOT/tools/rom_assets/MtkBt.apk" ]; then
+    # Bluetooth.apk and MtkBt.apk share android.uid.bluetooth, so they must have the same
+    # signature: a re-signed MtkBt.apk only goes with a re-signed Bluetooth.apk asset.
+    if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ] && [ -f "$REPO_ROOT/tools/rom_assets/MtkBt.apk" ]; then
         echo "==> Installing signature-aligned MtkBt.apk (tools/rom_assets/MtkBt.apk)"
         sudo mkdir -p "$MOUNT_SYS/app"
         sudo cp -f "$REPO_ROOT/tools/rom_assets/MtkBt.apk" "$MOUNT_SYS/app/MtkBt.apk"
