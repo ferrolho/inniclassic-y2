@@ -98,6 +98,23 @@ object TestHookLogic {
         return out
     }
 
+    /**
+     * Longest time of one `key` command (200 presses with the default hold and gap fit). With the wake (5 s)
+     * and the settle wait the reply comes before Android's 60 s timeout of a background ordered broadcast.
+     */
+    const val MAX_KEY_COMMAND_MS = 45_000L
+
+    /** Time of a `key` command: [count] presses of [holdMs] with [gapMs] between them. */
+    fun keyDurationMs(holdMs: Long, count: Int, gapMs: Long): Long =
+        count * holdMs + (count - 1).coerceAtLeast(0) * gapMs
+
+    /** The error for a `key` command that takes longer than [MAX_KEY_COMMAND_MS], else null. */
+    fun keyDurationError(holdMs: Long, count: Int, gapMs: Long): String? {
+        val ms = keyDurationMs(holdMs, count, gapMs)
+        if (ms <= MAX_KEY_COMMAND_MS) return null
+        return "key would take $ms ms (count*hold + (count-1)*gap); the limit is $MAX_KEY_COMMAND_MS ms: send it in parts"
+    }
+
     /** True for text that is only icon-font glyphs (Unicode private use area) and spaces. */
     fun isIconGlyph(text: String): Boolean {
         val t = text.trim()
@@ -169,14 +186,18 @@ object TestHookLogic {
 
     /**
      * The text for the ordered-broadcast result data: the full one-line JSON if it is short enough,
-     * else a short JSON that names the file with the full result.
+     * else a short JSON (with [power]) that names the file with the full result.
      */
-    fun broadcastData(json: String, ok: Boolean, error: String?, cmd: String, file: String?, max: Int = MAX_BROADCAST_CHARS): String {
+    fun broadcastData(
+        json: String, ok: Boolean, error: String?, cmd: String, file: String?,
+        max: Int = MAX_BROADCAST_CHARS, power: JSONObject? = null
+    ): String {
         if (json.length <= max) return json
         val out = JSONObject()
         out.put("ok", ok)
         out.put("error", error ?: JSONObject.NULL)
         out.put("cmd", cmd)
+        if (power != null) out.put("power", power)
         out.put("truncated", true)
         out.put("chars", json.length)
         out.put("file", file ?: JSONObject.NULL)

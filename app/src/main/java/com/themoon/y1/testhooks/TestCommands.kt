@@ -22,7 +22,13 @@ import java.io.File
  * (main menu actions, browser list clicks, the key dispatch path), so the back stack stays as after a
  * real walk. Each one calls `done(error)` once, with null when it worked.
  *
+ * Before each command, [TestPower] wakes the screen the app's way (not with a key) and waits until the app is
+ * awake (at most 5 s, else an error and the command does not run). Then it keeps the screen on until
+ * 10 minutes after the last command.
+ *
  * - `state` (default): only read the state.
+ * - `awake [--ei minutes <n>]`: keep the screen on for n minutes from now (default 10, 0 = stop now and do
+ *   not wake). Other commands extend the time to at least 10 minutes.
  * - `open --es screen <name>`: go to a screen from the main menu (see [TestHookLogic.SCREEN_IDS]).
  * - `browse --es type ALBUM|ARTIST|ALBUM_ARTIST|GENRE|SONGS|FAVORITES [--es value <name>] [--es artist <album artist>]`
  * - `play --es path <file> | --es query <text> [--es from album|songs]`
@@ -35,6 +41,33 @@ import java.io.File
 internal class TestCommands(private val main: MainActivity, private val handler: Handler) {
 
     fun run(cmd: String, intent: Intent, done: (String?) -> Unit) {
+        TestPower.commandStarted(main)
+        val explicit = cmd == "awake"
+        @Suppress("DEPRECATION")
+        val minutes = if (explicit) {
+            TestPowerLogic.parseMinutes(intent.extras?.get("minutes"))
+                ?: return done("awake needs --ei minutes <0..${TestPowerLogic.MAX_KEEP_AWAKE_MINUTES}>")
+        } else null
+        if (explicit && minutes == 0) {
+            TestPower.release(main)
+            return done(null)
+        }
+        TestPower.keepAwake(main, minutes, explicit)
+        TestPower.wakeThen(main) { error ->
+            when {
+                error != null -> done(error)
+                explicit -> done(null)
+                else -> try {
+                    runAwake(cmd, intent, done)
+                } catch (t: Throwable) {
+                    done("$cmd failed: $t")
+                }
+            }
+        }
+    }
+
+    /** The command itself, after the wake. */
+    private fun runAwake(cmd: String, intent: Intent, done: (String?) -> Unit) {
         when (cmd) {
             "state" -> done(null)
             "open" -> done(open(intent.getStringExtra("screen")))
@@ -300,6 +333,7 @@ internal class TestCommands(private val main: MainActivity, private val handler:
      * with FLAG_LONG_PRESS at the Android key repeat times, so onKeyLongPress and hold timers run as on the device.
      */
     private fun key(code: Int, long: Boolean, holdMs: Long, count: Int, gapMs: Long, done: (String?) -> Unit) {
+        TestHookLogic.keyDurationError(holdMs, count, gapMs)?.let { return done(it) }
         var remaining = count
         lateinit var pressNext: () -> Unit
         pressNext = {

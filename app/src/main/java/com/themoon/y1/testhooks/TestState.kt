@@ -2,7 +2,6 @@ package com.themoon.y1.testhooks
 
 import android.content.Context
 import android.media.AudioManager
-import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.view.View
@@ -351,16 +350,9 @@ internal class TestState(private val main: MainActivity, private val options: Op
         return out
     }
 
-    private fun power(): JSONObject {
-        val pm = main.getSystemService(Context.POWER_SERVICE) as PowerManager
-        @Suppress("DEPRECATION")
-        val screenOn = pm.isScreenOn
-        return JSONObject()
-            .put("screenOn", screenOn)
-            .put("screenSleeping", main.isScreenSleeping)
-            .put("fakeScreenOff", main.isFakeScreenOff)
-            .put("screenOffControl", main.isScreenOffControlEnabled)
-    }
+    /** The same as the `power` object of the reply, plus the Screen-Off Control setting. */
+    private fun power(): JSONObject = TestPower.json(main)
+        .put("screenOffControl", main.isScreenOffControlEnabled)
 
     // --- settings, library ---
 

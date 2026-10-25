@@ -9,6 +9,7 @@ import android.os.Looper
 import android.os.SystemClock
 import com.themoon.y1.BuildConfig
 import com.themoon.y1.MainActivity
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 
@@ -29,6 +30,9 @@ object TestHooks {
     private const val SENDER_PERMISSION = "android.permission.DUMP"
 
     private var receiver: TestHookReceiver? = null
+
+    /** The activity that gets the commands now. */
+    internal val activity: MainActivity? get() = receiver?.main
 
     /** Activity starts since the process started, and the time of the last one: a restart changes both. */
     var activityStarts = 0
@@ -95,6 +99,8 @@ internal class TestHookReceiver(val main: MainActivity) : BroadcastReceiver() {
         val ok = err == null
         val result = TestHookLogic.result(ok, err, cmd, state)
         var file: File? = null
+        val power = try { TestPower.json(main) } catch (t: Throwable) { JSONObject().put("error", t.toString()) }
+        result.put("power", power)
         try {
             val dir = main.getExternalFilesDir(null)
             if (dir != null) {
@@ -110,9 +116,10 @@ internal class TestHookReceiver(val main: MainActivity) : BroadcastReceiver() {
         val json = result.toString()
         try {
             pending.resultCode = if (ok) 1 else 0
-            pending.resultData = TestHookLogic.broadcastData(json, ok, err, cmd, file?.absolutePath)
+            pending.resultData = TestHookLogic.broadcastData(json, ok, err, cmd, file?.absolutePath, power = power)
         } finally {
             pending.finish()
+            TestPower.commandFinished()
         }
     }
 
