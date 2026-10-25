@@ -87,7 +87,8 @@ object IpodClassicLists {
 
     /**
      * Main menu elements with the iPod metrics: list pane 240 wide, 38 px rows with 23 sp text and a
-     * drawn chevron, and the cover pane moved to the new pane edge. The theme's own elements are not changed.
+     * drawn chevron, and the cover pane moved to the new pane edge and below the full-width status bar
+     * (as on the iPod, where the title bar spans the screen). The theme's own elements are not changed.
      */
     fun menuElements(elements: List<ThemeManager.MenuElement>, context: Context): List<ThemeManager.MenuElement> {
         if (!IpodClassicLayout.isActive) return elements
@@ -103,8 +104,12 @@ object IpodClassicLists {
                     height = screenHeight - IpodClassicMetrics.STATUS_BAR_HEIGHT - list.y)
                 el.type == "button" && el.parentId == list.id -> copy(el, height = IpodClassicMetrics.ROW_HEIGHT,
                     textSize = IpodClassicMetrics.LIST_TEXT_SP.toInt(), textRight = "")
-                el.type != "button" && el.x == oldRight -> copy(el, x = newRight,
-                    width = if (el.width > 0) screenWidth - newRight else el.width)
+                el.type != "button" && el.x == oldRight -> {
+                    val top = if (isBottomAligned(el)) el.y else maxOf(el.y, IpodClassicMetrics.STATUS_BAR_HEIGHT)
+                    copy(el, x = newRight, y = top,
+                        width = if (el.width > 0) screenWidth - newRight else el.width,
+                        height = if (el.height > 0 && top != el.y) screenHeight - top else el.height)
+                }
                 else -> el
             }
         }
@@ -169,15 +174,20 @@ object IpodClassicLists {
 
     private fun px(dp: Int, d: Float): Int = IpodClassicLayout.px(dp, d)
 
+    // MainMenuController measures y from the bottom for these elements.
+    private fun isBottomAligned(el: ThemeManager.MenuElement): Boolean =
+        el.gravity.lowercase(java.util.Locale.US).contains("bottom")
+
     private fun copy(
         el: ThemeManager.MenuElement,
         x: Int = el.x,
+        y: Int = el.y,
         width: Int = el.width,
         height: Int = el.height,
         textSize: Int = el.textSize,
         textRight: String = el.textRight
     ) = ThemeManager.MenuElement(
-        el.id, el.type, el.parentId, el.visibleOnFocus, x, el.y, width, height,
+        el.id, el.type, el.parentId, el.visibleOnFocus, x, y, width, height,
         el.textNormal, el.textFocused, textRight, el.textRightColor, el.textRightFocusedColor,
         el.iconNormal, el.iconFocused, el.previewImage, el.action, el.gravity, el.radius, el.focusIndex,
         textSize, el.textSecondarySize, el.textPosition, el.textAlign, el.bgColor, el.padding,

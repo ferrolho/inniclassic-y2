@@ -3,7 +3,10 @@ package com.themoon.y1.views
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -21,7 +24,8 @@ import kotlin.math.roundToInt
  * The optional "iPod Classic Layout" (Settings, off by default).
  *
  * When it is on and a Classic theme is in use, the status bar, the lists and Now Playing use the
- * iPod classic proportions from [IpodClassicMetrics]. The static views from activity_main.xml are
+ * iPod classic proportions from [IpodClassicMetrics]. The status bar spans the full width on all
+ * screens, also over the split screens and Cover Flow. The static views from activity_main.xml are
  * changed at runtime. Each changed property is recorded the first time it changes, so turning the
  * setting off restores the default layout without a restart.
  */
@@ -96,6 +100,7 @@ object IpodClassicLayout {
                 applyStatusBar(main, d)
                 appliedStatusKey = statusBarKey(main)
             }
+            keepStatusBarFull(main.findViewById(R.id.layout_status_bar))
             applyScreenPaddings(main, d)
             if (first || main.findViewById<View>(R.id.layout_player_mode)?.visibility == View.VISIBLE) {
                 IpodClassicNowPlaying.apply(main, d)
@@ -176,6 +181,31 @@ object IpodClassicLayout {
         }
     }
 
+    /**
+     * Keeps the status bar at the full width (the controllers set half the width for the split screens)
+     * and opaque in Cover Flow (applyTheme and Cover Flow make it transparent there). It stays transparent
+     * over the video player. Called at each apply and before each frame ([IpodStatusRuleView]), because
+     * the controllers also change it outside applyTheme(). Returns true when it changed the bar.
+     */
+    internal fun keepStatusBarFull(bar: View?): Boolean {
+        if (bar == null || !isActive) return false
+        var changed = false
+        val lp = bar.layoutParams
+        if (lp != null && lp.width != ViewGroup.LayoutParams.MATCH_PARENT) {
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            bar.layoutParams = lp
+            changed = true
+        }
+        if (MainActivity.instance?.currentScreenState == MainActivity.STATE_COVERFLOW && isTransparent(bar.background)) {
+            bar.background = ThemeManager.createStatusBarBackground()
+            changed = true
+        }
+        return changed
+    }
+
+    internal fun isTransparent(bg: Drawable?): Boolean =
+        bg == null || (bg is ColorDrawable && Color.alpha(bg.color) == 0)
+
     // Screens whose content starts below the status bar.
 
     private val belowStatusBarIds = intArrayOf(
@@ -198,7 +228,13 @@ object IpodClassicLayout {
             }
             v.setPadding(v.paddingLeft, px(IpodClassicMetrics.STATUS_BAR_HEIGHT, d), v.paddingRight, v.paddingBottom)
         }
+        // The cover panes of the split screens start below the full-width status bar.
+        for (id in coverPaneIds) {
+            main.findViewById<View>(id)?.let { setMargins(it, top = px(IpodClassicMetrics.STATUS_BAR_HEIGHT, d)) }
+        }
     }
+
+    private val coverPaneIds = intArrayOf(R.id.frame_browser_cover, R.id.frame_video_cover)
 
     // Text helpers
 
