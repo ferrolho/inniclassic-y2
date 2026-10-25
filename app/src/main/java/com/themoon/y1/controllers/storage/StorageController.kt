@@ -46,6 +46,10 @@ class StorageController(
         layoutStorage.visibility = View.GONE
     }
 
+    override fun onLibraryLoaded() {
+        buildStorageUI()
+    }
+
     fun buildStorageUI() {
         containerStorageItems.removeAllViews()
         layoutStorage.setBackgroundColor(ThemeManager.getOverlayBackgroundColor())
