@@ -654,6 +654,7 @@ internal fun MainActivity.shuffleAllSongs() {
 }
 
 internal fun MainActivity.handleMainMenuAction(action: String) {
+    if (!FeatureVisibility.isBuilt(action)) return
     backTargetForUtility = MainActivity.STATE_MENU
     when (action) {
         "OPEN_BROWSER", "MUSIC" -> {
