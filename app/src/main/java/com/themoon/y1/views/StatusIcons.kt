@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
@@ -48,19 +50,26 @@ object StatusIcons {
         val canvas = Canvas(bmp)
         val shape = shape(icon, w.toFloat(), h.toFloat())
 
-        if (active) {
-            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.FILL
-                shader = LinearGradient(0f, 0f, 0f, h.toFloat(), FILL_TOP, FILL_BOTTOM, Shader.TileMode.CLAMP)
-            }
-            canvas.drawPath(shape, fill)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            shader = LinearGradient(0f, 0f, 0f, h.toFloat(), FILL_TOP, FILL_BOTTOM, Shader.TileMode.CLAMP)
         }
         val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 1f
             color = if (active) EDGE else if (lightBar) EMPTY_EDGE_LIGHT else EMPTY_EDGE_DARK
         }
-        canvas.drawPath(shape, edge)
+        if (icon == Icon.HEADPHONES) {
+            // Band and cups overlap. Draw a 2 px edge, then the fill over it: the fill covers the inner half of the
+            // edge and the edges inside the overlap. (Path.op can loop for ever in the Skia of Android 4.4.)
+            edge.strokeWidth = 2f
+            canvas.drawPath(shape, edge)
+            if (!active) fill.apply { shader = null; xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
+            canvas.drawPath(shape, fill)
+        } else {
+            if (active) canvas.drawPath(shape, fill)
+            canvas.drawPath(shape, edge)
+        }
 
         if (icon == Icon.BLUETOOTH) {
             val rune = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -106,7 +115,7 @@ object StatusIcons {
         path.close()
     }
 
-    /** A head band and two ear cups, joined into one outline. */
+    /** A head band and two ear cups (they overlap; render() hides the edges inside). */
     private fun headphones(w: Float, h: Float): Path {
         val u = h / 18f
         val cupW = 4.4f * u
@@ -138,8 +147,8 @@ object StatusIcons {
             addRoundRect(RectF(left, cupTop, left + cupW, h - 0.5f), cr, cr, Path.Direction.CW)
             addRoundRect(RectF(right - cupW, cupTop, right, h - 0.5f), cr, cr, Path.Direction.CW)
         }
-        // One outline without the edges inside the overlap. If the union fails, the inner edges show.
-        if (!band.op(cups, Path.Op.UNION)) band.addPath(cups)
+        // Not Path.op: see render()
+        band.addPath(cups)
         return band
     }
 
