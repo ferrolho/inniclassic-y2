@@ -1,6 +1,7 @@
 package com.themoon.y1
 
 import com.themoon.y1.managers.MediaLibraryManager
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.TvSeason
 import com.themoon.y1.models.TvSeries
 import com.themoon.y1.models.VideoItem
@@ -104,7 +105,7 @@ internal fun MainActivity.rebuildUniqueAlbumListInternal() {
     val seenAlbums = HashSet<String>()
     for (song in MainActivity.customLibrary) {
         val album = song.album
-        if (!album.isNullOrBlank() && seenAlbums.add(album)) {
+        if (!album.isNullOrBlank() && seenAlbums.add(AlbumKey.of(song))) {
             uniqueAlbumList.add(song)
         }
     }
