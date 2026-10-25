@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -52,6 +53,16 @@ class CoverFlowController(
     private var coverFlowDirectionChangeTime = 0L
     private var lastCoverFlowWheelTime = 0L
 
+    // Speed scrolling: a fast wheel turn moves through the artist letters (see CoverFlowLetterJump).
+    private val letterJump = CoverFlowLetterJump(uniqueAlbumList, object : CoverFlowLetterJump.Ui {
+        override fun showLetter(letter: String) { MainActivity.instance?.showJumpLetter(letter) }
+        override fun hideLetter() { MainActivity.instance?.hideFastScrollLetter() }
+        override fun goTo(index: Int, direction: Int) = settleOnAlbum(index, direction)
+        override fun click() = clickFeedback()
+        override fun postDelayed(task: Runnable, delayMs: Long) { rootView.postDelayed(task, delayMs) }
+        override fun cancel(task: Runnable) { rootView.removeCallbacks(task) }
+    })
+
     override fun onEnter(state: ScreenState) {
         buildCoverFlowUI()
     }
@@ -61,12 +72,14 @@ class CoverFlowController(
     }
 
     override fun onExit() {
+        letterJump.reset()
         cancelAllAnimations()
         coverFlowContainer?.removeAllViews()
         containerBrowserItems.removeAllViews()
     }
 
     fun buildCoverFlowUI() {
+        letterJump.reset()
         val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         statusBar?.setBackgroundColor(0x00000000)
 
@@ -413,6 +426,7 @@ class CoverFlowController(
         val lag = now - eventTime
         val diff = now - lastCoverFlowWheelTime
         lastCoverFlowWheelTime = now
+        if (letterJump.onStep(dir, eventTime, currentCoverFlowIndex)) return
 
         val duration: Int = when {
             lag > 40 || diff < 40 -> 0
@@ -425,6 +439,16 @@ class CoverFlowController(
         if (lag <= 40) {
             clickFeedback()
         }
+    }
+
+    /** End of a letter jump: shows the album one step before [index], then turns to it ([direction] of the turn). */
+    private fun settleOnAlbum(index: Int, direction: Int) {
+        val total = uniqueAlbumList.size
+        if (index !in 0 until total || index == currentCoverFlowIndex) return
+        val step = if (direction < 0) -1 else 1
+        currentCoverFlowIndex = (index - step + total) % total
+        initCoverFlowPositions()
+        scrollCoverFlow(step > 0, 160)
     }
 
     private fun scrollCoverFlow(isNext: Boolean, duration: Int) {

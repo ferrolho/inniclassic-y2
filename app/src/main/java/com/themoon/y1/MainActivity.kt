@@ -747,15 +747,24 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun showFastScrollLetter(rawText: String) {
         if (currentScreenState != STATE_BROWSER || !::browserController.isInitialized) return
         val letter = browserController.jumpLetter ?: return
-        val tv = tvFastScrollLetter ?: return
+        showJumpLetter(letter)
+    }
 
-        tv.text = letter
-        tv.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-        tv.typeface = ThemeManager.getCustomFontBold()
-        tv.background = GradientDrawable().apply {
-            setColor(ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt())
-            cornerRadius = 15f * resources.displayMetrics.density
+    /**
+     * Shows [letter] in the letter box (lists and Cover Flow). It fades out [LetterJump.HIDE_DELAY_MS] after the
+     * last call. The box gets its theme colours when it comes on; after that, only a new letter changes it.
+     */
+    fun showJumpLetter(letter: String) {
+        val tv = tvFastScrollLetter ?: return
+        if (tv.visibility != View.VISIBLE) {
+            tv.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+            tv.typeface = ThemeManager.getCustomFontBold()
+            tv.background = GradientDrawable().apply {
+                setColor(ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt())
+                cornerRadius = 15f * resources.displayMetrics.density
+            }
         }
+        if (tv.text?.contentEquals(letter) != true) tv.text = letter
         tv.animate().cancel()
         tv.alpha = 1f
         tv.visibility = View.VISIBLE
