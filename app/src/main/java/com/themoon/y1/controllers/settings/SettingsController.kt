@@ -1417,6 +1417,7 @@ class SettingsController(
             if (materialIconFont != null) {
                 tvRight?.typeface = materialIconFont
                 tvRight?.textSize = 22f
+                tvRight?.let { centreIconInRow(it) }
             }
 
             // Keep the row highlight of createSettingRow: this listener replaces its listener.
@@ -1484,6 +1485,7 @@ class SettingsController(
             if (materialIconFont != null) {
                 tvRight?.typeface = materialIconFont
                 tvRight?.textSize = 22f
+                tvRight?.let { centreIconInRow(it) }
             }
             tvRight?.setTextColor(
                 if (isHidden) ThemeManager.getTextColorSecondary() else ThemeManager.getTextColorPrimary()
@@ -1538,7 +1540,25 @@ class SettingsController(
         }
     }
 
+    /**
+     * The icon glyphs fill the em box of the icon font (no descent), so a box of one line without font
+     * padding, centred in the row, centres the icons. A list style can have set a top padding for text.
+     */
+    private fun centreIconInRow(tv: TextView) {
+        tv.includeFontPadding = false
+        tv.gravity = Gravity.CENTER_VERTICAL
+        tv.setPadding(tv.paddingLeft, 0, tv.paddingRight, 0)
+        (tv.layoutParams as? LinearLayout.LayoutParams)?.let {
+            it.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            it.gravity = Gravity.CENTER_VERTICAL
+            tv.layoutParams = it
+        }
+    }
+
     fun toggleMenuReorderMode() {
+        // Material icon "swap_vert", from the same font as the eye icon. The font has no "↕" (and no space),
+        // so a fallback glyph sat on the icon baseline, below the row centre.
+        val reorderMark = "\uE8D5"
         if (!isMenuReorderMode) {
             val focused = activity.currentFocus
             if (focused != null && focused.parent == containerSettingsItems) {
@@ -1546,8 +1566,8 @@ class SettingsController(
                 currentReorderRow = focused
                 currentReorderRow?.setBackgroundColor(0xFFD32F2F.toInt())
                 val tvRight = (currentReorderRow as? LinearLayout)?.getChildAt(1) as? TextView
-                val currentIcon = tvRight?.text?.toString()?.replace(" ↕", "") ?: ""
-                tvRight?.text = "$currentIcon ↕"
+                val currentIcon = tvRight?.text?.toString()?.replace(reorderMark, "") ?: ""
+                tvRight?.text = currentIcon + reorderMark
                 tvRight?.setTextColor(0xFFFFFFFF.toInt())
             }
         } else {
@@ -1556,7 +1576,7 @@ class SettingsController(
                 // Replace the red reorder background with the normal row highlight.
                 currentReorderRow?.let { it.onFocusChangeListener?.onFocusChange(it, it.hasFocus()) }
                 val tvRight = (currentReorderRow as? LinearLayout)?.getChildAt(1) as? TextView
-                val currentIcon = tvRight?.text?.toString()?.replace(" ↕", "") ?: ""
+                val currentIcon = tvRight?.text?.toString()?.replace(reorderMark, "") ?: ""
                 tvRight?.text = currentIcon
                 tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 currentReorderRow = null
