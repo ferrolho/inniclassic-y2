@@ -417,7 +417,7 @@ class PodcastController(
         val prefs = activity.getSharedPreferences("AppPrefs", 0)
 
         if (localFile.exists() && localFile.length() > 0) {
-            val btnPlay = createListButton("\uE037", localize("Play (Downloaded)"), 0xFF00FF00.toInt()).apply {
+            val btnPlay = createListButton("\uE037", localize("Play (Downloaded)"), null).apply {
                 setOnKeyListener(wheelListener)
                 setOnClickListener {
                     clickFeedback()
@@ -454,7 +454,7 @@ class PodcastController(
             rootLayout.addView(btnStream)
 
             if (downloadManager.isDownloading(audioUrl)) {
-                val btnDownloading = createListButton("\uE863", localize("Downloading..."), 0xFFFF8800.toInt()).apply {
+                val btnDownloading = createListButton("\uE863", localize("Downloading..."), null).apply {
                     setOnKeyListener(wheelListener)
                 }
                 rootLayout.addView(btnDownloading)
