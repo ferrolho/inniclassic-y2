@@ -3,7 +3,7 @@ package com.themoon.y1.views
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.atan2
+import kotlin.math.abs
 import kotlin.math.sin
 
 class StatusIconsTest {
@@ -14,12 +14,12 @@ class StatusIconsTest {
         // 15 px = the round icons in the iPod Classic Layout; 16 px = the status bar without it.
         assertEquals(19, StatusIcons.widthFor(StatusIcons.Icon.WIFI, 15))
         assertEquals(15, StatusIcons.widthFor(StatusIcons.Icon.HEADPHONES, 15))
-        assertEquals(10, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15))
-        assertEquals(18, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15, connected = true))
+        assertEquals(11, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15))
+        assertEquals(14, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 15, connected = true))
         assertEquals(21, StatusIcons.widthFor(StatusIcons.Icon.WIFI, 16))
         assertEquals(16, StatusIcons.widthFor(StatusIcons.Icon.HEADPHONES, 16))
-        assertEquals(10, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16))
-        assertEquals(18, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16, connected = true))
+        assertEquals(11, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16))
+        assertEquals(14, StatusIcons.widthFor(StatusIcons.Icon.BLUETOOTH, 16, connected = true))
     }
 
     @Test
@@ -53,78 +53,61 @@ class StatusIconsTest {
     }
 
     @Test
-    fun runeHasTheClassicShapeAndFillsItsHeight() {
-        for (h in 10..40) {
-            val s = 1.5f
-            val r = StatusIcons.runeGeometry(h.toFloat(), s)
-            val p = r.points
-            assertEquals(12, p.size)
-            // Stem: bottom tip (point 2) and top tip (point 3) on x = 0; the miter tips touch the top and the bottom.
-            assertEquals(0f, p[4], eps)
-            assertEquals(0f, p[6], eps)
-            assertEquals(0f, p[7] - r.tipRise, eps)
-            assertEquals(h.toFloat(), p[5] + r.tipRise, eps)
-            // Right points at 1/4 and 3/4 of the line, arm ends level with them; mirror image about mid-height.
-            val top = p[7]
-            val line = p[5] - p[7]
-            assertEquals(top + line / 4f, p[9], eps)
-            assertEquals(top + 3f * line / 4f, p[3], eps)
-            assertEquals(p[1], p[9], eps)
-            assertEquals(p[11], p[3], eps)
-            assertEquals(r.halfWidth, p[8], eps)
-            assertEquals(-r.halfWidth, p[0], eps)
-            // Both arms cross the stem at mid-height.
-            assertEquals(h / 2f, (p[1] + p[3]) / 2f, eps)
-            assertEquals(h / 2f, (p[9] + p[11]) / 2f, eps)
-            // Rune about twice as tall as wide (macOS proportions).
-            assertEquals(StatusIcons.RUNE_WIDTH * h, 2f * r.halfWidth, eps)
-            // The joins stay sharp: the miters are below the default limit of Paint (4).
-            val q = line / 4f
-            val phi = atan2(r.halfWidth, q)
-            assertTrue(1f / sin(phi / 2f) < 4f)
-            assertTrue(Math.hypot(r.halfWidth.toDouble(), q.toDouble()) / q < 4.0)
-            assertTrue(r.inkRight > r.halfWidth && r.inkLeft > r.halfWidth)
-        }
-    }
-
-    @Test
-    fun bluetoothStemAndDotsAreOnPixelCentres() {
-        for (h in 10..40) {
+    fun runeIsAsTallAsTheIconWithASharpStemAndOpenHoles() {
+        // The status bar uses 15 (iPod layout) and 16 px; below 14 px the holes close.
+        for (h in 14..40) {
             for (connected in listOf(false, true)) {
                 val l = StatusIcons.bluetoothLayout(h, connected)
-                assertEquals(0.5f, l.stemX % 1f, eps)
-                // The ink of the rune is in the bitmap, and touches its left and right edges (within 1 px).
-                val left = l.stemX - l.rune.inkLeft
-                val right = l.stemX + l.rune.inkRight
-                assertTrue(left >= 0f && right <= l.width)
+                // Ink from the top row to the bottom row, like the Wi-Fi fan (the shape grows by grow / 2).
+                assertEquals(0f, l.y(2f) - l.grow / 2f, eps)
+                assertEquals(h.toFloat(), l.y(22f) + l.grow / 2f, eps)
+                // Stem x 11..13 of the viewBox: whole pixels, on pixel edges.
+                assertEquals(0f, l.stemLeft % 1f, eps)
+                assertEquals(0f, l.stem % 1f, eps)
+                assertEquals(l.stemLeft, l.x(11f) - l.grow / 2f, eps)
+                assertEquals(l.stemLeft + l.stem, l.x(13f) + l.grow / 2f, eps)
+                assertTrue(l.grow >= 0f)
+                // The triangle holes (1.88 units wide) stay open after the growth.
+                assertTrue("h=$h", 1.88f * l.scale - l.grow > 0.4f)
+                // The ink is in the bitmap.
+                assertTrue(l.stemLeft - l.inkLeft >= -eps && l.stemLeft + l.inkRight <= l.width + eps)
                 if (!connected) {
-                    assertTrue("h=$h", left < 1f && l.width - right < 1f)
+                    assertTrue("h=$h", l.stemLeft - l.inkLeft < 1f && l.width - (l.stemLeft + l.inkRight) < 1f)
                     assertEquals(0, l.dotX.size)
-                    continue
                 }
-                assertEquals(2, l.dotX.size)
-                assertEquals(h / 2f, l.dotY, eps)
-                for (x in l.dotX) assertEquals(0.5f, x % 1f, eps)
-                // Left dot touches the left edge; the right dot is in the bitmap, within 1 px of its edge.
-                assertEquals(0f, l.dotX[0] - l.dotRadius, 0.5f)
-                assertTrue(l.dotX[1] + l.dotRadius <= l.width && l.width - (l.dotX[1] + l.dotRadius) < 1f)
-                // At least dotGap between each dot and the ink of the rune, and less than 1 px more.
-                val gapLeft = left - (l.dotX[0] + l.dotRadius)
-                val gapRight = (l.dotX[1] - l.dotRadius) - right
-                assertTrue(gapLeft >= l.dotGap - eps && gapLeft < l.dotGap + 1f)
-                assertTrue(gapRight >= l.dotGap - eps && gapRight < l.dotGap + 1f)
             }
         }
     }
 
     @Test
+    fun connectedDotsAreAtTheMaterialPlacesOnPixelCentres() {
+        for (h in 14..40) {
+            val l = StatusIcons.bluetoothLayout(h, connected = true)
+            assertEquals(2, l.dotX.size)
+            assertEquals(h / 2f, l.dotY, eps)
+            // Dot diameter = 1.5 x the stem (3 px at 15 px), like the Material diamonds.
+            assertEquals(1.5f * l.stem, 2f * l.dotRadius, eps)
+            for (x in l.dotX) assertEquals(0.5f, x % 1f, eps)
+            // Within 1 px of x = 5 and x = 19 of the viewBox.
+            assertTrue(abs(l.dotX[0] - l.x(5f)) <= 1f)
+            assertTrue(abs(l.dotX[1] - l.x(19f)) <= 1f)
+            assertTrue(l.dotX[0] < l.stemLeft && l.dotX[1] > l.stemLeft + l.stem)
+            // In the bitmap, the outer dots touch its edges (within 1 px).
+            assertTrue(l.dotX[0] - l.dotRadius >= -eps && l.dotX[0] - l.dotRadius < 1f)
+            assertTrue(l.dotX[1] + l.dotRadius <= l.width + eps && l.width - (l.dotX[1] + l.dotRadius) < 1f)
+        }
+    }
+
+    @Test
     fun bluetoothAtTheIpodHeight() {
-        val l = StatusIcons.bluetoothLayout(15, connected = true)
-        assertEquals(1.5f, l.rune.stroke, eps)
-        assertEquals(1.5f, l.dotRadius, eps)
-        assertEquals(8.5f, l.stemX, eps)
-        assertEquals(1.5f, l.dotX[0], eps)
-        assertEquals(16.5f, l.dotX[1], eps)
-        assertEquals(7.5f, l.dotY, eps)
+        val off = StatusIcons.bluetoothLayout(15, connected = false)
+        assertEquals(2f, off.stem, eps)
+        assertEquals(5f, off.stemLeft, eps)
+        val on = StatusIcons.bluetoothLayout(15, connected = true)
+        assertEquals(6f, on.stemLeft, eps)
+        assertEquals(1.5f, on.dotRadius, eps)
+        assertEquals(1.5f, on.dotX[0], eps)
+        assertEquals(12.5f, on.dotX[1], eps)
+        assertEquals(7.5f, on.dotY, eps)
     }
 }
