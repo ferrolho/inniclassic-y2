@@ -126,33 +126,133 @@ internal fun MainActivity.isLightStatusBar(): Boolean {
 }
 
 internal fun MainActivity.updateStatusBarWifi(isConnected: Boolean) {
-    val iv = ivStatusWifi ?: return
-    iv.colorFilter = null
-    val density = resources.displayMetrics.density
-    val iconSizePx = (18 * density).toInt()
-    val light = isLightStatusBar()
-    val color = if (isConnected) {
-        if (light) 0xFF006425.toInt() else 0xFF34C759.toInt()
-    } else {
-        if (light) 0xFF9E4800.toInt() else 0xFFFFB300.toInt()
-    }
-    iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.WIFI, iconSizePx, color))
+    // Not connected: the same icon, empty.
+    setStatusBarIcon(ivStatusWifi ?: return, com.themoon.y1.views.StatusIcons.Icon.WIFI, isConnected, 6)
 }
 
+/** The state of the Bluetooth status icon (one MainActivity). */
+internal object StatusBarBluetooth {
+    val state = com.themoon.y1.views.StatusBarBluetoothState()
+}
+
+/** The rune; with an audio device connected, the rune with a dot on each side. */
 internal fun MainActivity.updateStatusBarBluetooth() {
-    val iv = ivStatusBluetooth ?: return
-    val density = resources.displayMetrics.density
-    val iconSizePx = (16 * density).toInt()
-    val color = ThemeManager.getTextColorPrimary()
-    iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.BLUETOOTH, iconSizePx, color))
+    setStatusBarIcon(
+        ivStatusBluetooth ?: return, com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH, true, 8,
+        StatusBarBluetooth.state.isConnected
+    )
+}
+
+/** A2DP connection broadcast for [device]: the icon gets or loses its dots. */
+internal fun MainActivity.onStatusBarA2dpState(device: android.bluetooth.BluetoothDevice?, profileState: Int) {
+    if (StatusBarBluetooth.state.onA2dpState(device?.address, profileState)) updateStatusBarBluetooth()
+}
+
+/** Bluetooth adapter broadcast: off forgets the devices; on asks the A2DP proxy for the connected devices. */
+internal fun MainActivity.onStatusBarBluetoothAdapterState(adapterState: Int) {
+    val on = adapterState == android.bluetooth.BluetoothAdapter.STATE_ON
+    if (StatusBarBluetooth.state.onAdapterState(on)) updateStatusBarBluetooth()
+    if (on) queryStatusBarBluetooth()
+}
+
+/**
+ * Asks the A2DP proxy once for the connected audio devices, then closes the proxy: at start and when Bluetooth
+ * comes on. After that, the A2DP broadcasts keep the state ([onStatusBarA2dpState]).
+ */
+internal fun MainActivity.queryStatusBarBluetooth() {
+    val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return
+    if (!adapter.isEnabled) return
+    if (!StatusBarBluetooth.state.adapterOn) StatusBarBluetooth.state.onAdapterState(true)
+    try {
+        adapter.getProfileProxy(applicationContext, object : android.bluetooth.BluetoothProfile.ServiceListener {
+            override fun onServiceConnected(profile: Int, proxy: android.bluetooth.BluetoothProfile) {
+                val devices = try {
+                    proxy.connectedDevices.mapNotNull { it?.address }
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                try {
+                    adapter.closeProfileProxy(profile, proxy)
+                } catch (_: Exception) {}
+                runOnUiThread {
+                    if (StatusBarBluetooth.state.onConnectedDevices(devices)) updateStatusBarBluetooth()
+                }
+            }
+
+            override fun onServiceDisconnected(profile: Int) {}
+        }, android.bluetooth.BluetoothProfile.A2DP)
+    } catch (_: Exception) {}
 }
 
 internal fun MainActivity.updateStatusBarHeadphone() {
-    val iv = ivStatusHeadphone ?: return
-    val density = resources.displayMetrics.density
-    val iconSizePx = (16 * density).toInt()
-    val color = ThemeManager.getTextColorPrimary()
-    iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.HEADPHONES, iconSizePx, color))
+    setStatusBarIcon(ivStatusHeadphone ?: return, com.themoon.y1.views.StatusIcons.Icon.HEADPHONES, true, 6)
+}
+
+/**
+ * Draws a status bar icon at its pixel size. With the iPod Classic Layout, the icon has the box of all
+ * status items (the cap height of the text, 1 px more at the top for these round shapes) and the same gap;
+ * else 16 dp with the margin of activity_main.xml.
+ */
+private fun MainActivity.setStatusBarIcon(
+    iv: android.widget.ImageView,
+    icon: com.themoon.y1.views.StatusIcons.Icon,
+    active: Boolean,
+    rightMarginDp: Int,
+    connected: Boolean = false
+) {
+    val d = resources.displayMetrics.density
+    val ipod = com.themoon.y1.views.IpodClassicLayout.isActive
+    val heightPx = if (ipod) {
+        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ROUND_ICON_HEIGHT, d)
+    } else {
+        com.themoon.y1.views.IpodClassicLayout.px(16, d)
+    }
+    val bmp = com.themoon.y1.views.StatusIcons.render(icon, heightPx, active, isLightStatusBar(), connected)
+    iv.colorFilter = null
+    iv.scaleType = android.widget.ImageView.ScaleType.CENTER
+    iv.setImageBitmap(bmp)
+
+    val lp = iv.layoutParams as? android.widget.LinearLayout.LayoutParams ?: return
+    val right = com.themoon.y1.views.IpodClassicLayout.px(
+        if (ipod) com.themoon.y1.views.IpodClassicMetrics.STATUS_ITEM_GAP else rightMarginDp, d
+    )
+    val bottom = if (ipod) com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_BAR_RULE, d) else 0
+    if (lp.width != bmp.width || lp.height != bmp.height || lp.rightMargin != right || lp.bottomMargin != bottom ||
+        lp.gravity != android.view.Gravity.CENTER_VERTICAL
+    ) {
+        lp.width = bmp.width
+        lp.height = bmp.height
+        lp.rightMargin = right
+        lp.bottomMargin = bottom
+        lp.gravity = android.view.Gravity.CENTER_VERTICAL
+        iv.layoutParams = lp
+    }
+}
+
+/**
+ * Puts the text of the right status group (the clock of "Time in Title Bar") after the battery, at the right
+ * edge, as in the macOS menu bar. The order is then icons, play/pause, battery, clock. The gap before the
+ * moved text is its old right margin (the gap to the next item); its right margin is 0.
+ * Only the first call moves views; later calls find no text before the battery.
+ */
+private fun MainActivity.moveStatusTextLast() {
+    val battery = batteryIconView ?: return
+    val group = battery.parent as? android.view.ViewGroup ?: return
+    var i = 0
+    while (i < group.indexOfChild(battery)) {
+        val v = group.getChildAt(i)
+        if (v !is android.widget.TextView) {
+            i++
+            continue
+        }
+        group.removeViewAt(i)
+        group.addView(v)
+        val lp = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams ?: continue
+        val batteryRight = (battery.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.rightMargin ?: 0
+        lp.leftMargin = (lp.rightMargin - batteryRight).coerceAtLeast(0)
+        lp.rightMargin = 0
+        v.layoutParams = lp
+    }
 }
 
 internal fun MainActivity.applyThemeInternal() {
@@ -194,6 +294,7 @@ internal fun MainActivity.applyThemeInternal() {
         tvStatusBattery?.setShadowLayer(0f, 0f, 0f, 0)
         batteryIconView?.setColor(primary)
         batteryIconView?.setShowPercentage(isShowBatteryPercentage)
+        moveStatusTextLast()
 
         updateStatusBarBluetooth()
         updateStatusBarHeadphone()
