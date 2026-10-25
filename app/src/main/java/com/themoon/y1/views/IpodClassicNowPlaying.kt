@@ -13,6 +13,7 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
@@ -294,12 +295,48 @@ object IpodClassicNowPlaying {
         L.setWidth(left, px(M.PROGRESS_LEFT - M.TIME_LEFT, d))
         L.setMargins(left, left = 0, right = 0)
         L.styleCentredText(left, size, bold, box.toFloat(), height = box, hGravity = Gravity.LEFT)
-        L.setWidth(bar, px(M.PROGRESS_WIDTH, d))
         L.setWeight(bar, 0f)
-        L.setHeight(bar, px(M.PROGRESS_HEIGHT, d))
+        if (bar is SeekBar) {
+            styleScrubBar(bar, d)
+        } else {
+            L.setWidth(bar, px(M.PROGRESS_WIDTH, d))
+            L.setHeight(bar, px(M.PROGRESS_HEIGHT, d))
+        }
         L.setWidth(right, px(M.TIME_RIGHT - M.PROGRESS_LEFT - M.PROGRESS_WIDTH, d))
         L.setMargins(right, left = 0, right = 0)
         L.styleCentredText(right, size, bold, box.toFloat(), height = box, hGravity = Gravity.RIGHT)
+    }
+
+    /**
+     * The scrub bar shows the bar at the progress bar position and adds the diamond ([ScrubBarGeometry]).
+     * The view is larger than the bar by the outsets: the bar is inside the padding, and negative margins
+     * keep it at the progress bar position. The default SeekBar padding (16 px each side) and thumb
+     * position made the bar shorter and put the diamond off the end of the fill.
+     */
+    private fun styleScrubBar(bar: SeekBar, d: Float) {
+        val barWidth = px(M.PROGRESS_WIDTH, d)
+        val barHeight = px(M.PROGRESS_HEIGHT, d)
+        val diamondWidth = px(M.SCRUB_DIAMOND_WIDTH, d)
+        val diamondHeight = px(M.SCRUB_DIAMOND_HEIGHT, d)
+        val ox = ScrubBarGeometry.outsetX(diamondWidth)
+        val oy = ScrubBarGeometry.outsetY(diamondHeight, barHeight)
+        L.setWidth(bar, barWidth + 2 * ox)
+        L.setHeight(bar, barHeight + 2 * oy)
+        L.setMargins(bar, left = -ox, right = -ox)
+        L.setPadding(bar, ox, oy, ox, oy)
+
+        val oldThumb = bar.thumb
+        val oldOffset = bar.thumbOffset
+        L.record(bar, "thumb") {
+            (it as SeekBar).thumb = oldThumb
+            it.thumbOffset = oldOffset
+        }
+        val thumb = bar.thumb as? ScrubDiamondDrawable
+        if (thumb == null || thumb.diamondWidth != diamondWidth || thumb.diamondHeight != diamondHeight) {
+            bar.thumb = ScrubDiamondDrawable(bar, diamondWidth, diamondHeight)
+        }
+        // The thumb is drawn with the origin at the bar's top-left corner (paddingLeft - thumbOffset, paddingTop).
+        bar.thumbOffset = 0
     }
 
     private fun px(dp: Int, d: Float): Int = L.px(dp, d)

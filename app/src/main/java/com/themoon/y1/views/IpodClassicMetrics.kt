@@ -59,6 +59,10 @@ object IpodClassicMetrics {
     const val TIME_RIGHT = 455
     // Time labels are taller than the bar and centred on it, so their caps can be centred exactly.
     const val TIME_BOX_HEIGHT = 41
+    // Scrub diamond: centred on the end of the fill and on the bar centre line, 2 px above and below the bar.
+    // Height - bar height is even, so the diamond centre is exactly on the bar centre.
+    const val SCRUB_DIAMOND_WIDTH = 22
+    const val SCRUB_DIAMOND_HEIGHT = 25
 
     // Album art tilt. Apple's image: left edge y 35..170, right edge y 44..162, width x 10..145.
     const val TILT_RIGHT_EDGE_RATIO = 119f / 136f
