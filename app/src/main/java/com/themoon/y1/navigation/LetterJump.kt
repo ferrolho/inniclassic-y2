@@ -5,8 +5,9 @@ import java.util.ArrayDeque
 import java.util.Locale
 
 /**
- * iPod speed scrolling: when the wheel turns fast in an alphabetical list, the selection jumps to the
- * first row of the next (or previous) letter, and a letter box shows the letter.
+ * iPod speed scrolling: a fast wheel turn in an alphabetical list starts letter mode ([Mode]). In letter mode
+ * each wheel step moves the selection to the first row of the next (or previous) letter, and a letter box
+ * shows the letter.
  */
 object LetterJump {
 
@@ -14,8 +15,11 @@ object LetterJump {
     const val FAST_STEPS = 4
     const val FAST_GAP_MS = 100L
 
-    /** The letter box hides this long after the last letter jump. */
-    const val HIDE_DELAY_MS = 600L
+    /**
+     * Letter mode ends this long after the last wheel step. The wheel driver sends no event when the thumb
+     * leaves the wheel (each step is a key press and release at the same time), so a stop is the only sign.
+     */
+    const val IDLE_END_MS = 800L
 
     private val HANGUL_INITIALS = "ㄱㄱㄴㄷㄷㄹㅁㅂㅂㅅㅅㅇㅈㅈㅊㅋㅌㅍㅎ"
 
@@ -107,6 +111,114 @@ object LetterJump {
         fun reset() {
             times.clear()
             lastDirection = 0
+        }
+    }
+
+    /** What a wheel step does. */
+    enum class Step {
+        /** Not in letter mode: the wheel steps one row. */
+        ROW,
+        /** Letter mode: the selection goes to [Mode.row], the first row of the next or previous letter. */
+        LETTER,
+        /** Letter mode, but there is no letter that way: the selection stays. */
+        STAY
+    }
+
+    /** What a key press does. */
+    enum class Press {
+        /** Not for letter mode: the key works as usual. */
+        PASS,
+        /** The rest of a centre press that ended letter mode: ignore it. */
+        DROP,
+        /** End letter mode, and ignore the key (centre). */
+        END,
+        /** End letter mode, then the key works as usual (Back, Play/Pause). */
+        END_AND_PASS
+    }
+
+    /**
+     * Letter mode, as on the iPod. [FAST_STEPS] fast steps start it ([WheelSpeed]). Then each wheel step, slow
+     * or fast, moves one letter, and the letter box stays. It ends [IDLE_END_MS] after the last step, or at a
+     * centre, Back or Play/Pause press. At the end, the screen goes to [row] (the end value of [end]).
+     * Pure state: the screen gives it the wheel steps and the keys, and runs the idle timer.
+     */
+    class Mode {
+        private val speed = WheelSpeed()
+        private var lastStepMs = 0L
+        private var dropCentre = false
+
+        var isActive = false
+            private set
+
+        /** The row of the letter in the box: the first row of that letter, or the start row; -1 when not active. */
+        var row = -1
+            private set
+
+        /**
+         * One wheel step ([direction] -1 or 1, at [timeMs]) with the selection at row [current]. [letters] gives
+         * the letter of each row ([lettersFor]), null when the rows are not alphabetical.
+         */
+        fun onStep(direction: Int, timeMs: Long, current: Int, letters: () -> List<String?>?): Step {
+            if (!isActive && !speed.onStep(direction, timeMs)) return Step.ROW
+            val list = letters()
+            val from = if (isActive) row else current
+            if (list == null || from !in list.indices) {
+                end()
+                return Step.ROW
+            }
+            isActive = true
+            lastStepMs = timeMs
+            val next = LetterJump.target(list, from, direction)
+            if (next < 0) {
+                row = from
+                return Step.STAY
+            }
+            row = next
+            return Step.LETTER
+        }
+
+        /** True when letter mode had no wheel step for [IDLE_END_MS] at [nowMs] (it must end now). */
+        fun isIdle(nowMs: Long): Boolean = isActive && nowMs - lastStepMs >= IDLE_END_MS
+
+        /** A key event ([keyCode], down or up, [repeatCount]). The screen calls [end] for [Press.END] and [Press.END_AND_PASS]. */
+        fun onKey(keyCode: Int, isDown: Boolean, repeatCount: Int): Press {
+            val isCentre = keyCode == KEY_CENTRE || keyCode == KEY_ENTER
+            if (isCentre && dropCentre) {
+                if (!isDown || repeatCount > 0) {
+                    if (!isDown) dropCentre = false
+                    return Press.DROP
+                }
+                dropCentre = false // a new press: the release of the last one did not come
+            }
+            if (!isActive || !isDown || repeatCount > 0) return Press.PASS
+            return when (keyCode) {
+                KEY_CENTRE, KEY_ENTER -> {
+                    dropCentre = true // its release must not click the row or the album
+                    Press.END
+                }
+                KEY_BACK, KEY_BACK_UP, KEY_PLAY_PAUSE, KEY_PLAY, KEY_PAUSE -> Press.END_AND_PASS
+                else -> Press.PASS
+            }
+        }
+
+        /** Ends letter mode. Returns the row to go to ([row]), or -1 when letter mode was not active. */
+        fun end(): Int {
+            val result = if (isActive) row else -1
+            isActive = false
+            row = -1
+            speed.reset()
+            return result
+        }
+
+        private companion object {
+            // android.view.KeyEvent codes (the values, so the class has no Android dependencies).
+            const val KEY_BACK = 4
+            const val KEY_BACK_UP = 19 // InputRouter also takes DPAD_UP as Back
+            const val KEY_CENTRE = 23
+            const val KEY_ENTER = 66
+            const val KEY_PLAY_PAUSE = 85
+            const val KEY_PLAY = 126
+            const val KEY_PAUSE = 127
         }
     }
 }

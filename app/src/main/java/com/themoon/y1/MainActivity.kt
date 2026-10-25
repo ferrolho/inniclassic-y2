@@ -324,9 +324,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         layoutVolumeOverlay.visibility = View.GONE
     }
 
-    private val fastScrollHandler = Handler(Looper.getMainLooper())
-    private val hideFastScrollTask = Runnable { hideFastScrollLetter() }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         InniClassicApplication.installConscrypt()
         super.onCreate(savedInstanceState)
@@ -557,7 +554,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin
             else -> state
         }
-        if (::browserController.isInitialized) browserController.jumpLetter = null
+        if (::browserController.isInitialized) browserController.endLetterJump()
         tvFastScrollLetter?.animate()?.cancel()
         tvFastScrollLetter?.visibility = View.GONE
         syncCurrentScreenState(targetState)
@@ -739,35 +736,39 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     /**
-     * Shows the letter box in the middle of the screen with the letter of the current letter jump
-     * (BrowserController.jumpLetter). Rows call this when they get focus; when the wheel steps row by row
-     * there is no jump letter, and nothing shows. The box fades out [LetterJump.HIDE_DELAY_MS] after the last jump.
+     * Shows the letter box in the middle of the screen with the letter of letter mode (BrowserController.jumpLetter).
+     * Rows call this when they get focus; when the wheel steps row by row there is no jump letter, and nothing shows.
      */
     @Suppress("UNUSED_PARAMETER")
     fun showFastScrollLetter(rawText: String) {
         if (currentScreenState != STATE_BROWSER || !::browserController.isInitialized) return
         val letter = browserController.jumpLetter ?: return
-        val tv = tvFastScrollLetter ?: return
+        showJumpLetter(letter)
+    }
 
-        tv.text = letter
-        tv.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-        tv.typeface = ThemeManager.getCustomFontBold()
-        tv.background = GradientDrawable().apply {
-            setColor(ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt())
-            cornerRadius = 15f * resources.displayMetrics.density
+    /**
+     * Shows [letter] in the letter box. It stays until [hideFastScrollLetter]: the screen hides it at the end of
+     * letter mode ([LetterJump.Mode]). The box gets its theme colours when it comes on; after that, only a new
+     * letter changes it.
+     */
+    fun showJumpLetter(letter: String) {
+        val tv = tvFastScrollLetter ?: return
+        if (tv.visibility != View.VISIBLE) {
+            tv.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+            tv.typeface = ThemeManager.getCustomFontBold()
+            tv.background = GradientDrawable().apply {
+                setColor(ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt())
+                cornerRadius = 15f * resources.displayMetrics.density
+            }
         }
+        if (tv.text?.contentEquals(letter) != true) tv.text = letter
         tv.animate().cancel()
         tv.alpha = 1f
         tv.visibility = View.VISIBLE
-
-        fastScrollHandler.removeCallbacks(hideFastScrollTask)
-        fastScrollHandler.postDelayed(hideFastScrollTask, LetterJump.HIDE_DELAY_MS)
     }
 
-    /** Fades out the letter box and ends the letter jump. */
+    /** Fades out the letter box (the end of letter mode). */
     fun hideFastScrollLetter() {
-        fastScrollHandler.removeCallbacks(hideFastScrollTask)
-        if (::browserController.isInitialized) browserController.jumpLetter = null
         val tv = tvFastScrollLetter ?: return
         if (tv.visibility != View.VISIBLE) return
         tv.animate().alpha(0f).setDuration(200).withEndAction { tv.visibility = View.GONE }

@@ -118,4 +118,102 @@ class LetterJumpTest {
         val speed = LetterJump.WheelSpeed()
         for (t in 0L..2000L step 120) assertFalse(speed.onStep(1, t))
     }
+
+    // Letter mode. Rows: 0 = "All Songs", A A B B C D D E.
+    private val rows = listOf(null, "A", "A", "B", "B", "C", "D", "D", "E")
+    private val letters = { rows }
+
+    /** Four steps 50 ms apart from [start]: the fourth starts letter mode. Returns the result of each step. */
+    private fun fastTurn(mode: LetterJump.Mode, dir: Int, start: Long, current: Int) =
+        (0 until 4).map { mode.onStep(dir, start + 50L * it, current, letters) }
+
+    @Test
+    fun mode_startsAtTheFourthFastStep() {
+        val mode = LetterJump.Mode()
+        val row = LetterJump.Step.ROW
+        assertEquals(listOf(row, row, row, LetterJump.Step.LETTER), fastTurn(mode, 1, 0, current = 1))
+        assertTrue(mode.isActive)
+        assertEquals(3, mode.row) // from A to the first B
+    }
+
+    @Test
+    fun mode_doesNotStartInAListThatIsNotAlphabetical() {
+        val mode = LetterJump.Mode()
+        for (t in 0L..300L step 50) assertEquals(LetterJump.Step.ROW, mode.onStep(1, t, 1) { null })
+        assertFalse(mode.isActive)
+    }
+
+    @Test
+    fun mode_slowStepsMoveOneLetterEach() {
+        val mode = LetterJump.Mode()
+        fastTurn(mode, 1, 0, current = 1)
+        assertEquals(LetterJump.Step.LETTER, mode.onStep(1, 600, 3, letters)) // 450 ms gap: still a letter
+        assertEquals(5, mode.row)
+        assertEquals(LetterJump.Step.LETTER, mode.onStep(1, 1300, 5, letters)) // 700 ms gap
+        assertEquals(6, mode.row)
+        assertTrue(mode.isActive)
+    }
+
+    @Test
+    fun mode_staysAtTheLastLetter() {
+        val mode = LetterJump.Mode()
+        fastTurn(mode, 1, 0, current = 6)
+        assertEquals(8, mode.row)
+        assertEquals(LetterJump.Step.STAY, mode.onStep(1, 400, 8, letters))
+        assertEquals(8, mode.row)
+        assertTrue(mode.isActive)
+    }
+
+    @Test
+    fun mode_directionChangeMovesBackOneLetter() {
+        val mode = LetterJump.Mode()
+        fastTurn(mode, 1, 0, current = 1) // to B
+        mode.onStep(1, 200, 3, letters) // to C
+        assertEquals(LetterJump.Step.LETTER, mode.onStep(-1, 260, 5, letters))
+        assertEquals(3, mode.row) // back to B, still in letter mode
+        assertEquals(LetterJump.Step.LETTER, mode.onStep(-1, 700, 3, letters))
+        assertEquals(1, mode.row) // A
+        assertEquals(LetterJump.Step.STAY, mode.onStep(-1, 800, 1, letters)) // "All Songs" is not a letter
+        assertTrue(mode.isActive)
+    }
+
+    @Test
+    fun mode_endsAfterTheIdleTime() {
+        val mode = LetterJump.Mode()
+        fastTurn(mode, 1, 0, current = 1) // last step at 150 ms
+        assertFalse(mode.isIdle(150 + LetterJump.IDLE_END_MS - 1))
+        assertTrue(mode.isIdle(150 + LetterJump.IDLE_END_MS))
+        assertEquals(3, mode.end()) // go to the first B
+        assertFalse(mode.isActive)
+        assertFalse(mode.isIdle(5000))
+        assertEquals(-1, mode.end())
+        // Then row by row again, and four fast steps start it again.
+        assertEquals(LetterJump.Step.ROW, mode.onStep(1, 2000, 3, letters))
+        assertEquals(LetterJump.Step.ROW, mode.onStep(1, 2050, 4, letters))
+    }
+
+    @Test
+    fun mode_centrePressEndsItAndIsIgnored() {
+        val mode = LetterJump.Mode()
+        assertEquals(LetterJump.Press.PASS, mode.onKey(23, isDown = true, repeatCount = 0)) // not active: opens the row
+        assertEquals(LetterJump.Press.PASS, mode.onKey(23, isDown = false, repeatCount = 0))
+        fastTurn(mode, 1, 0, current = 1)
+        assertEquals(LetterJump.Press.END, mode.onKey(23, isDown = true, repeatCount = 0))
+        assertEquals(3, mode.end())
+        assertEquals(LetterJump.Press.DROP, mode.onKey(23, isDown = true, repeatCount = 1)) // held
+        assertEquals(LetterJump.Press.DROP, mode.onKey(23, isDown = false, repeatCount = 0))
+        assertEquals(LetterJump.Press.PASS, mode.onKey(23, isDown = true, repeatCount = 0)) // the next press opens
+    }
+
+    @Test
+    fun mode_backAndPlayEndItAndWorkAsUsual() {
+        for (key in listOf(4, 85)) {
+            val mode = LetterJump.Mode()
+            fastTurn(mode, -1, 0, current = 8)
+            assertEquals(LetterJump.Press.PASS, mode.onKey(22, isDown = true, repeatCount = 0)) // wheel keys go to onStep
+            assertEquals(LetterJump.Press.END_AND_PASS, mode.onKey(key, isDown = true, repeatCount = 0))
+            assertEquals(6, mode.end()) // the first D
+            assertEquals(LetterJump.Press.PASS, mode.onKey(key, isDown = false, repeatCount = 0))
+        }
+    }
 }
