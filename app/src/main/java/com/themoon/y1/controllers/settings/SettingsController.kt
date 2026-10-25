@@ -29,6 +29,7 @@ import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.TablerIcons
@@ -589,6 +590,15 @@ class SettingsController(
             buildMusicMenuVisibilitySettingsUI()
         }
         containerSettingsItems.addView(btnMusicMenuVisibility)
+
+        val btnGroupAlbums = createSettingRow(localize("Group Albums"), groupAlbumsLabel())
+        btnGroupAlbums.setOnClickListener {
+            clickFeedback()
+            prefs.edit().putBoolean(AlbumKey.PREF_BY_ARTIST, !AlbumKey.byArtist).commit()
+            applyAlbumGrouping()
+            (btnGroupAlbums.getChildAt(1) as? TextView)?.text = groupAlbumsLabel()
+        }
+        containerSettingsItems.addView(btnGroupAlbums)
 
         var isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
         val btnLoopScrollToggle = createSettingRow(
@@ -1552,6 +1562,14 @@ class SettingsController(
         }
     }
 
+    private fun groupAlbumsLabel(): String = localize(if (AlbumKey.byArtist) "By Title and Artist" else "By Title")
+
+    /** Reads Group Albums and rebuilds the album lists, so the next Albums or Cover Flow screen uses it. */
+    private fun applyAlbumGrouping() {
+        AlbumKey.byArtist = prefs.getBoolean(AlbumKey.PREF_BY_ARTIST, false)
+        mainActivity?.rebuildUniqueAlbumList()
+    }
+
     private fun resetAllAppSettings() {
         try {
             prefs.edit()
@@ -1570,6 +1588,7 @@ class SettingsController(
                 .remove("loop_scroll_on")
                 .remove("eq_preset")
                 .remove("eq_profile_id")
+                .remove(AlbumKey.PREF_BY_ARTIST)
                 .remove("auto_fetch")
                 .commit()
         } catch (_: Exception) {}
@@ -1580,6 +1599,7 @@ class SettingsController(
         applyAlbumTiltSetting()
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
+        applyAlbumGrouping()
 
         mainActivity?.isScreenOffControlEnabled = false
         mainActivity?.isShowBatteryPercentage = false
