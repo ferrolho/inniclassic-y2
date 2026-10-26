@@ -27,6 +27,7 @@ import com.themoon.y1.changeTheme
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
@@ -40,6 +41,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.ListEdges
 import com.themoon.y1.views.TablerIcons
+import com.themoon.y1.views.ToggleStyle
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
@@ -47,7 +49,7 @@ import java.util.TimeZone
 
 /**
  * Controller for Settings screens:
- * Root settings menu, Date & Time, Theme selector, Language selector, Vibration,
+ * Root settings menu, Date & Time, Theme selector, Language selector,
  * Background settings, Volume limit, Legal, Main Menu visibility, and Music Menu visibility.
  */
 class SettingsController(
@@ -83,6 +85,12 @@ class SettingsController(
     private val mainActivity: MainActivity? get() = activity as? MainActivity
 
     var currentSettingsDepth: Int = 0
+        set(value) {
+            val old = field
+            field = value
+            // Title: the group name on a group list, the row name on a row's sub-screen (SettingsGroups.kt)
+            groupPages.onDepthChanged(old, value, containerSettingsItems, lastSettingsFocusIndex, mainActivity?.tvStatusBarTitle, localize)
+        }
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
@@ -100,11 +108,8 @@ class SettingsController(
     private var materialIconFont: Typeface? = null
 
     companion object {
-        val BACKLIGHT_TIMER_LABELS = arrayOf(
-            "10 Seconds", "20 Seconds", "30 Seconds", "1 Minute", "2 Minutes", "Always On"
-        )
-        val TIMEOUT_VALUES = intArrayOf(15000, 30000, 60000, 300000)
-        val TIMEOUT_NAMES = arrayOf("15 Sec", "30 Sec", "1 Min", "5 Min")
+        /** Backlight Timer is the one screen timer: it also sets Android's SCREEN_OFF_TIMEOUT (see BacklightTimer). */
+        val BACKLIGHT_TIMER_LABELS = com.themoon.y1.managers.BacklightTimer.LABELS
         val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
 
         // Common IANA zones covering the main UTC offsets, short enough to scroll with the wheel
@@ -172,7 +177,12 @@ class SettingsController(
         }
     }
 
+    // Groups on the top level (SettingsGroups.kt). The rows stay in buildSettingsUI; the groups only move them.
+    private val groupPages = SettingsGroupPages()
+
     override fun onEnter(state: ScreenState) {
+        // From the main menu: start at the top level. From a row's screen (Bluetooth, Equalizer...): stay in its group.
+        if (mainActivity?.backTargetForUtility == MainActivity.STATE_MENU) groupPages.close()?.let { lastSettingsFocusIndex = it }
         buildSettingsUI()
     }
 
@@ -208,6 +218,12 @@ class SettingsController(
     override fun onBackPressed(): Boolean {
         if (isMenuReorderMode) {
             toggleMenuReorderMode()
+            return true
+        }
+        if (currentSettingsDepth == 0 && groupPages.isOpen) {
+            lastSettingsFocusIndex = groupPages.close() ?: 0
+            buildSettingsUI()
+            clickFeedback()
             return true
         }
         if (currentSettingsDepth == 0) {
@@ -370,14 +386,14 @@ class SettingsController(
         val isShuffleMode = prefs.getBoolean("shuffle", false)
         val btnShuffle = createSettingRow(
             localize("Shuffle Mode"),
-            if (isShuffleMode) localize("ON") else localize("OFF")
+            onOff(isShuffleMode, localize)
         )
         btnShuffle.setOnClickListener {
             clickFeedback()
             toggleShuffleMode()
             val tvStatus = btnShuffle.getChildAt(1) as? TextView
             val newShuffle = prefs.getBoolean("shuffle", false)
-            tvStatus?.text = if (newShuffle) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newShuffle, localize)
         }
         containerSettingsItems.addView(btnShuffle)
 
@@ -424,7 +440,7 @@ class SettingsController(
         var isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
         val btnSoundCheck = createSettingRow(
             localize("Sound Check"),
-            if (isSoundCheckEnabled) localize("ON") else localize("OFF")
+            onOff(isSoundCheckEnabled, localize)
         )
         btnSoundCheck.setOnClickListener {
             clickFeedback()
@@ -432,7 +448,7 @@ class SettingsController(
             prefs.edit().putBoolean("sound_check_enabled", isSoundCheckEnabled).commit()
             mainActivity?.isSoundCheckEnabled = isSoundCheckEnabled
             val tvStatus = btnSoundCheck.getChildAt(1) as? TextView
-            tvStatus?.text = if (isSoundCheckEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isSoundCheckEnabled, localize)
             AudioEffectManager.getInstance().applySoundCheck()
         }
         containerSettingsItems.addView(btnSoundCheck)
@@ -440,28 +456,28 @@ class SettingsController(
         val videoStretchFill = prefs.getBoolean("video_stretch_fill", false)
         val btnVideoFill = createSettingRow(
             localize("Fill Video Screen"),
-            if (videoStretchFill) localize("ON") else localize("OFF")
+            onOff(videoStretchFill, localize)
         )
         btnVideoFill.setOnClickListener {
             clickFeedback()
             val newState = !prefs.getBoolean("video_stretch_fill", false)
             prefs.edit().putBoolean("video_stretch_fill", newState).commit()
             val tvStatus = btnVideoFill.getChildAt(1) as? TextView
-            tvStatus?.text = if (newState) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newState, localize)
         }
         containerSettingsItems.addView(btnVideoFill)
 
         var isAlbumTiltEnabled = prefs.getBoolean("album_tilt_enabled", true)
         val btnAlbumTilt = createSettingRow(
             localize("Album Cover Tilt"),
-            if (isAlbumTiltEnabled) localize("ON") else localize("OFF")
+            onOff(isAlbumTiltEnabled, localize)
         )
         btnAlbumTilt.setOnClickListener {
             clickFeedback()
             isAlbumTiltEnabled = !isAlbumTiltEnabled
             prefs.edit().putBoolean("album_tilt_enabled", isAlbumTiltEnabled).commit()
             val tvStatus = btnAlbumTilt.getChildAt(1) as? TextView
-            tvStatus?.text = if (isAlbumTiltEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isAlbumTiltEnabled, localize)
             applyAlbumTiltSetting()
         }
         containerSettingsItems.addView(btnAlbumTilt)
@@ -496,7 +512,7 @@ class SettingsController(
         var isSoundEffectEnabled = prefs.getBoolean("sound", true)
         val btnSound = createSettingRow(
             localize("Button Sound"),
-            if (isSoundEffectEnabled) localize("ON") else localize("OFF")
+            onOff(isSoundEffectEnabled, localize)
         )
         btnSound.setOnClickListener {
             isSoundEffectEnabled = !isSoundEffectEnabled
@@ -504,21 +520,58 @@ class SettingsController(
             applySoundSetting()
             clickFeedback()
             val tvStatus = btnSound.getChildAt(1) as? TextView
-            tvStatus?.text = if (isSoundEffectEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isSoundEffectEnabled, localize)
         }
         containerSettingsItems.addView(btnSound)
 
-        val btnVibrateMenu = createSettingRow(localize("Vibration"), "〉 ")
-        btnVibrateMenu.setOnClickListener {
+        // Settings → Controls: Button Vibration and Vibration Strength (no Vibration sub-screen).
+        // Vibration Strength is grey and the wheel skips it while Button Vibration is off.
+        var isVibrationEnabled = prefs.getBoolean("vibrate", true)
+        var vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
+        if (vibrationStrengthLevel !in VIBE_STRENGTH_NAMES.indices) vibrationStrengthLevel = 1
+        val btnVibration = createSettingRow(
+            localize("Button Vibration"),
+            onOff(isVibrationEnabled, localize)
+        )
+        val btnVibrationStrength = createSettingRow(
+            localize("Vibration Strength"),
+            localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
+        )
+        btnVibration.setOnClickListener {
+            isVibrationEnabled = !isVibrationEnabled
+            mainActivity?.isVibrationEnabled = isVibrationEnabled
             clickFeedback()
-            buildVibrationSettingsUI()
+            val tvStatus = btnVibration.getChildAt(1) as? TextView
+            tvStatus?.text = onOff(isVibrationEnabled, localize)
+            StatusBarSettings.setRowEnabled(btnVibrationStrength, isVibrationEnabled)
+            try {
+                prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit()
+                Settings.System.putInt(
+                    activity.contentResolver,
+                    Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                    if (isVibrationEnabled) 1 else 0
+                )
+            } catch (_: Exception) {}
         }
-        containerSettingsItems.addView(btnVibrateMenu)
+        btnVibrationStrength.setOnClickListener {
+            vibrationStrengthLevel = (vibrationStrengthLevel + 1) % VIBE_STRENGTH_NAMES.size
+            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
+            // The click vibration uses the new strength: a preview
+            clickFeedback()
+            val tvStatus = btnVibrationStrength.getChildAt(1) as? TextView
+            tvStatus?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
+            try {
+                prefs.edit().putInt("vibrate_strength", vibrationStrengthLevel).commit()
+            } catch (_: Exception) {}
+        }
+        containerSettingsItems.addView(btnVibration)
+        containerSettingsItems.addView(btnVibrationStrength)
+        StatusBarSettings.setRowEnabled(btnVibrationStrength, isVibrationEnabled)
 
         var isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
         val btnScreenOffCtrl = createSettingRow(
             localize("Screen-Off Control"),
-            if (isScreenOffControlEnabled) localize("ON") else localize("OFF")
+            onOff(isScreenOffControlEnabled, localize)
         )
         btnScreenOffCtrl.setOnClickListener {
             clickFeedback()
@@ -526,7 +579,7 @@ class SettingsController(
             prefs.edit().putBoolean("screen_off_control", isScreenOffControlEnabled).commit()
             mainActivity?.isScreenOffControlEnabled = isScreenOffControlEnabled
             val tvStatus = btnScreenOffCtrl.getChildAt(1) as? TextView
-            tvStatus?.text = if (isScreenOffControlEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isScreenOffControlEnabled, localize)
         }
         containerSettingsItems.addView(btnScreenOffCtrl)
 
@@ -547,14 +600,14 @@ class SettingsController(
         var isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
         val btnUsbPrompt = createSettingRow(
             localize("Ask on USB Connect"),
-            if (isUsbPromptEnabled) localize("ON") else localize("OFF")
+            onOff(isUsbPromptEnabled, localize)
         )
         btnUsbPrompt.setOnClickListener {
             clickFeedback()
             isUsbPromptEnabled = !isUsbPromptEnabled
             prefs.edit().putBoolean("usb_storage_prompt", isUsbPromptEnabled).commit()
             val tvStatus = btnUsbPrompt.getChildAt(1) as? TextView
-            tvStatus?.text = if (isUsbPromptEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isUsbPromptEnabled, localize)
         }
         containerSettingsItems.addView(btnUsbPrompt)
 
@@ -597,6 +650,17 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnTheme)
 
+        var isSwitchToggleStyle = ToggleStyle.isSwitch(activity)
+        val btnToggleStyle = createSettingRow(localize("Toggle Style"), ToggleStyle.label(isSwitchToggleStyle, localize))
+        btnToggleStyle.setOnClickListener {
+            clickFeedback()
+            isSwitchToggleStyle = !isSwitchToggleStyle
+            ToggleStyle.setSwitch(activity, isSwitchToggleStyle)
+            val tvStatus = btnToggleStyle.getChildAt(1) as? TextView
+            tvStatus?.text = ToggleStyle.label(isSwitchToggleStyle, localize)
+        }
+        containerSettingsItems.addView(btnToggleStyle)
+
         val btnMenuVisibility = createSettingRow(localize("Main Menu Items"), localize("Edit") + " 〉")
         btnMenuVisibility.setOnClickListener {
             clickFeedback()
@@ -623,14 +687,14 @@ class SettingsController(
         var isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
         val btnLoopScrollToggle = createSettingRow(
             localize("Wheel Loop Scroll"),
-            if (isLoopScrollOn) localize("ON") else localize("OFF")
+            onOff(isLoopScrollOn, localize)
         )
         btnLoopScrollToggle.setOnClickListener {
             clickFeedback()
             isLoopScrollOn = !isLoopScrollOn
             prefs.edit().putBoolean("loop_scroll_on", isLoopScrollOn).commit()
             val tvStatus = btnLoopScrollToggle.getChildAt(1) as? TextView
-            tvStatus?.text = if (isLoopScrollOn) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isLoopScrollOn, localize)
         }
         containerSettingsItems.addView(btnLoopScrollToggle)
 
@@ -648,27 +712,6 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnListEdges)
 
-        var currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
-        if (currentTimeoutIndex >= TIMEOUT_VALUES.size) currentTimeoutIndex = 0
-        val btnTimeout = createSettingRow(
-            localize("Screen Timeout"),
-            localize(TIMEOUT_NAMES[currentTimeoutIndex])
-        )
-        btnTimeout.setOnClickListener {
-            clickFeedback()
-            currentTimeoutIndex = (currentTimeoutIndex + 1) % TIMEOUT_VALUES.size
-            val tvStatus = btnTimeout.getChildAt(1) as? TextView
-            tvStatus?.text = localize(TIMEOUT_NAMES[currentTimeoutIndex])
-            try {
-                Settings.System.putInt(
-                    activity.contentResolver,
-                    Settings.System.SCREEN_OFF_TIMEOUT,
-                    TIMEOUT_VALUES[currentTimeoutIndex]
-                )
-            } catch (_: Exception) {}
-            prefs.edit().putInt("timeout_idx", currentTimeoutIndex).commit()
-        }
-        containerSettingsItems.addView(btnTimeout)
 
         val btnPowerOff = createSettingRow(localize("Power Off"), "〉 ")
         btnPowerOff.setOnClickListener {
@@ -747,20 +790,6 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnJellyfin)
 
-        var isAutoFetchEnabled = prefs.getBoolean("auto_fetch", false)
-        val btnAutoFetch = createSettingRow(
-            localize("Auto Fetch Album Art"),
-            if (isAutoFetchEnabled) localize("ON") else localize("OFF")
-        )
-        btnAutoFetch.setOnClickListener {
-            clickFeedback()
-            isAutoFetchEnabled = !isAutoFetchEnabled
-            prefs.edit().putBoolean("auto_fetch", isAutoFetchEnabled).commit()
-            val tvStatus = btnAutoFetch.getChildAt(1) as? TextView
-            tvStatus?.text = if (isAutoFetchEnabled) localize("ON") else localize("OFF")
-        }
-        containerSettingsItems.addView(btnAutoFetch)
-
         val btnClearCache = createSettingRow(localize("Clear Album Art & Info"), "〉 ")
         btnClearCache.setOnClickListener {
             clickFeedback()
@@ -785,14 +814,14 @@ class SettingsController(
         val scrobbler = LastFmScrobbler.getInstance(activity)
         val btnScrobbleToggle = createSettingRow(
             localize("Sync Scrobbles to Last.fm"),
-            if (scrobbler.isEnabled()) localize("ON") else localize("OFF")
+            onOff(scrobbler.isEnabled(), localize)
         )
         btnScrobbleToggle.setOnClickListener {
             clickFeedback()
             val newState = !scrobbler.isEnabled()
             scrobbler.setEnabled(newState)
             val tvStatus = btnScrobbleToggle.getChildAt(1) as? TextView
-            tvStatus?.text = if (newState) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newState, localize)
         }
         containerSettingsItems.addView(btnScrobbleToggle)
 
@@ -828,7 +857,7 @@ class SettingsController(
         val isShowPct = mainActivity?.isShowBatteryPercentage ?: prefs.getBoolean("show_battery_percentage", false)
         val btnBatteryPct = createSettingRow(
             localize("Battery Percentage"),
-            if (isShowPct) localize("ON") else localize("OFF")
+            onOff(isShowPct, localize)
         )
         btnBatteryPct.setOnClickListener {
             clickFeedback()
@@ -836,10 +865,13 @@ class SettingsController(
             mainActivity?.isShowBatteryPercentage = newPct
             prefs.edit().putBoolean("show_battery_percentage", newPct).commit()
             val tvStatus = btnBatteryPct.getChildAt(1) as? TextView
-            tvStatus?.text = if (newPct) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(newPct, localize)
             mainActivity?.batteryIconView?.setShowPercentage(newPct)
         }
         containerSettingsItems.addView(btnBatteryPct)
+
+        // Settings → Status Bar (SettingsGroups.kt): Clock, Battery, Battery Percentage
+        addStatusBarRows(btnBatteryPct)
 
         val btnStorageMenu = createSettingRow(localize("About"), "〉 ")
         btnStorageMenu.setOnClickListener {
@@ -895,6 +927,8 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnLegal)
 
+        SettingsBackupUi.addRows(activity, containerSettingsItems, createSettingRow, clickFeedback, localize)
+
         val btnResetAll = createSettingRow(localize("Reset All Settings"), "〉 ")
         btnResetAll.setOnClickListener {
             clickFeedback()
@@ -908,6 +942,13 @@ class SettingsController(
                 .show()
         }
         containerSettingsItems.addView(btnResetAll)
+
+        groupPages.arrange(containerSettingsItems, createSettingRow, clickFeedback, localize, mainActivity?.tvStatusBarTitle) {
+            // A row's screen (Bluetooth, Equalizer...) comes back into this group (see onEnter)
+            mainActivity?.backTargetForUtility = MainActivity.STATE_SETTINGS
+            lastSettingsFocusIndex = 0
+            buildSettingsUI()
+        }
 
         val sv = containerSettingsItems.parent as? ScrollView
         sv?.post {
@@ -1008,55 +1049,6 @@ class SettingsController(
         themeListFirstRow = containerSettingsItems.getChildAt(0)
     }
 
-    private fun buildVibrationSettingsUI() {
-        currentSettingsDepth = 1
-        containerSettingsItems.removeAllViews()
-
-        var isVibrationEnabled = prefs.getBoolean("vibrate", true)
-        val btnToggle = createSettingRow(
-            localize("Vibration Power"),
-            if (isVibrationEnabled) localize("ON") else localize("OFF")
-        )
-        btnToggle.setOnClickListener {
-            isVibrationEnabled = !isVibrationEnabled
-            mainActivity?.isVibrationEnabled = isVibrationEnabled
-            clickFeedback()
-            val tv = btnToggle.getChildAt(1) as? TextView
-            tv?.text = if (isVibrationEnabled) localize("ON") else localize("OFF")
-            try {
-                prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit()
-                Settings.System.putInt(
-                    activity.contentResolver,
-                    Settings.System.HAPTIC_FEEDBACK_ENABLED,
-                    if (isVibrationEnabled) 1 else 0
-                )
-            } catch (_: Exception) {}
-        }
-        containerSettingsItems.addView(btnToggle)
-
-        var vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
-        if (vibrationStrengthLevel >= VIBE_STRENGTH_NAMES.size) vibrationStrengthLevel = 1
-        val btnStrength = createSettingRow(
-            localize("Vibration Strength"),
-            localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
-        )
-        btnStrength.setOnClickListener {
-            vibrationStrengthLevel = (vibrationStrengthLevel + 1) % 3
-            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
-            clickFeedback()
-            val tv = btnStrength.getChildAt(1) as? TextView
-            tv?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
-            try {
-                prefs.edit().putInt("vibrate_strength", vibrationStrengthLevel).commit()
-            } catch (_: Exception) {}
-        }
-        containerSettingsItems.addView(btnStrength)
-
-        if (containerSettingsItems.childCount > 0) {
-            containerSettingsItems.getChildAt(0)?.requestFocus()
-        }
-    }
-
     fun buildBackgroundSettingsUI() {
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
@@ -1103,11 +1095,36 @@ class SettingsController(
             buildDateTimeUI()
         }
         containerSettingsItems.addView(rowFormat)
+        addDateTimeValueRows()
+    }
 
+    /**
+     * Settings → Status Bar: the Battery row (show or hide the battery icon) and the Clock row. Battery Percentage
+     * ([batteryPercentRow], made in buildSettingsUI) is grey and the wheel skips it while the battery icon is hidden.
+     */
+    private fun addStatusBarRows(batteryPercentRow: LinearLayout) {
+        val showBattery = StatusBarSettings.isBatteryShown(prefs)
+        val btnBattery = createSettingRow(localize("Battery"), onOff(showBattery, localize))
+        btnBattery.setOnClickListener {
+            clickFeedback()
+            StatusBarSettings.setBatteryShown(mainActivity, prefs, !StatusBarSettings.isBatteryShown(prefs))
+            // Again, for the state of Battery Percentage (the focus stays on this row)
+            buildSettingsUI()
+        }
+        containerSettingsItems.addView(btnBattery)
+        StatusBarSettings.setRowEnabled(batteryPercentRow, showBattery)
+        addClockRow()
+    }
+
+    /**
+     * The clock in the status bar ("Time in Title"), shown as Settings → Status Bar → Clock.
+     * Before the Settings groups, it was a row of Date & Time.
+     */
+    private fun addClockRow() {
         var isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
-            if (isTimeInTitleBar) localize("ON") else localize("OFF")
+            onOff(isTimeInTitleBar, localize)
         )
         rowTitleClock.setOnClickListener {
             clickFeedback()
@@ -1116,10 +1133,13 @@ class SettingsController(
             prefs.edit().putBoolean(ClockSettings.KEY_TIME_IN_TITLE, isTimeInTitleBar).commit()
             mainActivity?.onClockSettingsChanged()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
-            tvStatus?.text = if (isTimeInTitleBar) localize("ON") else localize("OFF")
+            tvStatus?.text = onOff(isTimeInTitleBar, localize)
         }
         containerSettingsItems.addView(rowTitleClock)
+    }
 
+    /** The rows of Date & Time after Time Format. */
+    private fun addDateTimeValueRows() {
         val rowTimeZone = createSettingRow(localize("Time Zone"), timeZoneCityName(TimeZone.getDefault().id))
         rowTimeZone.setOnClickListener {
             clickFeedback()
@@ -1480,10 +1500,14 @@ class SettingsController(
             if (materialIconFont != null) {
                 tvRight?.typeface = materialIconFont
                 tvRight?.textSize = 22f
+                tvRight?.let { centreIconInRow(it) }
             }
 
-            row.setOnFocusChangeListener { _, hasFocus ->
+            // Keep the row highlight of createSettingRow: this listener replaces its listener.
+            val rowHighlight = row.onFocusChangeListener
+            row.setOnFocusChangeListener { v, hasFocus ->
                 if (isMenuReorderMode) return@setOnFocusChangeListener
+                rowHighlight?.onFocusChange(v, hasFocus)
                 val currHidden = prefs.getBoolean("hide_btn_" + el.id, false)
                 if (hasFocus) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
@@ -1509,6 +1533,7 @@ class SettingsController(
                 clickFeedback()
                 val newState = !prefs.getBoolean("hide_btn_" + el.id, false)
                 prefs.edit().putBoolean("hide_btn_" + el.id, newState).commit()
+                com.themoon.y1.FeatureVisibility.onMenuButtonToggled(activity, el.action, newState)
                 tvRight?.text = if (newState) "\uE5CD" else "\uE8F4"
                 if (row.hasFocus()) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
@@ -1542,12 +1567,16 @@ class SettingsController(
             if (materialIconFont != null) {
                 tvRight?.typeface = materialIconFont
                 tvRight?.textSize = 22f
+                tvRight?.let { centreIconInRow(it) }
             }
             tvRight?.setTextColor(
                 if (isHidden) ThemeManager.getTextColorSecondary() else ThemeManager.getTextColorPrimary()
             )
 
-            row.setOnFocusChangeListener { _, hasFocus ->
+            // Keep the row highlight of createSettingRow: this listener replaces its listener.
+            val rowHighlight = row.onFocusChangeListener
+            row.setOnFocusChangeListener { v, hasFocus ->
+                rowHighlight?.onFocusChange(v, hasFocus)
                 val currHidden = com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
                 if (hasFocus) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
@@ -1576,23 +1605,28 @@ class SettingsController(
     }
 
     private fun sortMenuElements(buttons: ArrayList<ThemeManager.MenuElement>) {
-        val savedOrder = prefs.getString("custom_menu_order_" + ThemeManager.getCurrentTheme().name, "") ?: ""
-        if (savedOrder.isNotEmpty()) {
-            val orderList = savedOrder.split(",")
-            buttons.sortWith { e1, e2 ->
-                val idx1 = orderList.indexOf(e1.id)
-                val idx2 = orderList.indexOf(e2.id)
-                if (idx1 != -1 && idx2 != -1) idx1 - idx2
-                else if (idx1 != -1) -1
-                else if (idx2 != -1) 1
-                else e1.focusIndex - e2.focusIndex
-            }
-        } else {
-            buttons.sortWith { e1, e2 -> e1.focusIndex - e2.focusIndex }
+        com.themoon.y1.controllers.menu.MenuOrder.sort(buttons, prefs)
+    }
+
+    /**
+     * The icon glyphs fill the em box of the icon font (no descent), so a box of one line without font
+     * padding, centred in the row, centres the icons. A list style can have set a top padding for text.
+     */
+    private fun centreIconInRow(tv: TextView) {
+        tv.includeFontPadding = false
+        tv.gravity = Gravity.CENTER_VERTICAL
+        tv.setPadding(tv.paddingLeft, 0, tv.paddingRight, 0)
+        (tv.layoutParams as? LinearLayout.LayoutParams)?.let {
+            it.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            it.gravity = Gravity.CENTER_VERTICAL
+            tv.layoutParams = it
         }
     }
 
     fun toggleMenuReorderMode() {
+        // Material icon "swap_vert", from the same font as the eye icon. The font has no "↕" (and no space),
+        // so a fallback glyph sat on the icon baseline, below the row centre.
+        val reorderMark = "\uE8D5"
         if (!isMenuReorderMode) {
             val focused = activity.currentFocus
             if (focused != null && focused.parent == containerSettingsItems) {
@@ -1600,15 +1634,17 @@ class SettingsController(
                 currentReorderRow = focused
                 currentReorderRow?.setBackgroundColor(0xFFD32F2F.toInt())
                 val tvRight = (currentReorderRow as? LinearLayout)?.getChildAt(1) as? TextView
-                val currentIcon = tvRight?.text?.toString()?.replace(" ↕", "") ?: ""
-                tvRight?.text = "$currentIcon ↕"
+                val currentIcon = tvRight?.text?.toString()?.replace(reorderMark, "") ?: ""
+                tvRight?.text = currentIcon + reorderMark
                 tvRight?.setTextColor(0xFFFFFFFF.toInt())
             }
         } else {
             isMenuReorderMode = false
             if (currentReorderRow != null) {
+                // Replace the red reorder background with the normal row highlight.
+                currentReorderRow?.let { it.onFocusChangeListener?.onFocusChange(it, it.hasFocus()) }
                 val tvRight = (currentReorderRow as? LinearLayout)?.getChildAt(1) as? TextView
-                val currentIcon = tvRight?.text?.toString()?.replace(" ↕", "") ?: ""
+                val currentIcon = tvRight?.text?.toString()?.replace(reorderMark, "") ?: ""
                 tvRight?.text = currentIcon
                 tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 currentReorderRow = null
@@ -1621,10 +1657,7 @@ class SettingsController(
                     sb.append(tagStr).append(",")
                 }
             }
-            prefs.edit().putString(
-                "custom_menu_order_" + ThemeManager.getCurrentTheme().name,
-                sb.toString()
-            ).commit()
+            com.themoon.y1.controllers.menu.MenuOrder.save(prefs, sb.toString())
             Toast.makeText(activity, localize("Menu order saved!"), Toast.LENGTH_SHORT).show()
         }
     }
@@ -1644,7 +1677,9 @@ class SettingsController(
                 .remove(ClockSettings.KEY_24_HOUR_FORMAT)
                 .remove(ClockSettings.KEY_TIME_IN_TITLE)
                 .remove("show_battery_percentage")
+                .remove(StatusBarSettings.KEY_SHOW_BATTERY)
                 .remove("volume_limit_max")
+                .remove(ToggleStyle.PREF_KEY)
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
                 .remove("album_tilt_enabled")
@@ -1659,12 +1694,12 @@ class SettingsController(
                 .remove("eq_preset")
                 .remove("eq_profile_id")
                 .remove(AlbumKey.PREF_BY_ARTIST)
-                .remove("auto_fetch")
                 .commit()
         } catch (_: Exception) {}
 
         mainActivity?.isSoundCheckEnabled = false
         AudioEffectManager.getInstance().applySoundCheck()
+        ToggleStyle.reload(activity)
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
         ListEdges.reload(activity)
@@ -1678,6 +1713,7 @@ class SettingsController(
         mainActivity?.is24HourFormat = ClockSettings.DEFAULT_24_HOUR_FORMAT
         mainActivity?.onClockSettingsChanged()
         mainActivity?.batteryIconView?.setShowPercentage(false)
+        mainActivity?.let { StatusBarSettings.applyBattery(it) }
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
         buildSettingsUI()
