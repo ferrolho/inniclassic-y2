@@ -152,7 +152,6 @@ internal fun MainActivity.loadPreferences() {
     com.themoon.y1.models.AlbumKey.byArtist = prefs.getBoolean(com.themoon.y1.models.AlbumKey.PREF_BY_ARTIST, false)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq_enabled", false)
-    currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
     currentSystemBrightness = prefs.getInt("brightness_level", 255)
 
     eqPresetNames.clear()
