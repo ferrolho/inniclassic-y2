@@ -44,6 +44,7 @@ polish_dict = {
   "Radio": "Radio",
   "Bluetooth": "Bluetooth",
   "Wi-Fi": "Wi-Fi",
+  "Cell Radio": "Sieć komórkowa",
   "Settings": "Ustawienia",
   "Web Server": "Serwer WWW",
   "Server": "Serwer",
