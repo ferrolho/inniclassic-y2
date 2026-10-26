@@ -20,6 +20,11 @@ def todayDate = new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
 def defaultVersionCode = todayDate.toInteger()
 def defaultVersionName = todayDate
 
+// Features in the APK (default: all). Our own build leaves some out: -Pvideos=false -PmusicQuiz=false
+def featureFlag = { String name -> project.hasProperty(name) ? project.property(name).toString().toBoolean() : true }
+def featureVideos = featureFlag('videos')
+def featureMusicQuiz = featureFlag('musicQuiz')
+
 def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : defaultVersionCode
 def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName') : defaultVersionName
 
@@ -39,6 +44,8 @@ android {
         }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled true
+        buildConfigField "boolean", "FEATURE_VIDEOS", "${featureVideos}"
+        buildConfigField "boolean", "FEATURE_MUSIC_QUIZ", "${featureMusicQuiz}"
         buildConfigField "String", "LASTFM_API_KEY", "\"${lastFmApiKey}\""
         buildConfigField "String", "LASTFM_API_SECRET", "\"${lastFmApiSecret}\""
     }
