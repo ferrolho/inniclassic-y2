@@ -1,10 +1,13 @@
 package com.themoon.y1.controllers.player
 
 import android.app.Activity
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.util.LruCache
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +24,9 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
+import androidx.palette.graphics.Palette
+import com.themoon.y1.views.AudioVisualizerView
+import com.themoon.y1.views.SpectrumColors
 import java.io.File
 import java.util.Locale
 
@@ -45,6 +51,7 @@ class PlayerController(
     private val onBrowseArtist: (artistName: String) -> Unit,
     private val onToggleFavorite: () -> Unit,
     private val onAddToOnTheGo: (file: File) -> Unit,
+    private val onAddToPlaylist: (file: File) -> Unit,
     private val onToggleVisualizer: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
@@ -65,6 +72,13 @@ class PlayerController(
     private val frameAlbumReflection: FrameLayout? = rootView.findViewById(R.id.frame_album_reflection)
     private val ivPauseOverlay: ImageView? = rootView.findViewById(R.id.iv_pause_overlay)
     private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
+    private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
+    private var visualizerApplied = false
+    // Spectrum colour: main colour of the cover (Palette), cached per track path
+    private var spectrumArt: Bitmap? = null
+    private var spectrumCoverColor: Int? = null
+    private val spectrumColorCache = LruCache<String, Int>(64)
+    private val noCoverColor = 0 // cache value for "cover has no usable colour" (swatch colours are opaque)
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
     private val ivPlayerRepeatStatus: ImageView? = rootView.findViewById(R.id.iv_player_repeat_status)
@@ -116,6 +130,22 @@ class PlayerController(
         frameAlbumReflection?.let {
             it.setCameraDistance(density * 3500f)
             it.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            // Use the cover's centre as the tilt pivot, so both share one perspective and the
+            // reflection mirrors the tilted cover (with its own centre, a wedge-shaped gap shows)
+            val coverLp = frameAlbumArt?.layoutParams
+            val reflectionLp = it.layoutParams as? ViewGroup.MarginLayoutParams
+            if (coverLp != null && reflectionLp != null && coverLp.height > 0 && reflectionLp.width > 0) {
+                it.pivotX = reflectionLp.width / 2f
+                it.pivotY = -(coverLp.height / 2f + reflectionLp.topMargin)
+            }
+        }
+
+        // Spectrum takes the album art slot; same width as the art, so the column keeps its width
+        (frameAlbumArt?.parent as? LinearLayout)?.let { column ->
+            val visWidth = frameAlbumArt.layoutParams?.width ?: ViewGroup.LayoutParams.MATCH_PARENT
+            val visLp = LinearLayout.LayoutParams(visWidth, (190 * density).toInt())
+            visLp.bottomMargin = (8 * density).toInt()
+            column.addView(visualizerView, 0, visLp)
         }
 
         tvScrubStars[0] = rootView.findViewById(R.id.tv_scrub_star_1)
@@ -131,6 +161,7 @@ class PlayerController(
         layoutPlayerMode.visibility = View.VISIBLE
         applyThemeColors()
         updatePlayerUI()
+        refreshVisualizerState()
         progressHandler.post(updateProgressTask)
     }
 
@@ -261,6 +292,8 @@ class PlayerController(
             2 -> updateShuffleRepeatScrubLabels()
             3 -> updateRatingScrubStars()
         }
+        // A bottom state may have shown or hidden the lyrics overlay in the album art slot
+        refreshVisualizerState()
     }
 
     fun handleNowPlayingWheelInput(up: Boolean): Boolean {
@@ -409,11 +442,83 @@ class PlayerController(
             isFavorite = isFav,
             onToggleFavorite = onToggleFavorite,
             onAddToOnTheGo = onAddToOnTheGo,
+            onAddToPlaylist = onAddToPlaylist,
             onBrowseAlbum = onBrowseAlbum,
             onBrowseArtist = onBrowseArtist,
+            isSpectrumShowing = main.isVisualizerShowing,
             onToggleVisualizer = onToggleVisualizer,
             localize = localize
         )
+    }
+
+    /**
+     * Spectrum on: the spectrum replaces the album art and its reflection. Spectrum off: album art.
+     * While the lyrics overlay is showing it owns the album art slot, so the spectrum hides
+     * and comes back when the lyrics are hidden. Runs on toggle, on entering Now Playing and with
+     * every bottom state update (which also covers track changes and showing or hiding lyrics).
+     */
+    fun refreshVisualizerState() {
+        val main = MainActivity.instance ?: return
+        val isOn = main.isVisualizerShowing
+        val lyricsShowing = lyricsOverlayController.isShowing()
+        val showSpectrum = isOn && !lyricsShowing
+
+        // Only undo what this mode changed; the lyrics overlay manages the album art while it shows
+        if (!lyricsShowing) {
+            val albumVisibility = if (isOn) View.GONE else if (visualizerApplied) View.VISIBLE else null
+            if (albumVisibility != null) {
+                frameAlbumArt?.visibility = albumVisibility
+                frameAlbumReflection?.visibility = albumVisibility
+            }
+        }
+        visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
+        visualizerApplied = isOn
+        try {
+            main.audioVisualizer?.setEnabled(showSpectrum)
+        } catch (_: Exception) {}
+    }
+
+    fun updateVisualizer(fft: ByteArray?) {
+        if (visualizerView.visibility == View.VISIBLE) {
+            visualizerView.updateVisualizer(fft, spectrumColor())
+        }
+    }
+
+    /** Cover colour with enough contrast for the Now Playing background, or the theme accent. */
+    private fun spectrumColor(): Int {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            val art = (ivAlbumArt.drawable as? BitmapDrawable)?.bitmap
+            if (art !== spectrumArt) {
+                spectrumArt = art
+                if (art != null && !art.isRecycled) pickCoverColor(art)
+            }
+        }
+        val background = if (ThemeManager.isClassicTheme()) 0xFFFFFFFF.toInt() else ThemeManager.getOverlayBackgroundColor()
+        val accent = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+        return SpectrumColors.spectrumColor(spectrumCoverColor, background, accent)
+    }
+
+    private fun pickCoverColor(art: Bitmap) {
+        val main = MainActivity.instance ?: return
+        val path = main.currentPlaylist.getOrNull(main.currentIndex)?.absolutePath ?: return
+        val cached = spectrumColorCache.get(path)
+        if (cached != null) {
+            spectrumCoverColor = if (cached == noCoverColor) null else cached
+            return
+        }
+        // Palette works on a small copy, off the main thread
+        val small = try {
+            Bitmap.createScaledBitmap(art, 48, 48, true)
+        } catch (_: Exception) {
+            return
+        }
+        Palette.from(small).maximumColorCount(16).generate { palette ->
+            val swatch = palette?.vibrantSwatch ?: palette?.darkVibrantSwatch
+                ?: palette?.lightVibrantSwatch ?: palette?.dominantSwatch
+            val color = swatch?.rgb
+            spectrumColorCache.put(path, color ?: noCoverColor)
+            if (spectrumArt === art) spectrumCoverColor = color
+        }
     }
 
     private fun formatTime(ms: Int): String {
@@ -431,6 +536,7 @@ class PlayerController(
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER, 23, KeyEvent.KEYCODE_ENTER -> {
                 if (event.repeatCount == 0) {
+                    MainActivity.instance?.isLongPressConsumed = false
                     event.startTracking()
                 }
                 return true
@@ -463,6 +569,12 @@ class PlayerController(
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            val main = MainActivity.instance
+            if (main != null && main.isLongPressConsumed) {
+                // The hold opened the Now Playing menu, so skip the short-press action
+                main.isLongPressConsumed = false
+                return true
+            }
             if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
                 val now = System.currentTimeMillis()
                 if (now - lastCenterUpTime < 300) {
@@ -492,13 +604,14 @@ class PlayerController(
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85 || keyCode == 86 || keyCode == 126 || keyCode == 127) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
             val main = MainActivity.instance
             if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
                 clickFeedback()
-                main.isMediaLongPressConsumed = true
-                val currentSong = main.currentPlaylist[main.currentIndex]
-                main.showAddToPlaylistDialog(currentSong)
+                main.isLongPressConsumed = true
+                doubleClickHandler.removeCallbacks(singleClickRunnable)
+                lastCenterUpTime = 0
+                showContextMenu()
                 return true
             }
         }
