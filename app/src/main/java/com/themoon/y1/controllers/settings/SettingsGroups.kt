@@ -18,7 +18,10 @@ object SettingsGroups {
     /** A group of rows. A [direct] group has one row, and the top level shows that row itself (no group page). */
     class Group(val title: String, val rows: List<String>, val direct: Boolean = false)
 
-    /** Rows that are in a build only with a feature or a branch are in the list too; a missing row is skipped. */
+    /**
+     * Rows that are in a build only with a feature or a branch are in the list too (Click Volume), and rows that a
+     * branch removes stay in it (Screen Timeout): a missing row is skipped.
+     */
     val GROUPS: List<Group> = listOf(
         Group("Playback", listOf(
             "Shuffle Mode", "Repeat Mode", "Equalizer & Audio Effects", "Sound Check", "Volume Limit", "Playback Speed"
@@ -37,7 +40,7 @@ object SettingsGroups {
             "Main Menu Items", "Music Menu Items", "Group Albums"
         )),
         Group("Controls", listOf(
-            "Button Sound", "Vibration", "Wheel Loop Scroll", "Screen-Off Control", "Double-Click to Favorite",
+            "Button Sound", "Click Volume", "Vibration", "Wheel Loop Scroll", "Screen-Off Control", "Double-Click to Favorite",
             "Keyboard Layout"
         )),
         Group("Connectivity", listOf(

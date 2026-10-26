@@ -35,6 +35,7 @@ class SettingsGroupsTest {
         return re.findAll(body).map { it.groupValues[1] }.toList()
     }
 
+    /** Each row that this build makes is in one group; the groups can also list rows of other branches. */
     @Test
     fun everyRowIsInExactlyOneGroup() {
         val labels = rowLabels()
