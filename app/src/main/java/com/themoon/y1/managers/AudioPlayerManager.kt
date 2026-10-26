@@ -372,6 +372,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun playTrackList(list: List<File>, index: Int, initialSeekMs: Long = -1L) {
+        com.themoon.y1.eventlog.EventLog.playList(list, index, initialSeekMs)
         saveAudiobookBookmarkIfNeeded()
 
         val main = MainActivity.instance ?: return
@@ -451,6 +452,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun playPodcastStream(url: String, title: String, imageUrl: String?, channelName: String, offsetMs: Int) {
+        com.themoon.y1.eventlog.EventLog.podcast(title, channelName)
         val main = MainActivity.instance ?: return
 
         try {
@@ -568,6 +570,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun playOrPauseMusic() {
+        com.themoon.y1.eventlog.EventLog.playback("playPause")
         if (isUsingLegacyPlayer && legacyPlayer != null) {
             val player = legacyPlayer ?: return
             if (player.isPlaying) {
@@ -625,6 +628,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun nextTrack() {
+        com.themoon.y1.eventlog.EventLog.playback("next")
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
@@ -646,6 +650,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun prevTrack() {
+        com.themoon.y1.eventlog.EventLog.playback("prev")
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
@@ -669,6 +674,7 @@ class AudioPlayerManager private constructor() {
 
     fun seekRelative(offsetMs: Int) {
         val currentPos = getCurrentPosition().toLong()
+        com.themoon.y1.eventlog.EventLog.seek(currentPos, offsetMs)
         val duration = getDuration().toLong()
         var targetPos = currentPos + offsetMs
         if (targetPos < 0) targetPos = 0
@@ -683,6 +689,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun prepareMusicTrack(index: Int, initialSeekMs: Long = 0L, initialDurationMs: Long = 0L) {
+        com.themoon.y1.eventlog.EventLog.load(index, initialSeekMs)
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
 

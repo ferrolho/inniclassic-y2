@@ -260,6 +260,7 @@ class UsbStorageUiManager(
 
     fun showUsbStorageOverlay() {
         if (usbStorageOverlay != null) return
+        com.themoon.y1.eventlog.EventLog.usb("shared")
         val root = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
         val d = activity.resources.displayMetrics.density
 
@@ -344,6 +345,7 @@ class UsbStorageUiManager(
     }
 
     fun hideUsbStorageOverlay() {
+        if (usbStorageOverlay != null) com.themoon.y1.eventlog.EventLog.usb("ejected")
         if (usbStorageOverlay != null) {
             val root = activity.findViewById<ViewGroup>(android.R.id.content)
             root?.removeView(usbStorageOverlay)
