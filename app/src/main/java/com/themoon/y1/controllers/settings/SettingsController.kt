@@ -22,6 +22,7 @@ import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
@@ -745,6 +746,9 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBatteryPct)
 
+        // Settings → Status Bar (SettingsGroups.kt): Clock, Battery, Battery Percentage
+        addStatusBarRows(btnBatteryPct)
+
         val btnStorageMenu = createSettingRow(localize("About"), "〉 ")
         btnStorageMenu.setOnClickListener {
             clickFeedback()
@@ -1051,7 +1055,32 @@ class SettingsController(
             buildDateTimeUI()
         }
         containerSettingsItems.addView(rowFormat)
+        addDateTimeValueRows()
+    }
 
+    /**
+     * Settings → Status Bar: the Battery row (show or hide the battery icon) and the Clock row. Battery Percentage
+     * ([batteryPercentRow], made in buildSettingsUI) is grey and the wheel skips it while the battery icon is hidden.
+     */
+    private fun addStatusBarRows(batteryPercentRow: LinearLayout) {
+        val showBattery = StatusBarSettings.isBatteryShown(prefs)
+        val btnBattery = createSettingRow(localize("Battery"), onOff(showBattery, localize))
+        btnBattery.setOnClickListener {
+            clickFeedback()
+            StatusBarSettings.setBatteryShown(mainActivity, prefs, !StatusBarSettings.isBatteryShown(prefs))
+            // Again, for the state of Battery Percentage (the focus stays on this row)
+            buildSettingsUI()
+        }
+        containerSettingsItems.addView(btnBattery)
+        StatusBarSettings.setRowEnabled(batteryPercentRow, showBattery)
+        addClockRow()
+    }
+
+    /**
+     * The clock in the status bar ("Time in Title"), shown as Settings → Status Bar → Clock.
+     * Before the Settings groups, it was a row of Date & Time.
+     */
+    private fun addClockRow() {
         var isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", true)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
@@ -1066,7 +1095,10 @@ class SettingsController(
             tvStatus?.text = if (isTimeInTitleBar) localize("ON") else localize("OFF")
         }
         containerSettingsItems.addView(rowTitleClock)
+    }
 
+    /** The rows of Date & Time after Time Format. */
+    private fun addDateTimeValueRows() {
         val rowYear = createSettingRow(localize("Year"), dtYear.toString())
         rowYear.setOnClickListener {
             clickFeedback()
@@ -1474,6 +1506,7 @@ class SettingsController(
                 .remove("is_24h_format")
                 .remove("time_in_title_bar")
                 .remove("show_battery_percentage")
+                .remove(StatusBarSettings.KEY_SHOW_BATTERY)
                 .remove("volume_limit_max")
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
@@ -1500,6 +1533,7 @@ class SettingsController(
         mainActivity?.isTimeInTitleBar = false
         mainActivity?.is24HourFormat = false
         mainActivity?.batteryIconView?.setShowPercentage(false)
+        mainActivity?.let { StatusBarSettings.applyBattery(it) }
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
         buildSettingsUI()

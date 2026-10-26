@@ -23,7 +23,10 @@ object SettingsGroups {
             "Shuffle Mode", "Repeat Mode", "Equalizer & Audio Effects", "Sound Check", "Volume Limit", "Playback Speed"
         )),
         Group("Display", listOf(
-            "Display Brightness", "Backlight Timer", "Screen Timeout", "Battery Percentage"
+            "Display Brightness", "Backlight Timer", "Screen Timeout"
+        )),
+        Group("Status Bar", listOf(
+            "Time in Title", "Battery", "Battery Percentage"
         )),
         Group("Appearance", listOf(
             "Theme", "Background", "iPod Classic Layout", "Toggle Style", "List Edges", "Album Cover Tilt",
@@ -36,7 +39,7 @@ object SettingsGroups {
             "Button Sound", "Vibration", "Wheel Loop Scroll", "Screen-Off Control", "Double-Click to Favorite",
             "Keyboard Layout"
         )),
-        Group("Connections", listOf(
+        Group("Connectivity", listOf(
             "Bluetooth", "Wi-Fi", "Cell Radio", "Web Server", "Ask on USB Connect"
         )),
         Group("Library", listOf(
@@ -60,6 +63,7 @@ object SettingsGroups {
         "Display Brightness" to "Brightness",
         "Backlight Timer" to "Backlight",
         "Reset All Settings" to "Reset Settings",
+        "Time in Title" to "Clock",
     )
 
     const val TOP = -1

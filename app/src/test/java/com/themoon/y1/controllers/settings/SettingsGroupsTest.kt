@@ -15,15 +15,22 @@ class SettingsGroupsTest {
     private fun source(name: String): String? =
         listOf(File("$dir/$name"), File("app/$dir/$name")).firstOrNull { it.exists() }?.readText()
 
-    /** The labels of the rows that buildSettingsUI makes (and the backup rows, if this build has them). */
+    /** The body of the function [name] of [code]: from its declaration to the next function. */
+    private fun body(code: String, name: String): String {
+        val start = code.indexOf("fun $name(")
+        assertTrue("fun $name not found", start >= 0)
+        val end = code.indexOf("\n    fun ", start + 1).let { a ->
+            val b = code.indexOf("\n    private fun ", start + 1)
+            listOf(a, b).filter { it > 0 }.minOrNull() ?: code.length
+        }
+        return code.substring(start, end)
+    }
+
+    /** The labels of the rows that buildSettingsUI makes (with the Status Bar rows, and the backup rows if this build has them). */
     private fun rowLabels(): List<String> {
         val controller = source("SettingsController.kt") ?: error("SettingsController.kt not found")
-        val start = controller.indexOf("fun buildSettingsUI()")
-        val end = controller.indexOf("\n    fun ", start + 1).let { a ->
-            val b = controller.indexOf("\n    private fun ", start + 1)
-            listOf(a, b).filter { it > 0 }.minOrNull() ?: controller.length
-        }
-        val body = controller.substring(start, end) + (source("SettingsBackupUi.kt") ?: "")
+        val body = body(controller, "buildSettingsUI") + body(controller, "addStatusBarRows") +
+            body(controller, "addClockRow") + (source("SettingsBackupUi.kt") ?: "")
         val re = Regex("""createSettingRow\(\s*localize\("([^"]+)"\)""")
         return re.findAll(body).map { it.groupValues[1] }.toList()
     }
@@ -46,10 +53,13 @@ class SettingsGroupsTest {
     }
 
     @Test
-    fun topLevelHasSixToNineShortGroups() {
-        assertTrue(GROUPS.size in 6..9)
+    fun topLevelHasAtMostTenShortGroups() {
+        assertTrue(GROUPS.size in 6..10)
         assertEquals(
-            listOf("Playback", "Display", "Appearance", "Menus", "Controls", "Connections", "Library", "General", "Developer"),
+            listOf(
+                "Playback", "Display", "Status Bar", "Appearance", "Menus", "Controls", "Connectivity", "Library",
+                "General", "Developer"
+            ),
             GROUPS.map { it.title }
         )
         for (g in GROUPS) {
@@ -68,6 +78,14 @@ class SettingsGroupsTest {
         assertEquals("About", GROUPS.first { it.title == "General" }.rows.first())
         assertEquals("Power Off", GROUPS.first { it.title == "General" }.rows.last())
         assertEquals(listOf("Wireless ADB"), GROUPS.last().rows)
+    }
+
+    @Test
+    fun statusBarHasTheClockAndTheBatteryRows() {
+        val statusBar = GROUPS.first { it.title == "Status Bar" }
+        assertEquals(listOf("Time in Title", "Battery", "Battery Percentage"), statusBar.rows)
+        assertEquals("Clock", SettingsGroups.RENAMES["Time in Title"])
+        assertTrue(rowLabels().containsAll(statusBar.rows))
     }
 
     @Test
