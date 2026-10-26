@@ -411,6 +411,7 @@ object ThemeManager {
 
     fun setThemeIndex(index: Int) {
         currentThemeIndex = if (index in 0 until availableThemes.size) index else 0
+        com.themoon.y1.eventlog.EventLog.theme(currentThemeIndex)
     }
 
     fun findThemeIndexByName(name: String?): Int {
