@@ -227,6 +227,22 @@ object VolumeSteps {
         val s = step.coerceIn(0, STEPS)
         return if (limitStep in 1..STEPS) minOf(s, limitStep) else s
     }
+
+    /**
+     * A change of the Android music index that the app did not make. With the screen off, Android gets the volume
+     * keys (only while music plays) and moves the index by one for each push. With [VolumeSplit.SOFTWARE] the app
+     * keeps the index at [keptIndex], so a change that starts there is a volume key: returns -1 (down) or +1 (up),
+     * and the app moves its own step and puts the index back. At the top index ([maxIndex]) Android cannot go
+     * higher, so an up push sends the same index again. Returns 0 for other changes (the app's own index writes
+     * start below [keptIndex]).
+     */
+    fun stepFromIndexChange(prevIndex: Int, newIndex: Int, keptIndex: Int, maxIndex: Int): Int = when {
+        prevIndex != keptIndex -> 0
+        newIndex < prevIndex -> -1
+        newIndex > prevIndex -> 1
+        prevIndex == maxIndex -> 1
+        else -> 0
+    }
 }
 
 /** Small key-value store, so that the per-output logic has no Android dependency (prefs in the app). */

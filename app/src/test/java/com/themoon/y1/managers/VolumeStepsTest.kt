@@ -376,4 +376,22 @@ class VolumeStepsTest {
         for (c in plan) assertEquals(VolumeSteps.targetDb(step), levelDb(c, dac), 1e-4)
         for (c in plan.drop(2)) assertEquals(VolumeSteps.MIN_DECREASE_GAP_MS, c.delayMs)
     }
+
+    @Test
+    fun volumeKeysWithScreenOffMoveOneStep() {
+        // Android lowers the kept top index by one: one step down
+        assertEquals(-1, VolumeSteps.stepFromIndexChange(prevIndex = 15, newIndex = 14, keptIndex = 15, maxIndex = 15))
+        // Up at the top: Android cannot go higher and sends the same index
+        assertEquals(1, VolumeSteps.stepFromIndexChange(prevIndex = 15, newIndex = 15, keptIndex = 15, maxIndex = 15))
+        // Kept index below the system maximum: Android raises it by one
+        assertEquals(1, VolumeSteps.stepFromIndexChange(prevIndex = 12, newIndex = 13, keptIndex = 12, maxIndex = 15))
+    }
+
+    @Test
+    fun ownIndexWritesAreNotVolumeKeys() {
+        // The app puts the index back to the top (and FM radio moves it): these start below the kept index
+        assertEquals(0, VolumeSteps.stepFromIndexChange(prevIndex = 14, newIndex = 15, keptIndex = 15, maxIndex = 15))
+        assertEquals(0, VolumeSteps.stepFromIndexChange(prevIndex = 9, newIndex = 8, keptIndex = 15, maxIndex = 15))
+        assertEquals(0, VolumeSteps.stepFromIndexChange(prevIndex = 12, newIndex = 12, keptIndex = 12, maxIndex = 15))
+    }
 }

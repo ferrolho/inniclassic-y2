@@ -386,6 +386,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
         BluetoothAvrcpManager.getInstance(this).init()
         restoreVolumeForOutput(force = true)
+        AndroidVolumeChangeReceiver.register(applicationContext)
         FmRadioManager.getInstance(this).apply {
             volumeGate = { ready -> runOnUiThread { prepareVolumeForFm(ready) } }
             onPoweredDown = { runOnUiThread { leaveFmVolume() } }
@@ -710,6 +711,37 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val target = if (isUp) current + 1 else current - 1
         setVolumeLevel(VolumeSteps.clamp(target, volumeLimitMax))
         clickFeedback()
+    }
+
+    /**
+     * With the screen off, Android gets the volume keys (only while music plays) and moves the music index. Each push
+     * then changes our step by one, as with the screen on, and the index goes back to the top
+     * ([VolumeSteps.stepFromIndexChange]). Screen-Off Control does not apply: Android acts on these keys in any case.
+     */
+    fun onAndroidVolumeChange(prevIndex: Int, newIndex: Int) {
+        if (volumeSplit() != VolumeSplit.SOFTWARE || lastTargetVolume < 0) return
+        val maxIndex = try { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { return }
+        val delta = VolumeSteps.stepFromIndexChange(prevIndex, newIndex, lastTargetVolume, maxIndex)
+        if (delta != 0) adjustVolume(delta > 0)
+    }
+
+    /** Android's music index changes (hidden AudioManager.VOLUME_CHANGED_ACTION). Registered once for the process. */
+    private object AndroidVolumeChangeReceiver : BroadcastReceiver() {
+        private var registered = false
+
+        fun register(context: Context) {
+            if (registered) return
+            registered = true
+            context.registerReceiver(this, IntentFilter("android.media.VOLUME_CHANGED_ACTION"))
+        }
+
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1) != AudioManager.STREAM_MUSIC) return
+            val prev = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
+            val now = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
+            if (prev < 0 || now < 0) return
+            instance?.onAndroidVolumeChange(prev, now)
+        }
     }
 
     fun setVolumeLevel(targetVirtualVol: Int, showOverlay: Boolean = true) {
