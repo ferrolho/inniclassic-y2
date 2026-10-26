@@ -15,7 +15,8 @@ import android.widget.TextView
  */
 object SettingsGroups {
 
-    class Group(val title: String, val rows: List<String>)
+    /** A group of rows. A [direct] group has one row, and the top level shows that row itself (no group page). */
+    class Group(val title: String, val rows: List<String>, val direct: Boolean = false)
 
     /** Rows that are in a build only with a feature or a branch are in the list too; a missing row is skipped. */
     val GROUPS: List<Group> = listOf(
@@ -46,8 +47,9 @@ object SettingsGroups {
             "Auto Fetch Album Art", "Clear Album Art & Info", "Jellyfin Sync", "Sync Scrobbles to Last.fm",
             "Last.fm Account"
         )),
+        Group("Date & Time", listOf("Date & Time"), direct = true),
         Group("General", listOf(
-            "About", "Date & Time", "Language", "System Update", "Legal", "Export Settings", "Import Settings",
+            "About", "Language", "System Update", "Legal", "Export Settings", "Import Settings",
             "Reset All Settings", "Power Off"
         )),
         Group("Developer", listOf(
@@ -87,7 +89,8 @@ object SettingsGroups {
             val rows = GROUPS[open].rows.filter { it in present }
             if (rows.isNotEmpty()) return open to rows.map { Entry.Row(it) }
         }
-        val groups = GROUPS.indices.filter { g -> GROUPS[g].rows.any { it in present } }.map { Entry.GroupRow(it) }
+        val groups = GROUPS.indices.filter { g -> GROUPS[g].rows.any { it in present } }
+            .map { g -> if (GROUPS[g].direct) Entry.Row(GROUPS[g].rows.first()) else Entry.GroupRow(g) }
         val loose = present.filter { groupOf(it) == TOP }.map { Entry.Row(it) }
         return TOP to groups + loose
     }

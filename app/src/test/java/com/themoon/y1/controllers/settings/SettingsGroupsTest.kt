@@ -53,18 +53,19 @@ class SettingsGroupsTest {
     }
 
     @Test
-    fun topLevelHasAtMostTenShortGroups() {
-        assertTrue(GROUPS.size in 6..10)
+    fun topLevelHasAtMostElevenShortEntries() {
+        assertTrue(GROUPS.size in 6..11)
         assertEquals(
             listOf(
                 "Playback", "Display", "Status Bar", "Appearance", "Menus", "Controls", "Connectivity", "Library",
-                "General", "Developer"
+                "Date & Time", "General", "Developer"
             ),
             GROUPS.map { it.title }
         )
         for (g in GROUPS) {
             assertTrue("${g.title}: label too long", g.title.length <= 12)
             assertTrue("${g.title}: ${g.rows.size} rows", g.rows.size <= 10)
+            if (g.direct) assertEquals("${g.title}: a direct group has one row", 1, g.rows.size)
         }
         for ((old, new) in SettingsGroups.RENAMES) {
             assertTrue("rename of a row that is in no group: $old", SettingsGroups.groupOf(old) != TOP)
@@ -78,6 +79,15 @@ class SettingsGroupsTest {
         assertEquals("About", GROUPS.first { it.title == "General" }.rows.first())
         assertEquals("Power Off", GROUPS.first { it.title == "General" }.rows.last())
         assertEquals(listOf("Wireless ADB"), GROUPS.last().rows)
+    }
+
+    @Test
+    fun dateAndTimeIsARowOfTheTopLevelBeforeGeneral() {
+        val labels = rowLabels()
+        val (_, top) = SettingsGroups.page(labels, TOP)
+        val dateTime = top.indexOf(Entry.Row("Date & Time"))
+        val general = top.indexOf(Entry.GroupRow(GROUPS.indexOfFirst { it.title == "General" }))
+        assertTrue("Date & Time at $dateTime, General at $general", dateTime in 0 until general)
     }
 
     @Test
@@ -128,6 +138,7 @@ class SettingsGroupsTest {
         val reachable = top.flatMap { e ->
             when (e) {
                 is Entry.Row -> listOf(e.label)
+                // a direct group shows its row on the top level
                 is Entry.GroupRow -> SettingsGroups.page(labels, e.group).second.map { (it as Entry.Row).label }
             }
         }
