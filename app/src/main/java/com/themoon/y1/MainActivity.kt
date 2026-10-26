@@ -479,6 +479,26 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // After a boot the window is in touch mode until the first key, so requestFocus() does nothing
+        // and the first screen shows no selected row. Leave touch mode before the first layout.
+        val decor = window.decorView
+        if (decor.isInTouchMode) decor.requestFocusFromTouch()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // At a device boot the window can get focus in touch mode again (after onAttachedToWindow), which
+        // clears the selected row. Then leave touch mode and let the screen select its row again.
+        // Only in touch mode with no focus, so a row that the user selected keeps the focus.
+        val decor = window.decorView
+        if (hasFocus && decor.isInTouchMode && currentFocus == null) {
+            decor.requestFocusFromTouch()
+            getActiveScreenController()?.onRefreshUI()
+        }
+    }
+
     fun t(key: String): String = LanguageManager.getInstance(this).t(key)
 
     fun clickFeedback() {
