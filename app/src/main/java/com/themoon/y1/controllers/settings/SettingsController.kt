@@ -357,7 +357,9 @@ class SettingsController(
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) &&
+            (event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0
+        ) {
             toggleMenuReorderMode()
             clickFeedback()
             return true
@@ -573,21 +575,6 @@ class SettingsController(
             tvStatus?.text = onOff(isUsbPromptEnabled, localize)
         }
         containerSettingsItems.addView(btnUsbPrompt)
-
-        val currentKb = prefs.getString("keyboard_layout", "qwerty") ?: "qwerty"
-        val btnKeyboard = createSettingRow(
-            localize("Keyboard Layout"),
-            if (currentKb == "original") localize("Original") else localize("QWERTY")
-        )
-        btnKeyboard.setOnClickListener {
-            clickFeedback()
-            val cur = prefs.getString("keyboard_layout", "qwerty") ?: "qwerty"
-            val next = if (cur == "qwerty") "original" else "qwerty"
-            prefs.edit().putString("keyboard_layout", next).commit()
-            val tvStatus = btnKeyboard.getChildAt(1) as? TextView
-            tvStatus?.text = if (next == "original") localize("Original") else localize("QWERTY")
-        }
-        containerSettingsItems.addView(btnKeyboard)
 
         var backlightTimerIndex = prefs.getInt("backlight_timer_index", 3)
         if (backlightTimerIndex >= BACKLIGHT_TIMER_LABELS.size) backlightTimerIndex = 0
@@ -1571,6 +1558,7 @@ class SettingsController(
             }
             containerSettingsItems.addView(row)
         }
+        containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun buildMusicMenuVisibilitySettingsUI() {
@@ -1628,6 +1616,7 @@ class SettingsController(
             }
             containerSettingsItems.addView(row)
         }
+        containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun sortMenuElements(buttons: ArrayList<ThemeManager.MenuElement>) {
