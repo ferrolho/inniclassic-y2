@@ -86,6 +86,12 @@ class SettingsController(
     private val mainActivity: MainActivity? get() = activity as? MainActivity
 
     var currentSettingsDepth: Int = 0
+        set(value) {
+            val old = field
+            field = value
+            // Title: the group name on a group list, the row name on a row's sub-screen (SettingsGroups.kt)
+            groupPages.onDepthChanged(old, value, containerSettingsItems, lastSettingsFocusIndex, mainActivity?.tvStatusBarTitle, localize)
+        }
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
@@ -175,7 +181,12 @@ class SettingsController(
         }
     }
 
+    // Groups on the top level (SettingsGroups.kt). The rows stay in buildSettingsUI; the groups only move them.
+    private val groupPages = SettingsGroupPages()
+
     override fun onEnter(state: ScreenState) {
+        // From the main menu: start at the top level. From a row's screen (Bluetooth, Equalizer...): stay in its group.
+        if (mainActivity?.backTargetForUtility == MainActivity.STATE_MENU) groupPages.close()?.let { lastSettingsFocusIndex = it }
         buildSettingsUI()
     }
 
@@ -211,6 +222,12 @@ class SettingsController(
     override fun onBackPressed(): Boolean {
         if (isMenuReorderMode) {
             toggleMenuReorderMode()
+            return true
+        }
+        if (currentSettingsDepth == 0 && groupPages.isOpen) {
+            lastSettingsFocusIndex = groupPages.close() ?: 0
+            buildSettingsUI()
+            clickFeedback()
             return true
         }
         if (currentSettingsDepth == 0) {
@@ -941,6 +958,13 @@ class SettingsController(
                 .show()
         }
         containerSettingsItems.addView(btnResetAll)
+
+        groupPages.arrange(containerSettingsItems, createSettingRow, clickFeedback, localize, mainActivity?.tvStatusBarTitle) {
+            // A row's screen (Bluetooth, Equalizer...) comes back into this group (see onEnter)
+            mainActivity?.backTargetForUtility = MainActivity.STATE_SETTINGS
+            lastSettingsFocusIndex = 0
+            buildSettingsUI()
+        }
 
         val sv = containerSettingsItems.parent as? ScrollView
         sv?.post {
