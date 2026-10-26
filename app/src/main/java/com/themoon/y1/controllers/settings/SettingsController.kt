@@ -30,6 +30,7 @@ import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
+import com.themoon.y1.views.ListEdges
 import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.Calendar
@@ -557,6 +558,20 @@ class SettingsController(
             tvStatus?.text = if (isLoopScrollOn) localize("ON") else localize("OFF")
         }
         containerSettingsItems.addView(btnLoopScrollToggle)
+
+        var isListEdgeFade = ListEdges.isFade(activity)
+        val btnListEdges = createSettingRow(
+            localize("List Edges"),
+            if (isListEdgeFade) localize("Fade") else localize("Cut")
+        )
+        btnListEdges.setOnClickListener {
+            clickFeedback()
+            isListEdgeFade = !isListEdgeFade
+            ListEdges.setFade(activity, isListEdgeFade)
+            val tvStatus = btnListEdges.getChildAt(1) as? TextView
+            tvStatus?.text = if (isListEdgeFade) localize("Fade") else localize("Cut")
+        }
+        containerSettingsItems.addView(btnListEdges)
 
         var currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
         if (currentTimeoutIndex >= TIMEOUT_VALUES.size) currentTimeoutIndex = 0
@@ -1459,6 +1474,7 @@ class SettingsController(
                 .remove("repeat_mode")
                 .remove("repeat")
                 .remove("loop_scroll_on")
+                .remove(ListEdges.PREF_KEY)
                 .remove("eq_preset")
                 .remove("eq_profile_id")
                 .remove("auto_fetch")
@@ -1468,6 +1484,7 @@ class SettingsController(
         AudioEffectManager.getInstance().applySoundCheck()
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
+        ListEdges.reload(activity)
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
 
