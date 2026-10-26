@@ -139,6 +139,9 @@ internal fun MainActivity.initControllers() {
         onPlaylistsRequested = {
             changeScreen(ScreenState.Playlists)
         },
+        onShuffleSongsRequested = {
+            shuffleAllSongs()
+        },
         onSearchRequested = {
             wifiKeyboardController.currentKeyboardMode = 3
             changeScreen(MainActivity.STATE_WIFI_KEYBOARD)
@@ -632,6 +635,19 @@ internal fun MainActivity.initControllers() {
         registerController(ScreenState.Videos::class.java, videoBrowserController)
         registerController(ScreenState.VideoPlayer::class.java, videoPlayerController)
     }
+}
+
+/** iPod "Shuffle Songs": plays the whole music library with Shuffle on, from a random song. */
+internal fun MainActivity.shuffleAllSongs() {
+    val tracks = MainActivity.customLibrary.map { it.file }
+    if (tracks.isEmpty()) {
+        android.widget.Toast.makeText(this, t("No playable audio files found."), android.widget.Toast.LENGTH_SHORT).show()
+        return
+    }
+    isShuffleMode = true
+    prefs.edit().putBoolean("shuffle", true).apply()
+    AudioPlayerManager.getInstance().playTrackList(tracks, tracks.indices.random())
+    changeScreen(MainActivity.STATE_PLAYER)
 }
 
 internal fun MainActivity.handleMainMenuAction(action: String) {
