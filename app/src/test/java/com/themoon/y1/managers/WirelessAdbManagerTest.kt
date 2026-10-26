@@ -45,22 +45,19 @@ class WirelessAdbManagerTest {
     }
 
     @Test
-    fun labelShowsAddressWhenOn() {
+    fun labelIsOnOffWithTheMark() {
         val id: (String) -> String = { it }
-        fun shown(text: String) = withoutOnOffMark(text).toString()
-        assertEquals("On · 192.168.1.23:5555", shown(WirelessAdbManager.label(5555, "192.168.1.23", id)))
-        assertEquals("On · port 5555", shown(WirelessAdbManager.label(5555, null, id)))
-        assertEquals("Off", shown(WirelessAdbManager.label(null, "192.168.1.23", id)))
-        assertEquals("Wył.", shown(WirelessAdbManager.label(null, null) { if (it == "Off") "Wył." else it }))
+        assertEquals("On", withoutOnOffMark(WirelessAdbManager.label(5555, id)).toString())
+        assertEquals("Off", withoutOnOffMark(WirelessAdbManager.label(null, id)).toString())
+        assertEquals("Wył.", withoutOnOffMark(WirelessAdbManager.label(null) { if (it == "Off") "Wył." else it }).toString())
+        assertEquals(true, onOffState(WirelessAdbManager.label(5555, id)))
+        assertEquals(false, onOffState(WirelessAdbManager.label(null, id)))
     }
 
     @Test
-    fun labelHasTheOnOffMark() {
-        val id: (String) -> String = { it }
-        assertEquals(true, onOffState(WirelessAdbManager.label(5555, "192.168.1.23", id)))
-        assertEquals(true, onOffState(WirelessAdbManager.label(5555, null, id)))
-        assertEquals(false, onOffState(WirelessAdbManager.label(null, null, id)))
-        assertEquals("192.168.1.23:5555", WirelessAdbManager.address(5555, "192.168.1.23"))
-        assertEquals("port 5555", WirelessAdbManager.address(5555, null))
+    fun addressShowsOnlyWhenOn() {
+        assertEquals("192.168.1.23:5555", WirelessAdbManager.addressLabel(5555, "192.168.1.23"))
+        assertEquals("port 5555", WirelessAdbManager.addressLabel(5555, null))
+        assertNull(WirelessAdbManager.addressLabel(null, "192.168.1.23"))
     }
 }
