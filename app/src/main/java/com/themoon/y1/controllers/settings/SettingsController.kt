@@ -576,21 +576,6 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnUsbPrompt)
 
-        val currentKb = prefs.getString("keyboard_layout", "qwerty") ?: "qwerty"
-        val btnKeyboard = createSettingRow(
-            localize("Keyboard Layout"),
-            if (currentKb == "original") localize("Original") else localize("QWERTY")
-        )
-        btnKeyboard.setOnClickListener {
-            clickFeedback()
-            val cur = prefs.getString("keyboard_layout", "qwerty") ?: "qwerty"
-            val next = if (cur == "qwerty") "original" else "qwerty"
-            prefs.edit().putString("keyboard_layout", next).commit()
-            val tvStatus = btnKeyboard.getChildAt(1) as? TextView
-            tvStatus?.text = if (next == "original") localize("Original") else localize("QWERTY")
-        }
-        containerSettingsItems.addView(btnKeyboard)
-
         var backlightTimerIndex = prefs.getInt("backlight_timer_index", 3)
         if (backlightTimerIndex >= BACKLIGHT_TIMER_LABELS.size) backlightTimerIndex = 0
         val btnBacklightTimer = createSettingRow(
