@@ -80,6 +80,7 @@ import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
 import com.themoon.y1.managers.VirtualVolumeManager
 import com.themoon.y1.managers.AudioOutput
+import com.themoon.y1.managers.ClickVolume
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.VolumeCurves
 import com.themoon.y1.managers.VolumeMemory
@@ -544,7 +545,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             vibrator.vibrate((vibrationStrengthLevel * 15).toLong())
         }
         if (isSoundEffectEnabled) {
-            audioManager.playSoundEffect(AudioManager.FX_KEY_CLICK)
+            // Settings → Click Volume: a level of its own, not the music volume (see ClickVolume).
+            val level = prefs.getInt(ClickVolume.PREF, ClickVolume.DEFAULT)
+            val output = currentAudioOutput ?: AudioOutput.SPEAKER
+            audioManager.playSoundEffect(
+                AudioManager.FX_KEY_CLICK,
+                ClickVolume.clickGain(level, output, currentVirtualVolume.coerceAtLeast(0))
+            )
         }
     }
 
@@ -1060,7 +1067,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 Settings.System.putInt(
                     contentResolver,
                     Settings.System.SOUND_EFFECTS_ENABLED,
-                    if (isSoundEffectEnabled) 1 else 0
+                    // Always off: else Android also plays its own view click (default gain, -6 dB) on each
+                    // performClick and list item click, with ours and much louder. Our click (clickFeedback:
+                    // playSoundEffect with a volume) does not read this setting, so Button Sound still works.
+                    0
                 )
                 Settings.System.putInt(
                     contentResolver,
