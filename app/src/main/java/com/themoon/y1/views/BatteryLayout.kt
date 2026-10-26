@@ -11,13 +11,17 @@ import kotlin.math.roundToInt
  * The digits: each digit outline is mapped onto a box of whole pixels (its ink fills the box exactly). The hinting
  * of Android 4.4 gave the digits different heights (the "1" of "100" was 1 px taller than the "0"), and the outlines
  * of round digits have an overshoot that is less than 0.2 px at this size, so all digits get the same height (as a
- * hinted font does). The digit height is the fill height minus 2: 1 px free above and below in the fill, and the
- * same parity as the body, so the digits are exactly on the centre line of the body.
+ * hinted font does). The fill touches the outline (no gap), so the digits get 2 px more height. The digit height is
+ * the fill height minus 2: 1 px free above and below in the fill, and the same parity as the body, so the digits are
+ * exactly on the centre line of the body (status bar: 10 px digits with the 2 px outline, 8 px with the 3 px one).
  *
- * Charging: the bolt is on the right of the digits (as on macOS), 1 px taller than the digits at the top and at the
- * bottom (a pointed shape looks shorter), with 1 px between the digits and the bolt, as between the digits. The
- * digits keep the height that they have when the battery does not charge; only when the group is wider than the fill
- * is the height decreased (2 px at a time). "100" with the bolt fills the 21 px fill of the status bar exactly.
+ * Charging: the bolt is on the right of the digits (as on macOS), as tall as the digits (its flat tips need no
+ * overshoot), with 1 px between the digits and the bolt, as between the digits. Its arms are as thick as the digit
+ * stems (about 1.9 px at 10 px, 1.4 px at 8 px). The digits keep the height that they have when the battery does not
+ * charge. At 100 % on the charger the battery shows the bolt alone, in the centre (as with Battery Percentage off):
+ * "100" and the bolt do not fit (26 px in the 23 px fill of the 2 px outline), and the full fill says 100 %. When
+ * other digits and the bolt are wider than the fill, the bolt is not shown. Only when the digits alone are wider
+ * than the fill is the height decreased (2 px at a time).
  *
  * Colours: one digit colour, the theme's text colour, on the fill and on the empty part; the fill colours follow
  * it (see [fillColors]). So no part of a digit needs a second colour.
@@ -32,7 +36,7 @@ object BatteryLayout {
     /**
      * The battery in a view [width] x [height] with an outline of [outline] px. The ink ends 1 px before the right edge
      * of the view (as before). The shell is x 0..[shellRight], y 0..height; the nub is [nubLeft]..[nubRight] x
-     * [nubTop]..[nubBottom], on the centre line; the fill area is 1 px inside the outline.
+     * [nubTop]..[nubBottom], on the centre line; the fill area is the inside of the outline.
      */
     class Body(
         val outline: Int,
@@ -59,7 +63,7 @@ object BatteryLayout {
         val nubTop = (height - nubHeight) / 2
         return Body(
             outline, shellRight, shellRight, nubTop, right, nubTop + nubHeight,
-            outline + 1, outline + 1, shellRight - outline - 1, height - outline - 1
+            outline, outline, shellRight - outline, height - outline
         )
     }
 
@@ -86,12 +90,15 @@ object BatteryLayout {
         return IntArray(text.length) { i -> max(1, if (text[i] == '1') one else common) }
     }
 
-    /** Width of the bolt beside digits [digitHeight] tall (the bolt is [boltHeight]). */
+    /** Width of the bolt beside digits [digitHeight] tall (the bolt is [boltHeight]): 5 px at 10 px, 4 px at 8 px. */
     fun boltWidth(digitHeight: Int): Int = max(1, (boltHeight(digitHeight) / 2f).roundToInt())
 
-    fun boltHeight(digitHeight: Int): Int = digitHeight + 2
+    fun boltHeight(digitHeight: Int): Int = digitHeight
 
-    /** The digits (and the bolt when [bolt]) as one group: heights, widths and the full width with the gaps. */
+    /**
+     * The digits (and the bolt when [bolt]) as one group: heights, widths and the full width with the gaps.
+     * [boltWidth] 0 = no bolt (also when the bolt does not fit).
+     */
     class Group(val digitHeight: Int, val digitWidths: IntArray, val boltWidth: Int, val width: Int)
 
     fun group(text: String, inkRatios: FloatArray, fillWidth: Int, fillHeight: Int, bolt: Boolean): Group {
@@ -99,8 +106,9 @@ object BatteryLayout {
         while (true) {
             val widths = digitWidths(text, inkRatios, height)
             var width = widths.sum() + GAP * max(0, widths.size - 1)
-            val boltWidth = if (bolt) boltWidth(height) else 0
-            if (bolt) width += boltWidth + GAP
+            var boltWidth = if (bolt) boltWidth(height) else 0
+            if (boltWidth > 0 && width + GAP + boltWidth > fillWidth) boltWidth = 0
+            if (boltWidth > 0) width += boltWidth + GAP
             if (width <= fillWidth || height <= 4) return Group(height, widths, boltWidth, width)
             height -= 2
         }
@@ -137,6 +145,10 @@ object BatteryLayout {
         return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
     }
 
+    /** True when the battery shows only the bolt: charging, and Battery Percentage off or the level at 100 %. */
+    fun showsBoltAlone(level: Int, charging: Boolean, showPercentage: Boolean): Boolean =
+        charging && (!showPercentage || level >= 100)
+
     /** Left of the bolt: on the right of the digits of [group] (which start at [groupLeft]), after one gap. */
     fun boltLeft(groupLeft: Int, group: Group): Int =
         groupLeft + group.digitWidths.sum() + GAP * group.digitWidths.size
@@ -153,14 +165,19 @@ object BatteryLayout {
     private fun half(n: Int): Int = if (n >= 0) n / 2 else (n - 1) / 2
 
     /**
-     * The bolt in a box [width] x [height] from (0, 0): x, y of 8 points. Flat tips (2 px wide, 1 px when the bolt
-     * is narrower than 5 px) read as a bolt at this size; pointed tips gave a blurred diamond. The shape is the same
+     * The bolt in a box [width] x [height] from (0, 0): x, y of 8 points. Flat tips read as a bolt at this size;
+     * pointed tips gave a blurred diamond. The tip width sets the thickness of the arms: 2 px for 5 px wide (arm
+     * 1.9 px), 1.5 px for 4 px wide (arm 1.4 px), so the arms are as thick as the digit stems. The shape is the same
      * when turned 180°, so its centre is the centre of the box.
      */
     fun boltPoints(width: Int, height: Int): FloatArray {
         val w = width.toFloat()
         val h = height.toFloat()
-        val tip = if (width >= 5) 2f else 1f
+        val tip = when {
+            width >= 5 -> 2f
+            width == 4 -> 1.5f
+            else -> 1f
+        }
         val mid = h / 2f
         val jog = max(1, (height * 0.1f).roundToInt()).toFloat()
         return floatArrayOf(
@@ -176,8 +193,8 @@ object BatteryLayout {
     }
 
     /**
-     * Width of the bolt alone (Battery Percentage off), [height] tall: 0.6 of the height, with the parity of the fill,
-     * so that it is exactly in the centre.
+     * Width of the bolt alone (Battery Percentage off), [height] tall (the fill height minus 2): 0.6 of the height,
+     * with the parity of the fill, so that it is exactly in the centre.
      */
     fun soloBoltWidth(height: Int, fillWidth: Int): Int {
         var width = max(1, (height * 0.6f).roundToInt())

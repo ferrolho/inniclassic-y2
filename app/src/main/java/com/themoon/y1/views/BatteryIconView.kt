@@ -117,7 +117,7 @@ class BatteryIconView @JvmOverloads constructor(
         val lightText = BatteryLayout.isLight(color)
         val fill = BatteryLayout.fillColors(lightText, isCharging, level)
 
-        val strokeColor = if (ThemeManager.isClassicLightTheme()) 0xFF3C3C43.toInt() else 0xFF8E8E93.toInt()
+        val strokeColor = if (ThemeManager.isClassicLightTheme()) OUTLINE_LIGHT else OUTLINE_DARK
         paintStroke.color = strokeColor
         paintTerminal.color = strokeColor
         paintFill.color = fill[0]
@@ -144,11 +144,19 @@ class BatteryIconView @JvmOverloads constructor(
         val fillWidth = BatteryLayout.fillWidth(level, body.fillWidth)
         if (fillWidth > 0) {
             rectFill.set(fillLeft, body.fillTop.toFloat(), fillLeft + fillWidth, body.fillBottom.toFloat())
-            val r = maxOf(0f, pillRadius - 1f)
+            // The fill touches the outline: its corners follow the inner corners of the outline.
+            val r = maxOf(0f, pillRadius - outline / 2f)
             canvas.drawRoundRect(rectFill, r, r, paintFill)
         }
 
-        if (showPercentage) {
+        if (BatteryLayout.showsBoltAlone(level, isCharging, showPercentage)) {
+            // Charging with Battery Percentage off, or at 100 %: the bolt alone, in the centre.
+            val boltH = body.fillHeight - 2
+            val boltW = BatteryLayout.soloBoltWidth(boltH, body.fillWidth)
+            buildBoltPath(BatteryLayout.groupLeft(body.fillLeft, body.fillWidth, boltW), body.fillTop + 1, boltW, boltH)
+            paintBolt.color = if (lightText) color else 0xFF2E7D32.toInt()
+            canvas.drawPath(boltPath, paintBolt)
+        } else if (showPercentage) {
             try {
                 val tf = ThemeManager.getCustomFontBold()
                 if (tf != null) paintText.typeface = tf
@@ -163,9 +171,9 @@ class BatteryIconView @JvmOverloads constructor(
             // The bolt is on the right of the digits, as on macOS.
             buildDigitPath(text, left, top, group)
             boltPath.reset()
-            if (isCharging) {
+            if (group.boltWidth > 0) {
                 buildBoltPath(
-                    BatteryLayout.boltLeft(left, group), top - 1,
+                    BatteryLayout.boltLeft(left, group), top,
                     group.boltWidth, BatteryLayout.boltHeight(group.digitHeight)
                 )
             }
@@ -173,12 +181,6 @@ class BatteryIconView @JvmOverloads constructor(
             paintBolt.color = color
             canvas.drawPath(boltPath, paintBolt)
             canvas.drawPath(digitPath, paintText)
-        } else if (isCharging) {
-            val boltH = h - 2 * outline
-            val boltW = BatteryLayout.soloBoltWidth(boltH, body.fillWidth)
-            buildBoltPath(BatteryLayout.groupLeft(body.fillLeft, body.fillWidth, boltW), outline, boltW, boltH)
-            paintBolt.color = if (lightText) color else 0xFF2E7D32.toInt()
-            canvas.drawPath(boltPath, paintBolt)
         }
     }
 
@@ -240,5 +242,9 @@ class BatteryIconView @JvmOverloads constructor(
     private companion object {
         /** Text size of the outlines before they are fitted to the pixel boxes (large, so hinting has no effect). */
         const val REFERENCE_TEXT_SIZE = 100f
+
+        /** Outline and nub: Classic Light 8.1:1 on its bar (#DEDEDE), Classic Dark 7.7:1 on #1C1C1E. */
+        const val OUTLINE_LIGHT = 0xFF3C3C43.toInt()
+        const val OUTLINE_DARK = 0xFFAEAEB2.toInt()
     }
 }

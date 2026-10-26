@@ -23,13 +23,13 @@ class BatteryLayoutTest {
         assertEquals(29, thin.nubRight)
         assertEquals(5, thin.nubTop)
         assertEquals(11, thin.nubBottom)
-        // Fill 1 px inside the 2 px outline: x 3..24, y 3..13.
-        assertEquals(3, thin.fillLeft)
-        assertEquals(24, thin.fillRight)
-        assertEquals(3, thin.fillTop)
-        assertEquals(13, thin.fillBottom)
-        assertEquals(4, wide.fillLeft)
-        assertEquals(12, wide.fillBottom)
+        // The fill touches the 2 px outline: x 2..25, y 2..14.
+        assertEquals(2, thin.fillLeft)
+        assertEquals(25, thin.fillRight)
+        assertEquals(2, thin.fillTop)
+        assertEquals(14, thin.fillBottom)
+        assertEquals(3, wide.fillLeft)
+        assertEquals(13, wide.fillBottom)
         for (b in arrayOf(thin, wide)) {
             assertEquals(16, b.fillTop + b.fillBottom)
             assertEquals(16, b.nubTop + b.nubBottom)
@@ -49,8 +49,8 @@ class BatteryLayoutTest {
 
     @Test
     fun digitsHaveOneHeightCentredOnTheBody() {
-        // 8 px digits (rows 4..12) in the thin battery, 6 px (rows 5..11) in the wide one: centre line 8 in both.
-        for ((b, height) in listOf(thin to 8, wide to 6)) {
+        // 10 px digits (rows 3..13) in the thin battery, 8 px (rows 4..12) in the wide one: centre line 8 in both.
+        for ((b, height) in listOf(thin to 10, wide to 8)) {
             assertEquals(height, BatteryLayout.digitHeight(b.fillHeight))
             val top = BatteryLayout.digitTop(b.fillTop, b.fillHeight, height)
             assertEquals(16, 2 * top + height)
@@ -63,11 +63,12 @@ class BatteryLayoutTest {
         assertArrayEquals(intArrayOf(3, 5, 5), BatteryLayout.digitWidths("100", nimbus, 8))
         assertArrayEquals(intArrayOf(5, 5), BatteryLayout.digitWidths("86", nimbus, 8))
         assertArrayEquals(intArrayOf(3, 4, 4), BatteryLayout.digitWidths("100", nimbus, 6))
+        // At 10 px: 7 px digits, "1" 4 px.
+        assertArrayEquals(intArrayOf(4, 7, 7), BatteryLayout.digitWidths("100", nimbus, 10))
     }
 
     @Test
     fun chargingKeepsTheDigitHeightAtAllLevels() {
-        // The user's report: the charging digits were 7 px (0.5 px below the centre line) and the bolt 8.32 px.
         for (b in arrayOf(thin, wide)) {
             val normal = BatteryLayout.digitHeight(b.fillHeight)
             for (level in 0..100) {
@@ -75,13 +76,29 @@ class BatteryLayoutTest {
                     val g = BatteryLayout.group(level.toString(), nimbus, b.fillWidth, b.fillHeight, bolt)
                     assertEquals("level $level bolt $bolt", normal, g.digitHeight)
                     assertTrue("level $level bolt $bolt fits", g.width <= b.fillWidth)
+                    // The bolt is always shown while charging, except "100" in the thin battery.
+                    val dropped = b === thin && level == 100
+                    assertEquals("level $level bolt $bolt", bolt && !dropped, g.boltWidth > 0)
                 }
             }
         }
-        // "100" with the bolt fills the thin battery exactly: 5 + 1 + 3 + 1 + 5 + 1 + 5.
+        // "100" + bolt at 10 px is 4 + 1 + 7 + 1 + 7 + 1 + 5 = 26 px, wider than the 23 px fill: no bolt.
         val g = BatteryLayout.group("100", nimbus, thin.fillWidth, thin.fillHeight, true)
-        assertEquals(5, g.boltWidth)
-        assertEquals(21, g.width)
+        assertEquals(0, g.boltWidth)
+        assertEquals(20, g.width)
+        // "99" + bolt: 7 + 1 + 7 + 1 + 5 = 21 px.
+        assertEquals(21, BatteryLayout.group("99", nimbus, thin.fillWidth, thin.fillHeight, true).width)
+        // In the wide battery "100" + bolt fits at 8 px: 3 + 1 + 5 + 1 + 5 + 1 + 4 = 20 px in 21 px.
+        assertEquals(4, BatteryLayout.group("100", nimbus, wide.fillWidth, wide.fillHeight, true).boltWidth)
+    }
+
+    @Test
+    fun boltIsAloneAt100PercentWhenCharging() {
+        assertTrue(BatteryLayout.showsBoltAlone(100, true, true))
+        assertTrue(BatteryLayout.showsBoltAlone(63, true, false))
+        assertTrue(!BatteryLayout.showsBoltAlone(99, true, true))
+        assertTrue(!BatteryLayout.showsBoltAlone(100, false, true))
+        assertTrue(!BatteryLayout.showsBoltAlone(100, false, false))
     }
 
     @Test
@@ -89,6 +106,7 @@ class BatteryLayoutTest {
         for (b in arrayOf(thin, wide)) {
             for (level in 0..100) {
                 val g = BatteryLayout.group(level.toString(), nimbus, b.fillWidth, b.fillHeight, true)
+                if (g.boltWidth == 0) continue
                 val left = BatteryLayout.groupLeft(b.fillLeft, b.fillWidth, g.width)
                 val boltLeft = BatteryLayout.boltLeft(left, g)
                 // One gap after the last digit, and the bolt ends where the group ends.
@@ -97,8 +115,8 @@ class BatteryLayoutTest {
                 assertTrue("level $level inside the fill", left >= b.fillLeft && boltLeft + g.boltWidth <= b.fillRight)
             }
         }
-        // "100" at 8 px in the thin battery: digits from x 3 (3 + 1 + 5 + 1 + 5 px), 1 px gap, bolt 19..24 (5 px).
-        val g = BatteryLayout.group("100", nimbus, thin.fillWidth, thin.fillHeight, true)
+        // "99" at 10 px in the thin battery: digits from x 3 (7 + 1 + 7 px), 1 px gap, bolt 19..24 (5 px).
+        val g = BatteryLayout.group("99", nimbus, thin.fillWidth, thin.fillHeight, true)
         assertEquals(3, BatteryLayout.groupLeft(thin.fillLeft, thin.fillWidth, g.width))
         assertEquals(19, BatteryLayout.boltLeft(3, g))
     }
@@ -142,11 +160,16 @@ class BatteryLayoutTest {
     }
 
     @Test
-    fun groupBecomesSmallerOnlyWhenItDoesNotFit() {
-        // 21 px at 8 px does not fit in 19 px; at 6 px the group is 18 px.
+    fun groupBecomesSmallerOnlyWhenTheDigitsDoNotFit() {
+        // "100" + bolt at 8 px (20 px) does not fit in 19 px: the bolt goes, the digits (15 px) keep 8 px.
         val g = BatteryLayout.group("100", nimbus, 19, 10, true)
-        assertEquals(6, g.digitHeight)
-        assertEquals(18, g.width)
+        assertEquals(8, g.digitHeight)
+        assertEquals(0, g.boltWidth)
+        assertEquals(15, g.width)
+        // The digits alone (15 px at 8 px) do not fit in 14 px: at 6 px they are 13 px.
+        val small = BatteryLayout.group("100", nimbus, 14, 10, false)
+        assertEquals(6, small.digitHeight)
+        assertEquals(13, small.width)
     }
 
     @Test
@@ -176,19 +199,35 @@ class BatteryLayoutTest {
     }
 
     @Test
-    fun boltIsOnePixelTallerThanTheDigitsAtEachEnd() {
-        assertEquals(10, BatteryLayout.boltHeight(8))
-        assertEquals(5, BatteryLayout.boltWidth(8))
-        assertEquals(4, BatteryLayout.boltWidth(6))
+    fun boltIsAsTallAsTheDigits() {
+        assertEquals(10, BatteryLayout.boltHeight(10))
+        assertEquals(8, BatteryLayout.boltHeight(8))
+        assertEquals(5, BatteryLayout.boltWidth(10))
+        assertEquals(4, BatteryLayout.boltWidth(8))
+    }
+
+    /** Thickness of the upper arm of the bolt: distance of the top right point from the left edge of the arm. */
+    private fun armThickness(p: FloatArray): Double {
+        val dx = (p[0] - p[14]).toDouble(); val dy = (p[1] - p[15]).toDouble()
+        return Math.abs((p[2] - p[14]) * dy - (p[3] - p[15]) * dx) / Math.hypot(dx, dy)
+    }
+
+    @Test
+    fun boltArmsAreAsThickAsTheDigitStems() {
+        // Measured stems of Nimbus Sans Bold on these pixel boxes: 10 px "1" 1.8 px, "0" 2.0 px; 8 px 1.4 px.
+        val ten = armThickness(BatteryLayout.boltPoints(5, 10))
+        val eight = armThickness(BatteryLayout.boltPoints(4, 8))
+        assertTrue("10 px arm $ten", ten in 1.7..2.1)
+        assertTrue("8 px arm $eight", eight in 1.3..1.6)
     }
 
     @Test
     fun soloBoltIsExactlyCentred() {
-        // Battery Percentage off: 12 px tall in the thin battery (7 px wide), 10 px in the wide one (5 px).
-        assertEquals(7, BatteryLayout.soloBoltWidth(12, thin.fillWidth))
-        assertEquals(5, BatteryLayout.soloBoltWidth(10, wide.fillWidth))
+        // Battery Percentage off: the fill height minus 2; 10 px in the thin battery, 8 px in the wide one; both 5 px wide.
+        assertEquals(5, BatteryLayout.soloBoltWidth(10, thin.fillWidth))
+        assertEquals(5, BatteryLayout.soloBoltWidth(8, wide.fillWidth))
         for (b in arrayOf(thin, wide)) {
-            val w = BatteryLayout.soloBoltWidth(b.fillHeight + 2, b.fillWidth)
+            val w = BatteryLayout.soloBoltWidth(b.fillHeight - 2, b.fillWidth)
             assertEquals(0, (b.fillWidth - w) % 2)
         }
     }
