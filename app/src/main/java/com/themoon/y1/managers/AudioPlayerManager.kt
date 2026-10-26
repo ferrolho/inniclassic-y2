@@ -33,6 +33,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.core.TimeFormat
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -213,10 +214,7 @@ class AudioPlayerManager private constructor() {
                                     main.setupVisualizer()
 
                                     val duration = getDuration()
-                                    val remaining = (duration - getCurrentPosition()).coerceAtLeast(0)
-                                    val s = (remaining / 1000) % 60
-                                    val m = remaining / (1000 * 60)
-                                    main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
+                                    main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(getCurrentPosition().toInt(), duration.toInt())
                                     if (playWhenReady) {
                                         LastFmScrobbler.getInstance(main).onTrackStart(
                                             pendingScrobbleArtist,
@@ -624,6 +622,44 @@ class AudioPlayerManager private constructor() {
         MainActivity.instance?.updatePlayerUI()
     }
 
+    /**
+     * Stop: pause and go back to the start of the current track. The queue is kept.
+     * Audiobooks and podcasts keep their position (bookmark), so for them Stop only pauses.
+     */
+    fun stopMusic() {
+        val main = MainActivity.instance
+        val keepPosition = main != null && main.currentIndex in main.currentPlaylist.indices &&
+            tracksBookmark(main.currentPlaylist[main.currentIndex].absolutePath, main)
+        try {
+            if (isUsingLegacyPlayer && legacyPlayer != null) {
+                val player = legacyPlayer ?: return
+                if (player.isPlaying) {
+                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
+                    saveAudiobookBookmarkIfNeeded()
+                    player.pause()
+                }
+                if (!keepPosition) player.seekTo(0)
+            } else if (exoPlayer != null) {
+                val player = exoPlayer ?: return
+                if (player.playWhenReady) {
+                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
+                    saveAudiobookBookmarkIfNeeded()
+                    player.playWhenReady = false
+                }
+                if (!keepPosition) player.seekTo(0)
+            } else {
+                return
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AudioPlayerManager", "Failed to stop: ${e.message}")
+        }
+        isPlayingActive = false
+        stopPeriodicPositionSaver()
+        main?.isPausedByHand = true
+        savePlaybackState(sync = true)
+        main?.updatePlayerUI()
+    }
+
     fun nextTrack() {
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return
@@ -667,7 +703,7 @@ class AudioPlayerManager private constructor() {
         main.updatePlayerUI()
     }
 
-    fun seekRelative(offsetMs: Int) {
+    fun seekRelative(offsetMs: Int, savePosition: Boolean = true) {
         val currentPos = getCurrentPosition().toLong()
         val duration = getDuration().toLong()
         var targetPos = currentPos + offsetMs
@@ -679,7 +715,7 @@ class AudioPlayerManager private constructor() {
         } else if (exoPlayer != null) {
             exoPlayer?.seekTo(targetPos)
         }
-        savePlaybackPositionOnly(sync = true)
+        if (savePosition) savePlaybackPositionOnly(sync = true)
     }
 
     fun prepareMusicTrack(index: Int, initialSeekMs: Long = 0L, initialDurationMs: Long = 0L) {
@@ -743,23 +779,18 @@ class AudioPlayerManager private constructor() {
         }
 
         if (effectiveSeekMs > 0) {
-            val curS = (effectiveSeekMs / 1000) % 60
-            val curM = effectiveSeekMs / (1000 * 60)
-            main.tvPlayerTimeCurrent.text = String.format(Locale.US, "%02d:%02d", curM, curS)
+            main.tvPlayerTimeCurrent.text = TimeFormat.format(effectiveSeekMs)
             if (effectiveDurMs > 0) {
-                val remaining = (effectiveDurMs - effectiveSeekMs).coerceAtLeast(0)
-                val remS = (remaining / 1000) % 60
-                val remM = remaining / (1000 * 60)
-                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
-                main.playerProgress.progress = ((effectiveSeekMs * 100) / effectiveDurMs).toInt()
+                main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(effectiveSeekMs.toInt(), effectiveDurMs.toInt())
+                main.playerProgress.progress = ((effectiveSeekMs * 1000) / effectiveDurMs).toInt()
             } else {
-                main.tvPlayerTimeTotal.text = "00:00"
+                main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(0, 0)
                 main.playerProgress.progress = 0
             }
         } else {
             main.playerProgress.progress = 0
-            main.tvPlayerTimeCurrent.text = "00:00"
-            main.tvPlayerTimeTotal.text = "00:00"
+            main.tvPlayerTimeCurrent.text = "0:00"
+            main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(0, 0)
         }
 
         val ext = track.name.lowercase(Locale.US)
@@ -1001,10 +1032,7 @@ class AudioPlayerManager private constructor() {
                 main.setupVisualizer()
 
                 val duration = player.duration
-                val remaining = (duration - player.currentPosition).coerceAtLeast(0)
-                val s = (remaining / 1000) % 60
-                val m = remaining / (1000 * 60)
-                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
+                main.tvPlayerTimeTotal.text = main.playerController.rightTimeText(player.currentPosition, duration)
                 if (!main.isPausedByHand) {
                     LastFmScrobbler.getInstance(main).onTrackStart(
                         pendingScrobbleArtist,
@@ -1091,14 +1119,21 @@ class AudioPlayerManager private constructor() {
         }
     }
 
+    private fun isAudiobookPath(filePath: String, main: MainActivity): Boolean =
+        StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Audiobooks", ignoreCase = true) || main.isAudiobookLibraryMode
+
+    /** Audiobooks and podcasts keep a bookmark of their position. */
+    private fun tracksBookmark(filePath: String, main: MainActivity): Boolean =
+        isAudiobookPath(filePath, main) || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM")
+
     private fun saveAudiobookBookmarkIfNeeded() {
         try {
             val main = MainActivity.instance
             if (main != null && main.currentPlaylist.isNotEmpty()) {
                 if (main.currentIndex in 0 until main.currentPlaylist.size) {
                     val filePath = main.currentPlaylist[main.currentIndex].absolutePath
-                    val isAudiobook = StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Audiobooks", ignoreCase = true) || main.isAudiobookLibraryMode
-                    if (isAudiobook || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM")) {
+                    val isAudiobook = isAudiobookPath(filePath, main)
+                    if (tracksBookmark(filePath, main)) {
                         AudiobookManager.getInstance(main).saveBookmark(filePath, getCurrentPosition(), main.currentIndex)
                         val editor = main.prefs.edit()
                             .putInt("book_pos_$filePath", getCurrentPosition())
