@@ -161,7 +161,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 prefs.edit().putBoolean("usb_storage_prompt", value).apply()
             }
         }
-    var isAutoFetchEnabled: Boolean = true
     var is24HourFormat: Boolean = false
     var isTimeInTitleBar: Boolean = false
     var isShowBatteryPercentage: Boolean = false
@@ -860,10 +859,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     fun showPodcastActionDialog(title: String, audioUrl: String, imageUrl: String, channelTitle: String) {
         podcastController.showActionDialog(title, audioUrl, imageUrl, channelTitle)
-    }
-
-    fun fetchTrackInfoFromInternet(track: File, originalQuery: String, hasValidTags: Boolean, title: String?, artist: String?) {
-        // Tag lookups handled via MediaLibraryManager
     }
 
     fun turnOffScreen() {

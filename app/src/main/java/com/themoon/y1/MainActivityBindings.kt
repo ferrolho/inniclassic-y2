@@ -143,7 +143,6 @@ internal fun MainActivity.loadPreferences() {
     vibrationStrengthLevel = prefs.getInt("vibration_level", 1)
     isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
     isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
-    isAutoFetchEnabled = prefs.getBoolean("auto_fetch", true)
     is24HourFormat = prefs.getBoolean("is_24_hour_format", false)
     isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false)
     isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)

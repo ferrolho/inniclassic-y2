@@ -944,14 +944,6 @@ class AudioPlayerManager private constructor() {
                         main.ivPlayerBgBlur.setImageResource(0)
                         main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
-
-                        val hasValidTags = (!t.isNullOrBlank()) && (!a.isNullOrBlank() && !a.contains("Unknown"))
-                        val isAutoFetchEnabled = main.prefs.getBoolean("auto_fetch", true)
-
-                        if (!isPodcast && isAutoFetchEnabled) {
-                            val searchQuery = if (hasValidTags) "$a $t" else safeFileName.replace("-", " ").replace("_", " ")
-                            main.fetchTrackInfoFromInternet(track, searchQuery, hasValidTags, t, a)
-                        }
                     }
                 }
             }
