@@ -220,6 +220,8 @@ class EqualizerController(
             }
         }
         containerSettingsItems.addView(btnGraphicEq)
+        // Focus goes to the first row that can take it (not to a category header).
+        containerSettingsItems.requestFocus()
     }
 
     fun buildGraphicEqualizerUI() {
@@ -341,6 +343,7 @@ class EqualizerController(
         isProfileSelectorOpen = true
         containerSettingsItems.removeAllViews()
         createCategoryHeader("━ " + localize("SELECT PRESET / PROFILE") + " ━")
+        var currentRow: View? = null
 
         for (i in eqPresetNames.indices) {
             val presetId = "preset_$i"
@@ -353,6 +356,7 @@ class EqualizerController(
                 buildEqualizerSettingsUI()
             }
             containerSettingsItems.addView(row)
+            if (isCurrent) currentRow = row
         }
 
         val customList = prefs.getString("custom_eq_list", "") ?: ""
@@ -370,6 +374,7 @@ class EqualizerController(
                     buildEqualizerSettingsUI()
                 }
                 containerSettingsItems.addView(row)
+                if (isCurrent) currentRow = row
             }
         }
 
@@ -379,6 +384,7 @@ class EqualizerController(
             buildEqualizerSettingsUI()
         }
         containerSettingsItems.addView(btnBack)
+        (currentRow ?: containerSettingsItems).requestFocus()
     }
 
     private fun showSoftwareEqDialog() {
@@ -469,14 +475,6 @@ class EqualizerController(
             }
         }
 
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (isGraphicEqOpen || isProfileSelectorOpen) {
-                buildEqualizerSettingsUI()
-                return true
-            }
-            onNavigateBack()
-            return true
-        }
 
         return false
     }
