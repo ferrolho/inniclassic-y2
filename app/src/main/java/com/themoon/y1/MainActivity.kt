@@ -527,7 +527,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_SETTINGS -> ScreenState.Settings()
             STATE_BLUETOOTH -> ScreenState.Bluetooth
             STATE_WIFI -> ScreenState.Wifi
-            STATE_WIFI_KEYBOARD -> ScreenState.WifiKeyboard("")
             STATE_BRIGHTNESS -> ScreenState.Brightness
             STATE_STORAGE -> ScreenState.Storage
             STATE_WEBSERVER -> ScreenState.WebServer
