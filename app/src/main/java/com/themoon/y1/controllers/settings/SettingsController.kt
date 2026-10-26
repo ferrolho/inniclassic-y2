@@ -39,7 +39,7 @@ import java.util.Locale
 
 /**
  * Controller for Settings screens:
- * Root settings menu, Date & Time, Theme selector, Language selector, Vibration,
+ * Root settings menu, Date & Time, Theme selector, Language selector,
  * Background settings, Volume limit, Legal, Main Menu visibility, and Music Menu visibility.
  */
 class SettingsController(
@@ -75,6 +75,12 @@ class SettingsController(
     private val mainActivity: MainActivity? get() = activity as? MainActivity
 
     var currentSettingsDepth: Int = 0
+        set(value) {
+            val old = field
+            field = value
+            // Title: the group name on a group list, the row name on a row's sub-screen (SettingsGroups.kt)
+            groupPages.onDepthChanged(old, value, containerSettingsItems, lastSettingsFocusIndex, mainActivity?.tvStatusBarTitle, localize)
+        }
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
@@ -134,7 +140,12 @@ class SettingsController(
         }
     }
 
+    // Groups on the top level (SettingsGroups.kt). The rows stay in buildSettingsUI; the groups only move them.
+    private val groupPages = SettingsGroupPages()
+
     override fun onEnter(state: ScreenState) {
+        // From the main menu: start at the top level. From a row's screen (Bluetooth, Equalizer...): stay in its group.
+        if (mainActivity?.backTargetForUtility == MainActivity.STATE_MENU) groupPages.close()?.let { lastSettingsFocusIndex = it }
         buildSettingsUI()
     }
 
@@ -158,6 +169,12 @@ class SettingsController(
     override fun onBackPressed(): Boolean {
         if (isMenuReorderMode) {
             toggleMenuReorderMode()
+            return true
+        }
+        if (currentSettingsDepth == 0 && groupPages.isOpen) {
+            lastSettingsFocusIndex = groupPages.close() ?: 0
+            buildSettingsUI()
+            clickFeedback()
             return true
         }
         if (currentSettingsDepth == 0) {
@@ -457,12 +474,49 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnSound)
 
-        val btnVibrateMenu = createSettingRow(localize("Vibration"), "〉 ")
-        btnVibrateMenu.setOnClickListener {
+        // Settings → Controls: Button Vibration and Vibration Strength (no Vibration sub-screen).
+        // Vibration Strength is grey and the wheel skips it while Button Vibration is off.
+        var isVibrationEnabled = prefs.getBoolean("vibrate", true)
+        var vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
+        if (vibrationStrengthLevel !in VIBE_STRENGTH_NAMES.indices) vibrationStrengthLevel = 1
+        val btnVibration = createSettingRow(
+            localize("Button Vibration"),
+            onOff(isVibrationEnabled, localize)
+        )
+        val btnVibrationStrength = createSettingRow(
+            localize("Vibration Strength"),
+            localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
+        )
+        btnVibration.setOnClickListener {
+            isVibrationEnabled = !isVibrationEnabled
+            mainActivity?.isVibrationEnabled = isVibrationEnabled
             clickFeedback()
-            buildVibrationSettingsUI()
+            val tvStatus = btnVibration.getChildAt(1) as? TextView
+            tvStatus?.text = onOff(isVibrationEnabled, localize)
+            StatusBarSettings.setRowEnabled(btnVibrationStrength, isVibrationEnabled)
+            try {
+                prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit()
+                Settings.System.putInt(
+                    activity.contentResolver,
+                    Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                    if (isVibrationEnabled) 1 else 0
+                )
+            } catch (_: Exception) {}
         }
-        containerSettingsItems.addView(btnVibrateMenu)
+        btnVibrationStrength.setOnClickListener {
+            vibrationStrengthLevel = (vibrationStrengthLevel + 1) % VIBE_STRENGTH_NAMES.size
+            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
+            // The click vibration uses the new strength: a preview
+            clickFeedback()
+            val tvStatus = btnVibrationStrength.getChildAt(1) as? TextView
+            tvStatus?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
+            try {
+                prefs.edit().putInt("vibrate_strength", vibrationStrengthLevel).commit()
+            } catch (_: Exception) {}
+        }
+        containerSettingsItems.addView(btnVibration)
+        containerSettingsItems.addView(btnVibrationStrength)
+        StatusBarSettings.setRowEnabled(btnVibrationStrength, isVibrationEnabled)
 
         var isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
         val btnScreenOffCtrl = createSettingRow(
@@ -741,6 +795,9 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBatteryPct)
 
+        // Settings → Status Bar (SettingsGroups.kt): Clock, Battery, Battery Percentage
+        addStatusBarRows(btnBatteryPct)
+
         val btnStorageMenu = createSettingRow(localize("About"), "〉 ")
         btnStorageMenu.setOnClickListener {
             clickFeedback()
@@ -810,6 +867,13 @@ class SettingsController(
                 .show()
         }
         containerSettingsItems.addView(btnResetAll)
+
+        groupPages.arrange(containerSettingsItems, createSettingRow, clickFeedback, localize, mainActivity?.tvStatusBarTitle) {
+            // A row's screen (Bluetooth, Equalizer...) comes back into this group (see onEnter)
+            mainActivity?.backTargetForUtility = MainActivity.STATE_SETTINGS
+            lastSettingsFocusIndex = 0
+            buildSettingsUI()
+        }
 
         val sv = containerSettingsItems.parent as? ScrollView
         sv?.post {
@@ -950,53 +1014,6 @@ class SettingsController(
         }
     }
 
-    private fun buildVibrationSettingsUI() {
-        currentSettingsDepth = 1
-        containerSettingsItems.removeAllViews()
-
-        var isVibrationEnabled = prefs.getBoolean("vibrate", true)
-        val btnToggle = createSettingRow(
-            localize("Vibration Power"),
-            onOff(isVibrationEnabled, localize)
-        )
-        btnToggle.setOnClickListener {
-            isVibrationEnabled = !isVibrationEnabled
-            clickFeedback()
-            val tv = btnToggle.getChildAt(1) as? TextView
-            tv?.text = onOff(isVibrationEnabled, localize)
-            try {
-                prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit()
-                Settings.System.putInt(
-                    activity.contentResolver,
-                    Settings.System.HAPTIC_FEEDBACK_ENABLED,
-                    if (isVibrationEnabled) 1 else 0
-                )
-            } catch (_: Exception) {}
-        }
-        containerSettingsItems.addView(btnToggle)
-
-        var vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
-        if (vibrationStrengthLevel >= VIBE_STRENGTH_NAMES.size) vibrationStrengthLevel = 1
-        val btnStrength = createSettingRow(
-            localize("Vibration Strength"),
-            localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
-        )
-        btnStrength.setOnClickListener {
-            vibrationStrengthLevel = (vibrationStrengthLevel + 1) % 3
-            clickFeedback()
-            val tv = btnStrength.getChildAt(1) as? TextView
-            tv?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
-            try {
-                prefs.edit().putInt("vibrate_strength", vibrationStrengthLevel).commit()
-            } catch (_: Exception) {}
-        }
-        containerSettingsItems.addView(btnStrength)
-
-        if (containerSettingsItems.childCount > 0) {
-            containerSettingsItems.getChildAt(0)?.requestFocus()
-        }
-    }
-
     fun buildBackgroundSettingsUI() {
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
@@ -1042,7 +1059,32 @@ class SettingsController(
             buildDateTimeUI()
         }
         containerSettingsItems.addView(rowFormat)
+        addDateTimeValueRows()
+    }
 
+    /**
+     * Settings → Status Bar: the Battery row (show or hide the battery icon) and the Clock row. Battery Percentage
+     * ([batteryPercentRow], made in buildSettingsUI) is grey and the wheel skips it while the battery icon is hidden.
+     */
+    private fun addStatusBarRows(batteryPercentRow: LinearLayout) {
+        val showBattery = StatusBarSettings.isBatteryShown(prefs)
+        val btnBattery = createSettingRow(localize("Battery"), onOff(showBattery, localize))
+        btnBattery.setOnClickListener {
+            clickFeedback()
+            StatusBarSettings.setBatteryShown(mainActivity, prefs, !StatusBarSettings.isBatteryShown(prefs))
+            // Again, for the state of Battery Percentage (the focus stays on this row)
+            buildSettingsUI()
+        }
+        containerSettingsItems.addView(btnBattery)
+        StatusBarSettings.setRowEnabled(batteryPercentRow, showBattery)
+        addClockRow()
+    }
+
+    /**
+     * The clock in the status bar ("Time in Title"), shown as Settings → Status Bar → Clock.
+     * Before the Settings groups, it was a row of Date & Time.
+     */
+    private fun addClockRow() {
         var isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", true)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
@@ -1057,7 +1099,10 @@ class SettingsController(
             tvStatus?.text = onOff(isTimeInTitleBar, localize)
         }
         containerSettingsItems.addView(rowTitleClock)
+    }
 
+    /** The rows of Date & Time after Time Format. */
+    private fun addDateTimeValueRows() {
         val rowYear = createSettingRow(localize("Year"), dtYear.toString())
         rowYear.setOnClickListener {
             clickFeedback()
@@ -1478,6 +1523,7 @@ class SettingsController(
                 .remove("is_24h_format")
                 .remove("time_in_title_bar")
                 .remove("show_battery_percentage")
+                .remove(StatusBarSettings.KEY_SHOW_BATTERY)
                 .remove("volume_limit_max")
                 .remove(ToggleStyle.PREF_KEY)
                 .remove("sound_check_enabled")
@@ -1506,6 +1552,7 @@ class SettingsController(
         mainActivity?.isTimeInTitleBar = false
         mainActivity?.is24HourFormat = false
         mainActivity?.batteryIconView?.setShowPercentage(false)
+        mainActivity?.let { StatusBarSettings.applyBattery(it) }
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
         buildSettingsUI()
