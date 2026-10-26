@@ -36,6 +36,7 @@ object UsbMassStorageController {
     private fun call(cmd: String): String {
         val out = ExternalSdMountMonitor.runSuTimed(cmd)
         Log.i(TAG, "$cmd -> $out")
+        com.themoon.y1.eventlog.EventLog.usbCommand(cmd, out)
         return out
     }
 
