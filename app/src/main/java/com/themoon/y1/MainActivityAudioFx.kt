@@ -1,6 +1,7 @@
 package com.themoon.y1
 
 import android.media.audiofx.Visualizer
+import com.themoon.y1.controllers.player.PlayerController
 import com.themoon.y1.managers.AudioPlayerManager
 
 internal fun MainActivity.setupVisualizerInternal() {
@@ -13,7 +14,9 @@ internal fun MainActivity.setupVisualizerInternal() {
             captureSize = Visualizer.getCaptureSizeRange()[1]
             setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                 override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
-                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {}
+                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                    (getActiveScreenController() as? PlayerController)?.updateVisualizer(fft)
+                }
             }, Visualizer.getMaxCaptureRate() / 2, false, true)
             if (isVisualizerShowing) setEnabled(true)
         }
@@ -22,7 +25,7 @@ internal fun MainActivity.setupVisualizerInternal() {
 
 internal fun MainActivity.toggleVisualizerInternal() {
     isVisualizerShowing = !isVisualizerShowing
-    audioVisualizer?.setEnabled(isVisualizerShowing)
+    playerController.refreshVisualizerState()
 }
 
 internal fun MainActivity.rebootAudioEngineInternal() {
