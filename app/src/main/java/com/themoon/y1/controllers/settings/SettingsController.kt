@@ -32,6 +32,7 @@ import com.themoon.y1.managers.LastFmScrobbler
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.TablerIcons
+import com.themoon.y1.views.ToggleStyle
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
@@ -530,6 +531,17 @@ class SettingsController(
             buildThemeSelectorUI()
         }
         containerSettingsItems.addView(btnTheme)
+
+        var isSwitchToggleStyle = ToggleStyle.isSwitch(activity)
+        val btnToggleStyle = createSettingRow(localize("Toggle Style"), ToggleStyle.label(isSwitchToggleStyle, localize))
+        btnToggleStyle.setOnClickListener {
+            clickFeedback()
+            isSwitchToggleStyle = !isSwitchToggleStyle
+            ToggleStyle.setSwitch(activity, isSwitchToggleStyle)
+            val tvStatus = btnToggleStyle.getChildAt(1) as? TextView
+            tvStatus?.text = ToggleStyle.label(isSwitchToggleStyle, localize)
+        }
+        containerSettingsItems.addView(btnToggleStyle)
 
         val btnMenuVisibility = createSettingRow(localize("Main Menu Items"), localize("Edit") + " 〉")
         btnMenuVisibility.setOnClickListener {
@@ -1467,6 +1479,7 @@ class SettingsController(
                 .remove("time_in_title_bar")
                 .remove("show_battery_percentage")
                 .remove("volume_limit_max")
+                .remove(ToggleStyle.PREF_KEY)
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
                 .remove("album_tilt_enabled")
@@ -1482,6 +1495,7 @@ class SettingsController(
         } catch (_: Exception) {}
 
         AudioEffectManager.getInstance().applySoundCheck()
+        ToggleStyle.reload(activity)
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
