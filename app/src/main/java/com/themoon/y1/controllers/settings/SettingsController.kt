@@ -843,8 +843,8 @@ class SettingsController(
         val btnEng = createTablerListButton(
             if (isEngSelected) TablerIcons.CHECK else null,
             "English (Default)",
-            if (isEngSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-            if (isEngSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+            ThemeManager.getTextColorPrimary(),
+            ThemeManager.getListButtonFocusedTextColor()
         )
         btnEng.setOnClickListener {
             clickFeedback()
@@ -859,8 +859,8 @@ class SettingsController(
             val btnLang = createTablerListButton(
                 if (isSelected) TablerIcons.CHECK else null,
                 f.name.replace(".json", ""),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
             )
             btnLang.setOnClickListener {
                 clickFeedback()
@@ -890,8 +890,8 @@ class SettingsController(
             val btn = createTablerListButton(
                 icon,
                 localize(theme.name),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
             )
             btn.setOnClickListener {
                 clickFeedback()
