@@ -474,14 +474,6 @@ class EqualizerController(
             }
         }
 
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (isGraphicEqOpen || isProfileSelectorOpen) {
-                buildEqualizerSettingsUI()
-                return true
-            }
-            onNavigateBack()
-            return true
-        }
 
         return false
     }
