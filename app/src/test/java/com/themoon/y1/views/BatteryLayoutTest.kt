@@ -85,6 +85,63 @@ class BatteryLayoutTest {
     }
 
     @Test
+    fun boltIsOnTheRightOfTheDigitsAndTheGroupStaysCentred() {
+        for (b in arrayOf(thin, wide)) {
+            for (level in 0..100) {
+                val g = BatteryLayout.group(level.toString(), nimbus, b.fillWidth, b.fillHeight, true)
+                val left = BatteryLayout.groupLeft(b.fillLeft, b.fillWidth, g.width)
+                val boltLeft = BatteryLayout.boltLeft(left, g)
+                // One gap after the last digit, and the bolt ends where the group ends.
+                assertEquals(left + g.digitWidths.sum() + BatteryLayout.GAP * (g.digitWidths.size - 1) + 1, boltLeft)
+                assertEquals(left + g.width, boltLeft + g.boltWidth)
+                assertTrue("level $level inside the fill", left >= b.fillLeft && boltLeft + g.boltWidth <= b.fillRight)
+            }
+        }
+        // "100" at 8 px in the thin battery: digits from x 3 (3 + 1 + 5 + 1 + 5 px), 1 px gap, bolt 19..24 (5 px).
+        val g = BatteryLayout.group("100", nimbus, thin.fillWidth, thin.fillHeight, true)
+        assertEquals(3, BatteryLayout.groupLeft(thin.fillLeft, thin.fillWidth, g.width))
+        assertEquals(19, BatteryLayout.boltLeft(3, g))
+    }
+
+    private fun contrast(a: Int, b: Int): Double {
+        val la = BatteryLayout.luminance(a)
+        val lb = BatteryLayout.luminance(b)
+        return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)
+    }
+
+    @Test
+    fun oneDigitColourReadsOnEveryFill() {
+        // Classic Light text 1C1C1E; Classic Dark text white (and F2F2F7, a slightly darker white).
+        val texts = intArrayOf(0xFF1C1C1E.toInt(), 0xFFFFFFFF.toInt(), 0xFFF2F2F7.toInt())
+        assertTrue(!BatteryLayout.isLight(texts[0]))
+        assertTrue(BatteryLayout.isLight(texts[1]) && BatteryLayout.isLight(texts[2]))
+        for (text in texts) {
+            for (charging in booleanArrayOf(false, true)) {
+                for (level in intArrayOf(0, 1, 9, 10, 20, 21, 35, 63, 99, 100)) {
+                    for (fill in BatteryLayout.fillColors(BatteryLayout.isLight(text), charging, level)) {
+                        assertTrue(
+                            "text ${Integer.toHexString(text)} fill ${Integer.toHexString(fill)}",
+                            contrast(text, fill) >= 3.6
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun fillIsRedOnlyAtALowLevelWhenNotCharging() {
+        for (light in booleanArrayOf(false, true)) {
+            val low = BatteryLayout.fillColors(light, false, 20)
+            assertEquals(low[0], low[1]) // flat
+            assertTrue((low[0] shr 16 and 0xFF) > 2 * (low[0] shr 8 and 0xFF)) // red
+            val normal = BatteryLayout.fillColors(light, false, 21)
+            val charging = BatteryLayout.fillColors(light, true, 5)
+            for (c in normal + charging) assertTrue((c shr 8 and 0xFF) > (c shr 16 and 0xFF)) // green
+        }
+    }
+
+    @Test
     fun groupBecomesSmallerOnlyWhenItDoesNotFit() {
         // 21 px at 8 px does not fit in 19 px; at 6 px the group is 18 px.
         val g = BatteryLayout.group("100", nimbus, 19, 10, true)

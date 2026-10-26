@@ -2,7 +2,6 @@ package com.themoon.y1.views
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -114,28 +113,17 @@ class BatteryIconView @JvmOverloads constructor(
 
         val pillRadius = h * 0.12f
 
-        var currentColor = color
-        if (isCharging) {
-            currentColor = Color.parseColor("#4CAF50")
-        } else if (level <= 20) {
-            currentColor = Color.parseColor("#F44336")
-        }
+        // One digit colour (the theme's text colour); the fill colours follow it (see BatteryLayout.fillColors).
+        val lightText = BatteryLayout.isLight(color)
+        val fill = BatteryLayout.fillColors(lightText, isCharging, level)
 
         val strokeColor = if (ThemeManager.isClassicLightTheme()) 0xFF3C3C43.toInt() else 0xFF8E8E93.toInt()
         paintStroke.color = strokeColor
         paintTerminal.color = strokeColor
-        paintFill.color = currentColor
-
-        if (level <= 20 && !isCharging) {
-            paintFill.shader = null
-        } else {
-            val topColor = if (isCharging) "#8FE070" else "#D0E9B7"
-            val bottomColor = if (isCharging) "#4CAF50" else "#7CB342"
-            paintFill.shader = LinearGradient(
-                0f, 0f, 0f, h.toFloat(),
-                Color.parseColor(topColor), Color.parseColor(bottomColor), Shader.TileMode.CLAMP
-            )
-        }
+        paintFill.color = fill[0]
+        paintFill.shader = if (fill[0] == fill[1]) null else LinearGradient(
+            0f, 0f, 0f, h.toFloat(), fill[0], fill[1], Shader.TileMode.CLAMP
+        )
 
         // The stroke is centred on the shell edge, so an inset of half the outline puts both of its sides on whole pixels.
         val outline = if (thinOutline) 2 else 3
@@ -169,36 +157,27 @@ class BatteryIconView @JvmOverloads constructor(
 
             val text = level.toString()
             val group = BatteryLayout.group(text, inkRatios(), body.fillWidth, body.fillHeight, isCharging)
-            var x = BatteryLayout.groupLeft(body.fillLeft, body.fillWidth, group.width)
+            val left = BatteryLayout.groupLeft(body.fillLeft, body.fillWidth, group.width)
             val top = BatteryLayout.digitTop(body.fillTop, body.fillHeight, group.digitHeight)
 
+            // The bolt is on the right of the digits, as on macOS.
+            buildDigitPath(text, left, top, group)
             boltPath.reset()
             if (isCharging) {
-                buildBoltPath(x, top - 1, group.boltWidth, BatteryLayout.boltHeight(group.digitHeight))
-                x += group.boltWidth + BatteryLayout.GAP
+                buildBoltPath(
+                    BatteryLayout.boltLeft(left, group), top - 1,
+                    group.boltWidth, BatteryLayout.boltHeight(group.digitHeight)
+                )
             }
-            buildDigitPath(text, x, top, group)
-
             paintText.color = color
             paintBolt.color = color
             canvas.drawPath(boltPath, paintBolt)
             canvas.drawPath(digitPath, paintText)
-
-            if (fillWidth > 0) {
-                val filledColor = if (isCharging || level > 20) 0xFF1C1C1E.toInt() else Color.WHITE
-                paintText.color = filledColor
-                paintBolt.color = filledColor
-                canvas.save()
-                canvas.clipRect(fillLeft, 0f, fillLeft + fillWidth, h.toFloat())
-                canvas.drawPath(boltPath, paintBolt)
-                canvas.drawPath(digitPath, paintText)
-                canvas.restore()
-            }
         } else if (isCharging) {
             val boltH = h - 2 * outline
             val boltW = BatteryLayout.soloBoltWidth(boltH, body.fillWidth)
             buildBoltPath(BatteryLayout.groupLeft(body.fillLeft, body.fillWidth, boltW), outline, boltW, boltH)
-            paintBolt.color = 0xFF2E7D32.toInt()
+            paintBolt.color = if (lightText) color else 0xFF2E7D32.toInt()
             canvas.drawPath(boltPath, paintBolt)
         }
     }

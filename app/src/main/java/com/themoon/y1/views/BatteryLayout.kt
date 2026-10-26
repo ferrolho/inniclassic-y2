@@ -14,9 +14,13 @@ import kotlin.math.roundToInt
  * hinted font does). The digit height is the fill height minus 2: 1 px free above and below in the fill, and the
  * same parity as the body, so the digits are exactly on the centre line of the body.
  *
- * Charging: the bolt is 1 px taller than the digits at the top and at the bottom (a pointed shape looks shorter), with
- * 1 px between the bolt and the digits, as between the digits. The digits keep the height that they have when the
- * battery does not charge; only when the group is wider than the fill is the height decreased (2 px at a time).
+ * Charging: the bolt is on the right of the digits (as on macOS), 1 px taller than the digits at the top and at the
+ * bottom (a pointed shape looks shorter), with 1 px between the digits and the bolt, as between the digits. The
+ * digits keep the height that they have when the battery does not charge; only when the group is wider than the fill
+ * is the height decreased (2 px at a time). "100" with the bolt fills the 21 px fill of the status bar exactly.
+ *
+ * Colours: one digit colour, the theme's text colour, on the fill and on the empty part; the fill colours follow
+ * it (see [fillColors]). So no part of a digit needs a second colour.
  *
  * No Android dependencies, so the unit tests can check the maths.
  */
@@ -101,6 +105,41 @@ object BatteryLayout {
             height -= 2
         }
     }
+
+    /**
+     * Fill colours (ARGB, top and bottom of the gradient; the same for a flat fill). The digits and the bolt have one
+     * colour, the theme's text colour, on the fill and on the empty part. So the fill must read with that colour:
+     * dark text (Classic Light) gets the light fills, light text (Classic Dark: white) gets darker fills. Each pair
+     * has a contrast of at least 3.7:1 with its text colour (WCAG), and the fills still read as green and red.
+     * Low level (20 % or less, not charging): flat red.
+     */
+    fun fillColors(lightText: Boolean, charging: Boolean, level: Int): IntArray = when {
+        charging -> if (lightText) intArrayOf(0xFF388E3C.toInt(), 0xFF2E7D32.toInt())
+        else intArrayOf(0xFF8FE070.toInt(), 0xFF4CAF50.toInt())
+        level <= LOW_LEVEL -> if (lightText) intArrayOf(0xFFC62828.toInt(), 0xFFC62828.toInt())
+        else intArrayOf(0xFFF44336.toInt(), 0xFFF44336.toInt())
+        else -> if (lightText) intArrayOf(0xFF4E8A2E.toInt(), 0xFF2F6B1A.toInt())
+        else intArrayOf(0xFFD0E9B7.toInt(), 0xFF7CB342.toInt())
+    }
+
+    /** The red fill up to this level, when the battery does not charge. */
+    const val LOW_LEVEL = 20
+
+    /** True when [argb] is a light colour (WCAG relative luminance above 0.5), for example white text. */
+    fun isLight(argb: Int): Boolean = luminance(argb) > 0.5
+
+    /** WCAG relative luminance of [argb] (alpha ignored). */
+    fun luminance(argb: Int): Double {
+        fun channel(shift: Int): Double {
+            val c = ((argb shr shift) and 0xFF) / 255.0
+            return if (c <= 0.04045) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+    }
+
+    /** Left of the bolt: on the right of the digits of [group] (which start at [groupLeft]), after one gap. */
+    fun boltLeft(groupLeft: Int, group: Group): Int =
+        groupLeft + group.digitWidths.sum() + GAP * group.digitWidths.size
 
     /** Left of a group [groupWidth] wide, centred in the fill; an odd free pixel goes to the right. */
     fun groupLeft(fillLeft: Int, fillWidth: Int, groupWidth: Int): Int =
