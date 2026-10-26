@@ -150,7 +150,6 @@ internal fun MainActivity.loadPreferences() {
     isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq", false)
-    currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
     currentSystemBrightness = prefs.getInt("brightness_level", 255)
 
     eqPresetNames.clear()
