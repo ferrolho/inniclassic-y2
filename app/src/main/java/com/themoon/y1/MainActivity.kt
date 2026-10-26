@@ -1101,7 +1101,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
                     if (bondState == BluetoothDevice.BOND_BONDED) {
                         val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                        if (device != null) {
+                        // Connect audio only when the Y2 started the pairing. A car that started it
+                        // connects its profiles itself; a second connection at the same time fails.
+                        if (device != null && bluetoothController.takeY2BondRequest(device)) {
                             bluetoothController.connectBluetoothAudio(device)
                         }
                     }

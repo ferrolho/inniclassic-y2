@@ -25,6 +25,7 @@ import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.BluetoothDiscoverableLogic
 import com.themoon.y1.managers.BluetoothDiscoverableManager
+import com.themoon.y1.managers.BluetoothPairingAgent
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
@@ -61,6 +62,16 @@ class BluetoothController(
         private set
     var isBtConnectingState = false
 
+    /** Device that the Y2 asked to pair with (Connect on an available device); null after its bond. */
+    private var bondRequestedAddress: String? = null
+
+    /** True once for the device that the Y2 asked to pair with: then the Y2 connects its audio. */
+    fun takeY2BondRequest(device: BluetoothDevice): Boolean {
+        if (bondRequestedAddress != device.address) return false
+        bondRequestedAddress = null
+        return true
+    }
+
     // Bluetooth proxy reference
     private var globalA2dp: BluetoothProfile? = null
 
@@ -96,7 +107,7 @@ class BluetoothController(
         }
         btnScanBt.setOnClickListener {
             clickFeedback()
-            startBluetoothScan()
+            startBluetoothScan(userAction = true)
         }
         BluetoothDiscoverableManager.init(activity)
     }
@@ -138,8 +149,12 @@ class BluetoothController(
         } catch (ignored: Exception) {}
     }
 
+    /**
+     * Rebuild the device list and start a device scan. A scan that the user did not ask for does not
+     * start while a pairing runs or a car connects after a bond (see [BluetoothPairingAgent.scanAllowed]).
+     */
     @SuppressLint("MissingPermission")
-    fun startBluetoothScan() {
+    fun startBluetoothScan(userAction: Boolean = false) {
         var currentFocusIndex = 0
         for (i in 0 until containerBtItems.childCount) {
             if (containerBtItems.getChildAt(i).hasFocus()) {
@@ -250,9 +265,14 @@ class BluetoothController(
         }
         containerBtItems.addView(tvAvailable)
 
-        if (ba.isDiscovering) {
+        if (!userAction && !BluetoothPairingAgent.scanAllowed()) {
+            if (ba.isDiscovering) ba.cancelDiscovery()
+            btnScanBt.text = localize("Scan Complete (Retry)")
+        } else if (ba.isDiscovering) {
             ba.cancelDiscovery()
-            Handler(Looper.getMainLooper()).postDelayed({ ba.startDiscovery() }, 500)
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (userAction || BluetoothPairingAgent.scanAllowed()) ba.startDiscovery()
+            }, 500)
         } else {
             ba.startDiscovery()
         }
@@ -469,6 +489,7 @@ class BluetoothController(
 
         if (targetDevice.bondState != BluetoothDevice.BOND_BONDED) {
             Toast.makeText(activity, localize("Pairing with ") + targetDevice.name + "...", Toast.LENGTH_SHORT).show()
+            bondRequestedAddress = targetDevice.address
             try {
                 targetDevice.javaClass.getMethod("createBond").invoke(targetDevice)
             } catch (ignored: Exception) {}

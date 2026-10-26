@@ -34,9 +34,12 @@ object BluetoothPairingPolicy {
     enum class Action {
         /** Legacy pairing: send a fixed PIN. */
         SEND_PIN,
-        /** Secure Simple Pairing: accept (numeric comparison, Just Works, OOB). */
+        /** Secure Simple Pairing without a code: accept (Just Works, OOB). */
         CONFIRM,
-        /** The other device types the passkey that we show; we also accept. */
+        /**
+         * Show the code and accept: numeric comparison (the other device shows the same code and
+         * asks its user to compare), or the other device types the passkey that we show.
+         */
         SHOW_CODE_AND_CONFIRM,
         /** The other device types the PIN that we show; we send the same PIN. */
         SHOW_CODE_AND_SEND_PIN,
@@ -46,11 +49,23 @@ object BluetoothPairingPolicy {
 
     fun actionFor(variant: Int): Action = when (variant) {
         VARIANT_PIN -> Action.SEND_PIN
-        VARIANT_PASSKEY_CONFIRMATION, VARIANT_CONSENT, VARIANT_OOB_CONSENT -> Action.CONFIRM
-        VARIANT_DISPLAY_PASSKEY -> Action.SHOW_CODE_AND_CONFIRM
+        VARIANT_CONSENT, VARIANT_OOB_CONSENT -> Action.CONFIRM
+        VARIANT_PASSKEY_CONFIRMATION, VARIANT_DISPLAY_PASSKEY -> Action.SHOW_CODE_AND_CONFIRM
         VARIANT_DISPLAY_PIN -> Action.SHOW_CODE_AND_SEND_PIN
         else -> Action.CANCEL
     }
+
+    /** Text above the code: compare it (numeric comparison) or type it (display variants). */
+    fun codePrompt(variant: Int): String =
+        if (variant == VARIANT_PASSKEY_CONFIRMATION) "Make sure that this code shows on"
+        else "Type this code on"
+
+    /**
+     * How long other Bluetooth work (a device scan) must wait after a pairing or connection event.
+     * A scan during pairing, or while a car connects its profiles, makes the attempt fail.
+     */
+    const val QUIET_PAIRING_MS = 40_000L
+    const val QUIET_AFTER_BOND_MS = 15_000L
 
     fun pinForAttempt(attempt: Int): String? = PINS.getOrNull(attempt)
 

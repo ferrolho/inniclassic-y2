@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 import com.themoon.y1.managers.BluetoothPairingPolicy.Action
@@ -23,6 +24,9 @@ import com.themoon.y1.managers.BluetoothPairingPolicy.FailureOutcome
  * This receiver has a higher priority than the Settings receiver, answers the request
  * (setPin / setPairingConfirmation need only BLUETOOTH_ADMIN in the Y2 Bluetooth.apk), and
  * aborts the broadcast, so the Settings pairing dialog does not open.
+ *
+ * While a pairing runs, and for a short time after it, [scanAllowed] is false: a device scan at
+ * that time makes the pairing (or the first profile connections of a car) fail.
  */
 class BluetoothPairingAgent(
     private val activity: Activity,
@@ -41,6 +45,8 @@ class BluetoothPairingAgent(
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 BluetoothDevice.ACTION_PAIRING_REQUEST -> {
+                    quietFor(BluetoothPairingPolicy.QUIET_PAIRING_MS)
+                    stopScan()
                     onPairingRequest(intent)
                     if (isOrderedBroadcast) abortBroadcast()
                 }
@@ -88,21 +94,19 @@ class BluetoothPairingAgent(
                     Log.w(TAG, "setPin($pin) for $address: $ok")
                 }
                 Action.CONFIRM -> {
-                    val code = BluetoothPairingPolicy.formatCode(variant, key)
-                    if (code != null && variant == BluetoothPairingPolicy.VARIANT_PASSKEY_CONFIRMATION) {
-                        toast(localize("Pairing code: ") + code)
-                    }
                     val ok = device.setPairingConfirmation(true)
                     Log.w(TAG, "setPairingConfirmation(true) for $address: $ok")
                 }
                 Action.SHOW_CODE_AND_CONFIRM -> {
-                    showCode(device, BluetoothPairingPolicy.formatCode(variant, key))
+                    // Numeric comparison: the Y2 cannot compare, so it accepts at once and shows the
+                    // code; the user compares it on the other device (car), which also asks to confirm.
+                    showCode(device, variant, BluetoothPairingPolicy.formatCode(variant, key))
                     val ok = device.setPairingConfirmation(true)
                     Log.w(TAG, "setPairingConfirmation(true) for $address: $ok")
                 }
                 Action.SHOW_CODE_AND_SEND_PIN -> {
                     val code = BluetoothPairingPolicy.formatCode(variant, key)
-                    showCode(device, code)
+                    showCode(device, variant, code)
                     if (code != null) {
                         val ok = device.setPin(code.toByteArray())
                         Log.w(TAG, "setPin(shown code) for $address: $ok")
@@ -126,8 +130,14 @@ class BluetoothPairingAgent(
         val state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
         val previous = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, BluetoothDevice.ERROR)
         val address = device.address
-        if (state == BluetoothDevice.BOND_BONDING) return
+        if (state == BluetoothDevice.BOND_BONDING) {
+            quietFor(BluetoothPairingPolicy.QUIET_PAIRING_MS)
+            stopScan()
+            return
+        }
         dismissCode()
+        // After a bond, a car connects its profiles: no scan for some seconds. After a failure: none.
+        quietFor(if (state == BluetoothDevice.BOND_BONDED) BluetoothPairingPolicy.QUIET_AFTER_BOND_MS else 0L)
         val sent = sentPinIndex.remove(address)
 
         if (state == BluetoothDevice.BOND_BONDED) {
@@ -162,16 +172,18 @@ class BluetoothPairingAgent(
         }
     }
 
-    private fun showCode(device: BluetoothDevice, code: String?) {
+    private fun showCode(device: BluetoothDevice, variant: Int, code: String?) {
         if (code == null) return
         dismissCode()
-        val message = localize("Type this code on") + " " + deviceName(device) + ":\n\n" + code
+        val message = localize(BluetoothPairingPolicy.codePrompt(variant)) + " " + deviceName(device) + ":\n\n" + code
         try {
             codeDialog = AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(localize("Bluetooth Pairing"))
                 .setMessage(message)
                 .setPositiveButton(localize("OK"), null)
                 .show()
+            // The bond normally ends before this and closes the dialog.
+            handler.postDelayed({ dismissCode() }, CODE_DIALOG_MAX_MS)
         } catch (e: Exception) {
             Log.e(TAG, "Cannot show pairing code dialog", e)
             Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
@@ -187,6 +199,13 @@ class BluetoothPairingAgent(
     private fun deviceName(device: BluetoothDevice): String =
         device.name?.takeIf { it.isNotBlank() } ?: device.address
 
+    private fun stopScan() {
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            if (adapter != null && adapter.isDiscovering) adapter.cancelDiscovery()
+        } catch (_: Exception) {}
+    }
+
     private fun toast(text: String) {
         Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
     }
@@ -195,5 +214,16 @@ class BluetoothPairingAgent(
         private const val TAG = "BtPairing"
         private const val EXTRA_REASON = "android.bluetooth.device.extra.REASON"
         private const val RETRY_DELAY_MS = 1500L
+        private const val CODE_DIALOG_MAX_MS = 60_000L
+
+        @Volatile
+        private var quietUntil = 0L
+
+        private fun quietFor(ms: Long) {
+            quietUntil = SystemClock.elapsedRealtime() + ms
+        }
+
+        /** False while a pairing runs and shortly after a bond: do not start a device scan then. */
+        fun scanAllowed(): Boolean = SystemClock.elapsedRealtime() >= quietUntil
     }
 }

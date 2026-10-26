@@ -26,7 +26,7 @@ class BluetoothPairingPolicyTest {
     fun eachVariantGetsTheCorrectAction() {
         assertEquals(Action.SEND_PIN, BluetoothPairingPolicy.actionFor(0))
         assertEquals(Action.CANCEL, BluetoothPairingPolicy.actionFor(1))
-        assertEquals(Action.CONFIRM, BluetoothPairingPolicy.actionFor(2))
+        assertEquals(Action.SHOW_CODE_AND_CONFIRM, BluetoothPairingPolicy.actionFor(2))
         assertEquals(Action.CONFIRM, BluetoothPairingPolicy.actionFor(3))
         assertEquals(Action.SHOW_CODE_AND_CONFIRM, BluetoothPairingPolicy.actionFor(4))
         assertEquals(Action.SHOW_CODE_AND_SEND_PIN, BluetoothPairingPolicy.actionFor(5))
@@ -37,6 +37,13 @@ class BluetoothPairingPolicyTest {
     fun unknownVariantIsCancelled() {
         assertEquals(Action.CANCEL, BluetoothPairingPolicy.actionFor(-1))
         assertEquals(Action.CANCEL, BluetoothPairingPolicy.actionFor(42))
+    }
+
+    @Test
+    fun numericComparisonAsksToCompareTheCode() {
+        assertEquals("Make sure that this code shows on", BluetoothPairingPolicy.codePrompt(BluetoothPairingPolicy.VARIANT_PASSKEY_CONFIRMATION))
+        assertEquals("Type this code on", BluetoothPairingPolicy.codePrompt(BluetoothPairingPolicy.VARIANT_DISPLAY_PASSKEY))
+        assertEquals("Type this code on", BluetoothPairingPolicy.codePrompt(BluetoothPairingPolicy.VARIANT_DISPLAY_PIN))
     }
 
     @Test
