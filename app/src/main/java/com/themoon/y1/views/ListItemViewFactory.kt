@@ -318,6 +318,12 @@ object ListItemViewFactory {
             includeFontPadding = false
         }
         row.addView(tvVal)
+        // A row that opens a deeper screen: a drawn chevron (ChevronView) in place of the small "〉" text.
+        val (valueText, hasChevron) = DisclosureChevron.split(displayVal)
+        if (hasChevron) {
+            tvVal.text = valueText
+            row.addView(ChevronView(context, tvTitle))
+        }
 
         fun updateBg(focused: Boolean) {
             row.background = if (focused) {
@@ -366,6 +372,17 @@ object ListItemViewFactory {
         focusedIconColor = focusedColor
     )
 
+    /**
+     * A row of a single-choice list (Theme, Language, EQ preset...). Each row keeps the tick column on the
+     * left, so the text does not move; only the chosen row shows the tick ([CheckMarkView]). Normal text and
+     * focus colours.
+     */
+    fun createCheckListButton(context: Context, text: String, isChecked: Boolean): View {
+        val row = createTablerListButton(context, TablerIcons.CHECK, text)
+        if (!isChecked) (row as ViewGroup).getChildAt(0).visibility = View.INVISIBLE
+        return row
+    }
+
     fun createTablerListButtonWithRightIcon(
         context: Context,
         iconPaths: Array<String>?,
@@ -395,7 +412,11 @@ object ListItemViewFactory {
 
         val iconSize = (18f * d).toInt()
         var ivLeft: ImageView? = null
-        if (iconPaths != null) {
+        // The tick of a selection list: the same column, but as tall as the capital letters of the text.
+        val tick = if (iconPaths === TablerIcons.CHECK) CheckMarkView(context) else null
+        if (tick != null) {
+            row.addView(tick)
+        } else if (iconPaths != null) {
             ivLeft = ImageView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
                     rightMargin = (10f * d).toInt()
@@ -418,6 +439,7 @@ object ListItemViewFactory {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
         }
         row.addView(tv)
+        tick?.textView = tv
 
         val rightIconSize = (16f * d).toInt()
         var ivRight: ImageView? = null
@@ -435,12 +457,14 @@ object ListItemViewFactory {
             row.background = if (focused) {
                 tv.setTextColor(actualFocusedTextColor)
                 tv.isSelected = true
+                tick?.color = actualFocusedIconColor
                 if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualFocusedIconColor))
                 if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, actualFocusedIconColor))
                 createFocusedButtonBackground(context)
             } else {
                 tv.setTextColor(actualTextColor)
                 tv.isSelected = false
+                tick?.color = actualIconColor
                 if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualIconColor))
                 if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, ThemeManager.getTextColorSecondary()))
                 createButtonBackground(context, ThemeManager.getListButtonNormalBg())
@@ -450,6 +474,36 @@ object ListItemViewFactory {
         updateBg(false)
         row.setOnFocusChangeListener { _, hasFocus -> updateBg(hasFocus) }
         IpodClassicLists.styleListRow(row, tv, null)
+        return row
+    }
+
+    /**
+     * A row of the Wi-Fi and Bluetooth lists, like macOS: a tick column on the left (the tick shows only on the
+     * chosen row, so the text does not move), the name, then status glyphs in fixed slots on the right (lock, signal,
+     * device type; [RowGlyphsView]). The tick column has the same size as the single-choice lists. The glyphs are as
+     * tall as the capital letters of the name and on its baseline, in the primary text colour (as macOS: black or
+     * white, not grey), and in the focused text colour on the focused row.
+     */
+    fun createChoiceRowWithRightIcons(
+        context: Context,
+        text: String,
+        isChecked: Boolean,
+        slots: List<RowGlyphs.Slot>
+    ): View {
+        val row = createTablerListButtonWithRightIcon(context, TablerIcons.CHECK, text) as LinearLayout
+        if (!isChecked) row.getChildAt(0).visibility = View.INVISIBLE
+
+        val glyphs = RowGlyphsView(context, slots).apply {
+            textView = row.getChildAt(1) as TextView
+            color = ThemeManager.getTextColorPrimary()
+        }
+        row.addView(glyphs)
+
+        val rowFocusListener = row.onFocusChangeListener
+        row.setOnFocusChangeListener { v, hasFocus ->
+            rowFocusListener?.onFocusChange(v, hasFocus)
+            glyphs.color = if (hasFocus) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary()
+        }
         return row
     }
 }
