@@ -345,6 +345,8 @@ class PlayerController(
                     rating = if (up) Math.min(5, rating + 1) else Math.max(0, rating - 1)
                     main.setSongRating(path, rating)
                     updateRatingScrubStars()
+                    // The stars under the song details show the rating too; before, they changed only with the song.
+                    updateRatingDisplay()
                 }
             }
             LYRICS_STATE -> lyricsOverlayController.scrollLines(if (up) 1 else -1)
