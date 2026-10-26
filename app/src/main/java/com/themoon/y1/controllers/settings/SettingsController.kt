@@ -1151,6 +1151,18 @@ class SettingsController(
         }.start()
     }
 
+    /** Back from a value list: the focus on the row of that value (Year...Minute), not on the first row. */
+    private fun focusDateTimeRow(label: String) {
+        val title = localize(label)
+        for (i in 0 until containerSettingsItems.childCount) {
+            val row = containerSettingsItems.getChildAt(i) as? ViewGroup ?: continue
+            if ((row.getChildAt(0) as? TextView)?.text?.toString() == title) {
+                row.requestFocus()
+                return
+            }
+        }
+    }
+
     /** Takes Year...Minute from the clock again, and shows them if the Date & Time list shows (the focus stays). */
     private fun refreshDateTimeScreen() {
         val c = Calendar.getInstance()
@@ -1192,6 +1204,7 @@ class SettingsController(
                 }
                 setClockField(type, valNum)
                 buildDateTimeUI()
+                focusDateTimeRow(if (type == "Hour") "Hour (24H)" else type)
             }
             containerSettingsItems.addView(btn)
             if (valNum == currentValue) focusBtn = btn
