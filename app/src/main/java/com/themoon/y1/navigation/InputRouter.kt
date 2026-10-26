@@ -26,6 +26,8 @@ class InputRouter private constructor() {
     var backDebounceUntil: Long = 0L
         private set
 
+    private val backPress = BackPress()
+
     fun suppressBackUntilRelease(debounceMs: Long = 350L) {
         isBackSuppressed = true
         backDebounceUntil = System.currentTimeMillis() + debounceMs
@@ -75,6 +77,8 @@ class InputRouter private constructor() {
         val action = event.action
         // A press kept below (wake, USB storage screen) must not pair with its release
         if (isCentreKey(keyCode) && action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) centrePress.reset()
+        // A Back press kept below (wake, USB storage screen, suppression) must not pair with its release
+        if (isBackKey(keyCode) && action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) backPress.reset()
 
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val isScreenOn = if (android.os.Build.VERSION.SDK_INT >= 20) {
@@ -213,18 +217,10 @@ class InputRouter private constructor() {
         if (activeController?.onKeyDown(keyCode, event) == true) {
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
+        if (isBackKey(keyCode)) {
+            // Back on release (onKeyUp), like the other buttons: a held press does nothing yet
             val now = System.currentTimeMillis()
-            if (isBackSuppressed || now < backDebounceUntil || event.repeatCount > 0) {
-                return true
-            }
-            if (activeController?.onBackPressed() == true) {
-                return true
-            }
-            if (NavigationManager.getInstance().navigateBack()) {
-                return true
-            }
-            (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+            if (!isBackSuppressed && now >= backDebounceUntil) backPress.onPress(event.repeatCount)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE || keyCode == 85) {
@@ -249,6 +245,15 @@ class InputRouter private constructor() {
         return false
     }
 
+    private fun isBackKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4
+
+    private fun goBack(activeController: ScreenController?) {
+        if (activeController?.onBackPressed() == true) return
+        if (NavigationManager.getInstance().navigateBack()) return
+        (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+    }
+
     fun onKeyUp(
         keyCode: Int,
         event: KeyEvent,
@@ -262,8 +267,9 @@ class InputRouter private constructor() {
         if (activeController?.onKeyUp(keyCode, event) == true) {
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
+        if (isBackKey(keyCode)) {
             isBackSuppressed = false
+            if (backPress.onRelease(event.isCanceled)) goBack(activeController)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
