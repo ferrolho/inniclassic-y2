@@ -379,7 +379,7 @@ class BluetoothController(
         }
         btnConnect.visibility = View.GONE
 
-        val btnUnpair = createTablerListButton(TablerIcons.TRASH, localize("Delete Device"), null, 0xFFFF5555.toInt(), 0xFFFF5555.toInt()).apply {
+        val btnUnpair = createTablerListButton(TablerIcons.TRASH, localize("Forget Device"), null, 0xFFFF5555.toInt(), 0xFFFF5555.toInt()).apply {
             visibility = View.GONE
             setOnClickListener {
                 clickFeedback()
