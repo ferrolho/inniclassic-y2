@@ -33,6 +33,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.core.TimeFormat
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -214,9 +215,7 @@ class AudioPlayerManager private constructor() {
 
                                     val duration = getDuration()
                                     val remaining = (duration - getCurrentPosition()).coerceAtLeast(0)
-                                    val s = (remaining / 1000) % 60
-                                    val m = remaining / (1000 * 60)
-                                    main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
+                                    main.tvPlayerTimeTotal.text = "-" + TimeFormat.format(remaining)
                                     if (playWhenReady) {
                                         LastFmScrobbler.getInstance(main).onTrackStart(
                                             pendingScrobbleArtist,
@@ -781,23 +780,19 @@ class AudioPlayerManager private constructor() {
         }
 
         if (effectiveSeekMs > 0) {
-            val curS = (effectiveSeekMs / 1000) % 60
-            val curM = effectiveSeekMs / (1000 * 60)
-            main.tvPlayerTimeCurrent.text = String.format(Locale.US, "%02d:%02d", curM, curS)
+            main.tvPlayerTimeCurrent.text = TimeFormat.format(effectiveSeekMs)
             if (effectiveDurMs > 0) {
                 val remaining = (effectiveDurMs - effectiveSeekMs).coerceAtLeast(0)
-                val remS = (remaining / 1000) % 60
-                val remM = remaining / (1000 * 60)
-                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
+                main.tvPlayerTimeTotal.text = "-" + TimeFormat.format(remaining)
                 main.playerProgress.progress = ((effectiveSeekMs * 1000) / effectiveDurMs).toInt()
             } else {
-                main.tvPlayerTimeTotal.text = "00:00"
+                main.tvPlayerTimeTotal.text = "-0:00"
                 main.playerProgress.progress = 0
             }
         } else {
             main.playerProgress.progress = 0
-            main.tvPlayerTimeCurrent.text = "00:00"
-            main.tvPlayerTimeTotal.text = "00:00"
+            main.tvPlayerTimeCurrent.text = "0:00"
+            main.tvPlayerTimeTotal.text = "-0:00"
         }
 
         val ext = track.name.lowercase(Locale.US)
@@ -1040,9 +1035,7 @@ class AudioPlayerManager private constructor() {
 
                 val duration = player.duration
                 val remaining = (duration - player.currentPosition).coerceAtLeast(0)
-                val s = (remaining / 1000) % 60
-                val m = remaining / (1000 * 60)
-                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
+                main.tvPlayerTimeTotal.text = "-" + TimeFormat.format(remaining)
                 if (!main.isPausedByHand) {
                     LastFmScrobbler.getInstance(main).onTrackStart(
                         pendingScrobbleArtist,
