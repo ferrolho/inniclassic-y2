@@ -508,8 +508,6 @@ polish_dict = {
   "Eject before disconnecting.": "Wysuń przed odłączeniem.",
   "Eject": "Wysuń",
   "Ask on USB Connect": "Pytaj przy podłączeniu USB",
-  "Keyboard Layout": "Układ klawiatury",
-  "Original": "Oryginalna",
   "QWERTY": "QWERTY",
   "Next": "Dalej",
   "Login": "Zaloguj",
