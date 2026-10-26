@@ -84,9 +84,29 @@ object VolumeCurves {
 }
 
 /**
+ * How a volume step is split between the Android STREAM_MUSIC index and the software gain of the players.
+ *
+ * On the Y2 the vendor audio HAL sends the music index to the CS43131 DAC, and that DAC volume also applies to
+ * the button click (STREAM_SYSTEM) and all other sounds. A2DP applies the index as a mixer gain to all streams too.
+ */
+enum class VolumeSplit {
+    /**
+     * Music: the index stays at the top, the software gain does all the attenuation. Thus the click and other
+     * system sounds have the same level at each music volume.
+     */
+    SOFTWARE,
+
+    /**
+     * FM radio: the index does most of the attenuation (the quietest index that is not quieter than the step),
+     * the software gain the rest. The FM audio may not go through the player gain, so FM needs the index.
+     */
+    INDEX
+}
+
+/**
  * 30 volume steps, all [STEP_DB] apart: step s (1..30) is [TOP_DB] - (30 - s) × [STEP_DB]; step 0 is mute.
- * For each step, the Android index does most of the attenuation (the quietest index that is not quieter than
- * the step), and a software gain (≤ 1.0, through [VirtualVolumeManager]) does the rest.
+ * Each step is an Android index and a software gain (≤ 1.0, through [VirtualVolumeManager]); [VolumeSplit]
+ * says which part does the attenuation.
  */
 object VolumeSteps {
     const val STEPS = 30
@@ -106,6 +126,12 @@ object VolumeSteps {
      */
     const val MIN_DECREASE_GAP_MS = 220L
 
+    /**
+     * An index increase comes this long after the gain change that makes up for it. The player applies a new gain
+     * a little later than the call (ExoPlayer sets it on its playback thread), so the index never goes up first.
+     */
+    const val INCREASE_AFTER_GAIN_MS = 100L
+
     private const val EPSILON = 1e-9
 
     data class Setting(val index: Int, val gain: Float)
@@ -115,11 +141,23 @@ object VolumeSteps {
 
     fun targetDb(step: Int): Double = TOP_DB - (STEPS - step) * STEP_DB
 
-    /** The Android index and the software gain for [step]. Step 0 (or less) = index 0, gain 0. */
-    fun settingFor(step: Int, curve: VolumeCurve, sysMaxIndex: Int = curve.maxIndex): Setting {
+    /**
+     * The Android index and the software gain for [step].
+     * [VolumeSplit.SOFTWARE]: the top index for all steps; step 0 (or less) = gain 0 (the index does not move).
+     * [VolumeSplit.INDEX]: step 0 (or less) = index 0, gain 0.
+     */
+    fun settingFor(
+        step: Int,
+        curve: VolumeCurve,
+        sysMaxIndex: Int = curve.maxIndex,
+        split: VolumeSplit = VolumeSplit.SOFTWARE
+    ): Setting {
+        val maxIndex = minOf(curve.maxIndex, sysMaxIndex).coerceAtLeast(1)
+        if (split == VolumeSplit.SOFTWARE) {
+            return Setting(maxIndex, gainAt(step, maxIndex, curve))
+        }
         if (step <= 0) return Setting(0, 0f)
         val target = targetDb(step.coerceAtMost(STEPS))
-        val maxIndex = minOf(curve.maxIndex, sysMaxIndex).coerceAtLeast(1)
         var index = maxIndex
         for (i in 1..maxIndex) {
             if (curve.dbAt(i) >= target - EPSILON) {
@@ -133,7 +171,9 @@ object VolumeSteps {
 
     /**
      * The writes that take the Android index from [fromIndex] to the index of [step].
-     * - Up (or no change): one write at once.
+     * - No index change: one write (gain only) at once.
+     * - Up: the gain of the step at once (the level goes down or stays), then the index [INCREASE_AFTER_GAIN_MS]
+     *   later. Thus the level never goes above the step, also when the player applies the gain late.
      * - Down: the gain goes to the level of the step at once (first write, index not changed), then the index
      *   goes down one index at a time, [MIN_DECREASE_GAP_MS] apart (the first one also that far after the last
      *   index write, [msSinceLastWrite]). At each write the gain makes up for the higher index, so the level
@@ -145,11 +185,15 @@ object VolumeSteps {
         step: Int,
         curve: VolumeCurve,
         sysMaxIndex: Int = curve.maxIndex,
-        msSinceLastWrite: Long = Long.MAX_VALUE
+        msSinceLastWrite: Long = Long.MAX_VALUE,
+        split: VolumeSplit = VolumeSplit.SOFTWARE
     ): List<IndexChange> {
-        val final = settingFor(step, curve, sysMaxIndex)
-        val start = fromIndex.coerceAtMost(minOf(curve.maxIndex, sysMaxIndex).coerceAtLeast(1))
-        if (start <= final.index) return listOf(IndexChange(final.index, final.gain, 0L))
+        val final = settingFor(step, curve, sysMaxIndex, split)
+        val start = fromIndex.coerceIn(0, minOf(curve.maxIndex, sysMaxIndex).coerceAtLeast(1))
+        if (start == final.index) return listOf(IndexChange(final.index, final.gain, 0L))
+        if (start < final.index) {
+            return listOf(IndexChange(start, final.gain, 0L), IndexChange(final.index, final.gain, INCREASE_AFTER_GAIN_MS))
+        }
         val out = ArrayList<IndexChange>()
         out.add(IndexChange(start, gainAt(step, start, curve), 0L))
         var delay = (MIN_DECREASE_GAP_MS - msSinceLastWrite).coerceIn(0L, MIN_DECREASE_GAP_MS)

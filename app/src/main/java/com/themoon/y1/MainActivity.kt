@@ -83,6 +83,7 @@ import com.themoon.y1.managers.AudioOutput
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.VolumeCurves
 import com.themoon.y1.managers.VolumeMemory
+import com.themoon.y1.managers.VolumeSplit
 import com.themoon.y1.managers.VolumeSteps
 import com.themoon.y1.managers.VolumeStore
 import com.themoon.y1.models.SongItem
@@ -384,6 +385,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
         BluetoothAvrcpManager.getInstance(this).init()
         restoreVolumeForOutput(force = true)
+        FmRadioManager.getInstance(this).apply {
+            volumeGate = { ready -> runOnUiThread { prepareVolumeForFm(ready) } }
+            onPoweredDown = { runOnUiThread { leaveFmVolume() } }
+        }
 
         var playbackRestored = false
         if (ExternalSdMountMonitor.hasSecondarySlot() && !ExternalSdMountMonitor.isSecondaryReady()) {
@@ -717,9 +722,47 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     private val volumeIndexHandler = Handler(Looper.getMainLooper())
     private var lastVolumeIndexWriteMs = 0L
 
+    /**
+     * Music uses [VolumeSplit.SOFTWARE]: the Android index stays at the top, so the button click and other system
+     * sounds do not change with the music volume. FM radio uses [VolumeSplit.INDEX] while it is on.
+     */
+    private var fmVolumeMode = false
+    private val fmVolumeHandler = Handler(Looper.getMainLooper())
+
+    private fun volumeSplit(): VolumeSplit = if (fmVolumeMode) VolumeSplit.INDEX else VolumeSplit.SOFTWARE
+
+    /**
+     * Before the FM audio starts: lowers the index to the index split of the current step (one index at a time),
+     * then runs [ready]. The FM audio may not go through the player gain, so it starts only at the lower index.
+     */
+    fun prepareVolumeForFm(ready: Runnable) {
+        fmVolumeMode = true
+        val output = currentAudioOutput ?: detectAudioOutput().also { currentAudioOutput = it }
+        val ms = applyVolumeStep(currentVirtualVolume.coerceAtLeast(0), output, showOverlay = false)
+        fmVolumeHandler.removeCallbacksAndMessages(null)
+        fmVolumeHandler.postDelayed(ready, ms + 50L)
+    }
+
+    /** FM radio is off: back to the software split (the gain first, then the index goes up). */
+    fun leaveFmVolume() {
+        fmVolumeHandler.removeCallbacksAndMessages(null)
+        if (!fmVolumeMode) return
+        fmVolumeMode = false
+        val output = currentAudioOutput ?: detectAudioOutput().also { currentAudioOutput = it }
+        applyVolumeStep(currentVirtualVolume.coerceAtLeast(0), output, showOverlay = false)
+    }
+
     /** Sets one index and gain of a [VolumeSteps.indexSchedule]. Lowers the louder of the two first, so no short peak comes between them. */
     private fun writeVolumeChange(change: VolumeSteps.IndexChange) {
         val current = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { -1 }
+        if (change.index < current &&
+            android.os.SystemClock.uptimeMillis() - lastVolumeIndexWriteMs < VolumeSteps.MIN_DECREASE_GAP_MS
+        ) {
+            // The main thread was busy and the writes came late, too close together: plan again from this index.
+            val output = currentAudioOutput ?: return
+            applyVolumeStep(currentVirtualVolume.coerceAtLeast(0), output, showOverlay = false)
+            return
+        }
         val gainFirst = change.index > current
         if (gainFirst) VirtualVolumeManager.getInstance().setMasterGain(change.gain)
         if (change.index != current) {
@@ -731,18 +774,20 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (!gainFirst) VirtualVolumeManager.getInstance().setMasterGain(change.gain)
     }
 
-    private fun applyVolumeStep(step: Int, output: AudioOutput, showOverlay: Boolean) {
+    /** Sets [step] for [output]. Returns the time (ms) until the last index write of the plan. */
+    private fun applyVolumeStep(step: Int, output: AudioOutput, showOverlay: Boolean): Long {
         val target = step.coerceIn(0, VIRTUAL_VOLUME_STEPS)
         currentVirtualVolume = target
         volumeMemory.save(output, target)
         val sysMaxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val curve = VolumeCurves.forOutput(output)
-        val setting = VolumeSteps.settingFor(target, curve, sysMaxVol)
+        val split = volumeSplit()
+        val setting = VolumeSteps.settingFor(target, curve, sysMaxVol, split)
         lastTargetVolume = setting.index
         lastTargetVolumeTime = System.currentTimeMillis()
         val fromIndex = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { 0 }
         val plan = VolumeSteps.indexSchedule(
-            fromIndex, target, curve, sysMaxVol, android.os.SystemClock.uptimeMillis() - lastVolumeIndexWriteMs
+            fromIndex, target, curve, sysMaxVol, android.os.SystemClock.uptimeMillis() - lastVolumeIndexWriteMs, split
         )
         volumeIndexHandler.removeCallbacksAndMessages(null)
         var atMs = 0L
@@ -751,6 +796,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             if (atMs == 0L) writeVolumeChange(change) else volumeIndexHandler.postDelayed({ writeVolumeChange(change) }, atMs)
         }
         if (showOverlay) showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS)
+        return atMs
     }
 
     fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int) {

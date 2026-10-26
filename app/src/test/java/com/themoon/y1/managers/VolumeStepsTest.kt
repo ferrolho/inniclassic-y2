@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.themoon.y1.managers.VolumeSteps.IndexChange
+import com.themoon.y1.managers.VolumeSplit.INDEX
+import com.themoon.y1.managers.VolumeSplit.SOFTWARE
 import kotlin.math.log10
 
 class VolumeStepsTest {
@@ -13,7 +15,7 @@ class VolumeStepsTest {
 
     /** The level of a step: dB of the Android index plus the software gain in dB. */
     private fun levelDb(step: Int): Double {
-        val s = VolumeSteps.settingFor(step, curve)
+        val s = VolumeSteps.settingFor(step, curve, split = INDEX)
         return curve.dbAt(s.index) + 20.0 * log10(s.gain.toDouble())
     }
 
@@ -27,8 +29,8 @@ class VolumeStepsTest {
 
     @Test
     fun stepZeroIsMute() {
-        assertEquals(VolumeSteps.Setting(0, 0f), VolumeSteps.settingFor(0, curve))
-        assertEquals(VolumeSteps.Setting(0, 0f), VolumeSteps.settingFor(-3, curve))
+        assertEquals(VolumeSteps.Setting(0, 0f), VolumeSteps.settingFor(0, curve, split = INDEX))
+        assertEquals(VolumeSteps.Setting(0, 0f), VolumeSteps.settingFor(-3, curve, split = INDEX))
     }
 
     @Test
@@ -50,7 +52,7 @@ class VolumeStepsTest {
     @Test
     fun hardwareDoesMostOfTheAttenuation() {
         for (s in 1..30) {
-            val setting = VolumeSteps.settingFor(s, curve)
+            val setting = VolumeSteps.settingFor(s, curve, split = INDEX)
             assertTrue(setting.gain in 0f..1f)
             val target = VolumeSteps.targetDb(s)
             assertTrue("index of step $s is not quieter than the target", curve.dbAt(setting.index) >= target - 1e-9)
@@ -62,25 +64,25 @@ class VolumeStepsTest {
 
     @Test
     fun mappingForMeasuredA2dpTable() {
-        assertEquals(VolumeSteps.Setting(15, 1f), VolumeSteps.settingFor(30, curve))
-        assertEquals(VolumeSteps.Setting(14, 1f), VolumeSteps.settingFor(29, curve))
-        assertEquals(VolumeSteps.Setting(13, 1f), VolumeSteps.settingFor(28, curve))
-        assertEquals(11, VolumeSteps.settingFor(25, curve).index) // -10 dB: index 11 (-8.5) - 1.5 dB
-        assertEquals(12, VolumeSteps.settingFor(26, curve).index) // -8 dB: index 11 (-8.5) is too quiet
-        assertEquals(VolumeSteps.Setting(12, 1f), VolumeSteps.settingFor(27, curve))
-        assertEquals(1, VolumeSteps.settingFor(9, curve).index) // -42 dB
-        assertEquals(1f, VolumeSteps.settingFor(9, curve).gain, 1e-6f)
-        assertEquals(2, VolumeSteps.settingFor(10, curve).index) // -40 dB: index 2 (-39) - 1 dB
-        val step1 = VolumeSteps.settingFor(1, curve) // -58 dB: index 1 (-42) - 16 dB
+        assertEquals(VolumeSteps.Setting(15, 1f), VolumeSteps.settingFor(30, curve, split = INDEX))
+        assertEquals(VolumeSteps.Setting(14, 1f), VolumeSteps.settingFor(29, curve, split = INDEX))
+        assertEquals(VolumeSteps.Setting(13, 1f), VolumeSteps.settingFor(28, curve, split = INDEX))
+        assertEquals(11, VolumeSteps.settingFor(25, curve, split = INDEX).index) // -10 dB: index 11 (-8.5) - 1.5 dB
+        assertEquals(12, VolumeSteps.settingFor(26, curve, split = INDEX).index) // -8 dB: index 11 (-8.5) is too quiet
+        assertEquals(VolumeSteps.Setting(12, 1f), VolumeSteps.settingFor(27, curve, split = INDEX))
+        assertEquals(1, VolumeSteps.settingFor(9, curve, split = INDEX).index) // -42 dB
+        assertEquals(1f, VolumeSteps.settingFor(9, curve, split = INDEX).gain, 1e-6f)
+        assertEquals(2, VolumeSteps.settingFor(10, curve, split = INDEX).index) // -40 dB: index 2 (-39) - 1 dB
+        val step1 = VolumeSteps.settingFor(1, curve, split = INDEX) // -58 dB: index 1 (-42) - 16 dB
         assertEquals(1, step1.index)
         assertEquals(0.1585f, step1.gain, 1e-4f)
         // No two steps share the same setting.
-        assertEquals(30, (1..30).map { VolumeSteps.settingFor(it, curve) }.toSet().size)
+        assertEquals(30, (1..30).map { VolumeSteps.settingFor(it, curve, split = INDEX) }.toSet().size)
     }
 
     @Test
     fun indexIsLimitedToTheSystemMaximum() {
-        val s = VolumeSteps.settingFor(30, curve, sysMaxIndex = 10)
+        val s = VolumeSteps.settingFor(30, curve, sysMaxIndex = 10, split = INDEX)
         assertEquals(10, s.index)
         assertEquals(1f, s.gain, 1e-6f)
     }
@@ -167,8 +169,8 @@ class VolumeStepsTest {
             val c = VolumeCurves.forOutput(o)
             assertEquals(15, c.maxIndex)
             for (s in 2..30) {
-                val a = VolumeSteps.settingFor(s, c)
-                val b = VolumeSteps.settingFor(s - 1, c)
+                val a = VolumeSteps.settingFor(s, c, split = INDEX)
+                val b = VolumeSteps.settingFor(s - 1, c, split = INDEX)
                 assertTrue(c.dbAt(a.index) + 20 * log10(a.gain.toDouble()) > c.dbAt(b.index) + 20 * log10(b.gain.toDouble()))
             }
         }
@@ -181,13 +183,13 @@ class VolumeStepsTest {
         val dac = VolumeCurves.WIRED
         assertTrue(VolumeCurves.SPEAKER === dac)
         for (i in 1..15) assertEquals(-2.0 * (15 - i), dac.dbAt(i), 1e-9)
-        assertEquals(VolumeSteps.Setting(15, 1f), VolumeSteps.settingFor(30, dac))
-        assertEquals(VolumeSteps.Setting(1, 1f), VolumeSteps.settingFor(16, dac)) // -28 dB
-        val step1 = VolumeSteps.settingFor(1, dac) // -58 dB: index 1 (-28) - 30 dB
+        assertEquals(VolumeSteps.Setting(15, 1f), VolumeSteps.settingFor(30, dac, split = INDEX))
+        assertEquals(VolumeSteps.Setting(1, 1f), VolumeSteps.settingFor(16, dac, split = INDEX)) // -28 dB
+        val step1 = VolumeSteps.settingFor(1, dac, split = INDEX) // -58 dB: index 1 (-28) - 30 dB
         assertEquals(1, step1.index)
         assertEquals(0.0316f, step1.gain, 1e-4f)
         // Steps 16..30 are exactly one index each, with no software gain.
-        for (s in 16..30) assertEquals(VolumeSteps.Setting(s - 15, 1f), VolumeSteps.settingFor(s, dac))
+        for (s in 16..30) assertEquals(VolumeSteps.Setting(s - 15, 1f), VolumeSteps.settingFor(s, dac, split = INDEX))
     }
 
     // --- index schedule (kernel ignores a fast drop of more than one index) ---
@@ -197,43 +199,50 @@ class VolumeStepsTest {
     private fun levelDb(c: IndexChange, curve: VolumeCurve) = curve.dbAt(c.index) + 20.0 * log10(c.gain.toDouble())
 
     @Test
-    fun increaseIsOneWriteAtOnce() {
-        assertEquals(listOf(IndexChange(15, 1f, 0)), VolumeSteps.indexSchedule(3, 30, dac, msSinceLastWrite = 0))
-        assertEquals(listOf(IndexChange(5, 1f, 0)), VolumeSteps.indexSchedule(0, 20, dac, msSinceLastWrite = 0))
-        val same = VolumeSteps.indexSchedule(1, 5, dac, msSinceLastWrite = 0) // gain only
+    fun increaseSetsTheGainFirstThenTheIndex() {
+        val later = VolumeSteps.INCREASE_AFTER_GAIN_MS
+        assertEquals(
+            listOf(IndexChange(3, 1f, 0), IndexChange(15, 1f, later)),
+            VolumeSteps.indexSchedule(3, 30, dac, msSinceLastWrite = 0, split = INDEX)
+        )
+        assertEquals(
+            listOf(IndexChange(0, 1f, 0), IndexChange(5, 1f, later)),
+            VolumeSteps.indexSchedule(0, 20, dac, msSinceLastWrite = 0, split = INDEX)
+        )
+        val same = VolumeSteps.indexSchedule(1, 5, dac, msSinceLastWrite = 0, split = INDEX) // gain only
         assertEquals(1, same.size)
         assertEquals(1, same[0].index)
     }
 
     @Test
     fun largeDropGoesOneIndexAtATime() {
-        val plan = VolumeSteps.indexSchedule(15, 20, dac) // index 15 → 5
+        val plan = VolumeSteps.indexSchedule(15, 20, dac, split = INDEX) // index 15 → 5
         assertEquals(listOf(15) + (14 downTo 5).toList(), plan.map { it.index })
         assertEquals(0L, plan[0].delayMs)
         assertEquals(0L, plan[1].delayMs) // the last write was long ago
         for (c in plan.drop(2)) assertEquals(VolumeSteps.MIN_DECREASE_GAP_MS, c.delayMs)
         // The level is the level of the step at once, and stays there.
         for (c in plan) assertEquals(VolumeSteps.targetDb(20), levelDb(c, dac), 1e-4)
-        assertEquals(VolumeSteps.settingFor(20, dac), VolumeSteps.Setting(plan.last().index, plan.last().gain))
+        assertEquals(VolumeSteps.settingFor(20, dac, split = INDEX), VolumeSteps.Setting(plan.last().index, plan.last().gain))
     }
 
     @Test
     fun firstDecreaseWaitsForTheGapAfterTheLastWrite() {
-        val plan = VolumeSteps.indexSchedule(10, 24, dac, msSinceLastWrite = 50) // 10 → 9
+        val plan = VolumeSteps.indexSchedule(10, 24, dac, msSinceLastWrite = 50, split = INDEX) // 10 → 9
         assertEquals(listOf(10, 9), plan.map { it.index })
         assertEquals(listOf(0L, 170L), plan.map { it.delayMs })
     }
 
     @Test
     fun muteGoesDownWithGainZero() {
-        val plan = VolumeSteps.indexSchedule(3, 0, dac)
+        val plan = VolumeSteps.indexSchedule(3, 0, dac, split = INDEX)
         assertEquals(listOf(3, 2, 1, 0), plan.map { it.index })
         for (c in plan) assertEquals(0f, c.gain, 0f)
     }
 
     @Test
     fun a2dpDropAlsoKeepsTheLevel() {
-        val plan = VolumeSteps.indexSchedule(15, 9, curve) // A2DP 0 dB → -42 dB (index 1)
+        val plan = VolumeSteps.indexSchedule(15, 9, curve, split = INDEX) // A2DP 0 dB → -42 dB (index 1)
         assertEquals(1, plan.last().index)
         for (c in plan) assertEquals(VolumeSteps.targetDb(9), levelDb(c, curve), 1e-4)
     }
@@ -244,7 +253,7 @@ class VolumeStepsTest {
      * write, and that the index ends at the index of the last step.
      */
     private fun simulateWheel(fromStep: Int, steps: Int, gapMs: Long, up: Boolean = false) {
-        var index = VolumeSteps.settingFor(fromStep, dac).index
+        var index = VolumeSteps.settingFor(fromStep, dac, split = INDEX).index
         var lastWrite = -10_000L
         val writes = ArrayList<Pair<Long, Int>>() // time, index
         var pending: List<Pair<Long, IndexChange>> = emptyList()
@@ -265,14 +274,14 @@ class VolumeStepsTest {
             runUntil(now)
             step += if (up) 1 else -1
             var at = now
-            pending = VolumeSteps.indexSchedule(index, step, dac, msSinceLastWrite = now - lastWrite).map {
+            pending = VolumeSteps.indexSchedule(index, step, dac, msSinceLastWrite = now - lastWrite, split = INDEX).map {
                 at += it.delayMs
                 at to it
             }
             runUntil(now)
         }
         runUntil(Long.MAX_VALUE)
-        assertEquals(VolumeSteps.settingFor(step, dac).index, index)
+        assertEquals(VolumeSteps.settingFor(step, dac, split = INDEX).index, index)
         var prev: Pair<Long, Int>? = null
         for (w in writes) {
             val p = prev
@@ -292,7 +301,79 @@ class VolumeStepsTest {
     }
 
     @Test
-    fun fastWheelUpIsAtOnce() {
+    fun fastWheelUpReachesTheIndexOfTheLastStep() {
         simulateWheel(fromStep = 10, steps = 15, gapMs = 30, up = true)
+    }
+
+    // --- software split (music): the index stays at the top ---
+
+    /** Level of a write: dB of the index plus the gain in dB. */
+    private fun softwareLevelDb(step: Int, c: VolumeCurve): Double {
+        val s = VolumeSteps.settingFor(step, c, split = SOFTWARE)
+        return c.dbAt(s.index) + 20.0 * log10(s.gain.toDouble())
+    }
+
+    @Test
+    fun softwareSplitKeepsTheTopIndexForAllSteps() {
+        for (c in listOf(VolumeCurves.A2DP, VolumeCurves.WIRED, VolumeCurves.SPEAKER)) {
+            for (s in 0..30) assertEquals("step $s", 15, VolumeSteps.settingFor(s, c, split = SOFTWARE).index)
+        }
+    }
+
+    @Test
+    fun softwareSplitKeepsTheTwoDbSteps() {
+        for (c in listOf(VolumeCurves.A2DP, VolumeCurves.WIRED)) {
+            for (s in 1..30) assertEquals("step $s", VolumeSteps.targetDb(s), softwareLevelDb(s, c), 1e-4)
+        }
+        assertEquals(1f, VolumeSteps.settingFor(30, dac, split = SOFTWARE).gain, 0f)
+        assertEquals(0.00126f, VolumeSteps.settingFor(1, dac, split = SOFTWARE).gain, 1e-5f) // -58 dB
+    }
+
+    @Test
+    fun softwareSplitMutesWithTheGainOnly() {
+        assertEquals(VolumeSteps.Setting(15, 0f), VolumeSteps.settingFor(0, dac, split = SOFTWARE))
+        assertEquals(VolumeSteps.Setting(15, 0f), VolumeSteps.settingFor(-1, dac, split = SOFTWARE))
+    }
+
+    @Test
+    fun softwareSplitRespectsTheSystemMaximum() {
+        assertEquals(VolumeSteps.Setting(10, 1f), VolumeSteps.settingFor(30, curve, sysMaxIndex = 10, split = SOFTWARE))
+    }
+
+    @Test
+    fun softwareSplitChangesOnlyTheGain() {
+        for (step in 0..30) {
+            val plan = VolumeSteps.indexSchedule(15, step, dac, msSinceLastWrite = 0, split = SOFTWARE)
+            assertEquals(1, plan.size)
+            assertEquals(15, plan[0].index)
+            assertEquals(0L, plan[0].delayMs)
+        }
+    }
+
+    /** First start after the update, or FM radio off: the index goes up to the top, never before the gain. */
+    @Test
+    fun migrationRaisesTheIndexOnlyAfterTheGain() {
+        for (from in 0..14) {
+            for (step in 0..30) {
+                val plan = VolumeSteps.indexSchedule(from, step, dac, msSinceLastWrite = 0, split = SOFTWARE)
+                assertEquals(2, plan.size)
+                assertEquals("no index change in the first write", from, plan[0].index)
+                assertEquals(VolumeSteps.settingFor(step, dac, split = SOFTWARE).gain, plan[0].gain, 0f)
+                assertEquals(15, plan[1].index)
+                assertTrue(plan[1].delayMs >= VolumeSteps.INCREASE_AFTER_GAIN_MS)
+                // The level is never above the step: at the old index with the new gain it is lower or the same.
+                if (step > 0 && from > 0) assertTrue(levelDb(plan[0], dac) <= VolumeSteps.targetDb(step) + 1e-4)
+            }
+        }
+    }
+
+    /** FM radio on: from the top index down to the index split, one index at a time, the level stays at the step. */
+    @Test
+    fun switchToIndexSplitForFmKeepsTheLevel() {
+        val step = 12 // -36 dB: index 1 (-28) and -8 dB gain
+        val plan = VolumeSteps.indexSchedule(15, step, dac, split = INDEX)
+        assertEquals(listOf(15) + (14 downTo 1).toList(), plan.map { it.index })
+        for (c in plan) assertEquals(VolumeSteps.targetDb(step), levelDb(c, dac), 1e-4)
+        for (c in plan.drop(2)) assertEquals(VolumeSteps.MIN_DECREASE_GAP_MS, c.delayMs)
     }
 }
