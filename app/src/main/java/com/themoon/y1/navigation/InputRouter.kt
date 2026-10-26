@@ -113,7 +113,8 @@ class InputRouter private constructor() {
 
         // Screen is off: block or allow only media controls based on isScreenOffControlEnabled
         if (!isScreenOn) {
-            if (!isScreenOffControlEnabled) {
+            // Media keys from a remote (Bluetooth, wired headset) always act; Screen-Off Control is for the Y2's own buttons
+            if (!RemoteMediaKeys.actsWithScreenOff(event, isScreenOffControlEnabled)) {
                 return true
             }
             val isMediaKey = keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||

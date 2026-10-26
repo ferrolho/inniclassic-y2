@@ -1302,14 +1302,16 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 val isScreenOffCtrl = instance?.isScreenOffControlEnabled
                     ?: context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
                         .getBoolean("screen_off_control", false)
-                if (!isScreenOffCtrl) {
+                // Media keys from a remote (car, Bluetooth headphones, wired headset) always act
+                if (!com.themoon.y1.navigation.RemoteMediaKeys.actsWithScreenOff(event, isScreenOffCtrl)) {
                     return
                 }
             }
 
             val am = AudioPlayerManager.getInstance()
             when (event.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {
+                KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85,
+                KeyEvent.KEYCODE_HEADSETHOOK -> {
                     am.playOrPauseMusic()
                 }
                 KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> {
