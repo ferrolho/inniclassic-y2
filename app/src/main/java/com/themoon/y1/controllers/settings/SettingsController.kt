@@ -455,6 +455,22 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnSound)
 
+        // Click Volume: Low / Medium / High; each push plays a click at the new level.
+        val clickVolume = com.themoon.y1.managers.ClickVolume
+        var clickVolumeLevel = clickVolume.validLevel(prefs.getInt(clickVolume.PREF, clickVolume.DEFAULT))
+        val btnClickVolume = createSettingRow(
+            localize("Click Volume"),
+            localize(clickVolume.LABELS[clickVolumeLevel])
+        )
+        btnClickVolume.setOnClickListener {
+            clickVolumeLevel = clickVolume.next(clickVolumeLevel)
+            prefs.edit().putInt(clickVolume.PREF, clickVolumeLevel).commit()
+            val tvStatus = btnClickVolume.getChildAt(1) as? TextView
+            tvStatus?.text = localize(clickVolume.LABELS[clickVolumeLevel])
+            clickFeedback()
+        }
+        containerSettingsItems.addView(btnClickVolume)
+
         val btnVibrateMenu = createSettingRow(localize("Vibration"), "〉 ")
         btnVibrateMenu.setOnClickListener {
             clickFeedback()
@@ -1448,6 +1464,7 @@ class SettingsController(
                 .remove("video_stretch_fill")
                 .remove("album_tilt_enabled")
                 .remove("backlight_timer_index")
+                .remove(com.themoon.y1.managers.ClickVolume.PREF)
                 .remove("screen_off_control")
                 .remove("repeat_mode")
                 .remove("repeat")

@@ -80,6 +80,7 @@ import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
 import com.themoon.y1.managers.VirtualVolumeManager
 import com.themoon.y1.managers.AudioOutput
+import com.themoon.y1.managers.ClickVolume
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.VolumeCurves
 import com.themoon.y1.managers.VolumeMemory
@@ -507,7 +508,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             vibrator.vibrate((vibrationStrengthLevel * 15).toLong())
         }
         if (isSoundEffectEnabled) {
-            audioManager.playSoundEffect(AudioManager.FX_KEY_CLICK)
+            // Settings → Click Volume: a level of its own, not the music volume (see ClickVolume).
+            val level = prefs.getInt(ClickVolume.PREF, ClickVolume.DEFAULT)
+            val output = currentAudioOutput ?: AudioOutput.SPEAKER
+            audioManager.playSoundEffect(
+                AudioManager.FX_KEY_CLICK,
+                ClickVolume.clickGain(level, output, currentVirtualVolume.coerceAtLeast(0))
+            )
         }
     }
 
