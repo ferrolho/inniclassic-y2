@@ -9,9 +9,9 @@ import kotlin.math.pow
  * so the click (STREAM_SYSTEM) always gets the same hardware level. Its level is the `volume` of
  * `AudioManager.playSoundEffect(FX_KEY_CLICK, volume)`, a linear gain on the click sound (1.0 = the full sound).
  *
- * Levels, in dB of that gain: Low -30, Medium -20, High -10. Medium is about the click level of a typical music
- * volume before (Android index 8–10 = -14…-10 dB, with Android's default click gain of -6 dB). Each level is
- * 10 dB from the next, a clear step. The default click gain (-6 dB) at the top index was too loud for a click.
+ * Levels, in dB of that gain: Low -26, Medium -16, High -6. High is Android's default click gain (-6 dB), the click
+ * that the user heard on each centre push until Android's own view click was turned off. Each level is 10 dB from
+ * the next, a clear step also on the small speaker (in the mixer the click peaks are then -9, -19 and -29 dBFS).
  *
  * Headphones (wired and Bluetooth): the click is not more than [HEADPHONE_ABOVE_MUSIC_DB] above the music level,
  * so it is not loud in the ears when the music is quiet; and not below [HEADPHONE_FLOOR_DB], so it stays audible
@@ -25,7 +25,7 @@ object ClickVolume {
     const val DEFAULT = MEDIUM
 
     val LABELS = arrayOf("Low", "Medium", "High")
-    val LEVEL_DB = doubleArrayOf(-30.0, -20.0, -10.0)
+    val LEVEL_DB = doubleArrayOf(-26.0, -16.0, -6.0)
 
     const val HEADPHONE_ABOVE_MUSIC_DB = 6.0
     const val HEADPHONE_FLOOR_DB = -40.0

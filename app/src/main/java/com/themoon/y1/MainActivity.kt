@@ -1045,7 +1045,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 Settings.System.putInt(
                     contentResolver,
                     Settings.System.SOUND_EFFECTS_ENABLED,
-                    if (isSoundEffectEnabled) 1 else 0
+                    // Always off: else Android also plays its own view click (default gain, -6 dB) on each
+                    // performClick and list item click, with ours and much louder. Our click (clickFeedback:
+                    // playSoundEffect with a volume) does not read this setting, so Button Sound still works.
+                    0
                 )
                 Settings.System.putInt(
                     contentResolver,
