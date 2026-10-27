@@ -169,6 +169,7 @@
   "Folders": "Carpetas",
   "Artists": "Artistas",
   "Albums": "Álbumes",
+  "Compilations": "Recopilatorios",
   "All Songs": "Todas las canciones",
   "Playlists": "Listas de reproducción",
   "Switch to Audiobooks": "Cambiar a Audiolibros",
@@ -232,6 +233,8 @@
   "HIDDEN": "OCULTO",
   "SHOW": "MOSTRAR",
   "Shuffle Mode": "Modo aleatorio",
+  "Shuffle Songs": "Canciones aleatorias",
+  "No playable audio files found.": "No se encontraron archivos de audio reproducibles.",
   "Shuffle": "Aleatorio",
   "Song": "canción",
   "Songs": "canciones",
@@ -331,6 +334,9 @@
   "Keyboard Layout": "Distribución del teclado",
   "Original": "Original",
   "QWERTY": "QWERTY",
+  "Group Albums": "Agrupar álbumes",
+  "By Title": "Por título",
+  "By Title and Artist": "Por título y artista",
   "Next": "Siguiente",
   "Login": "Iniciar sesión",
   "Add to Favorites": "Añadir a favoritos",
@@ -453,8 +459,6 @@
   "Buy 1 Heart ($1,500)": "Comprar 1 corazón ($1.500)",
   "Heart Purchased": "Corazón comprado",
   "Recently Played": "Reproducido recientemente",
-  "No recently played albums yet.": "Aún no hay álbumes reproducidos recientemente.",
-  "Clear Recently Played": "Borrar reproducido recientemente",
-  "Are you sure you want to clear your recently played history?": "¿Seguro que deseas borrar el historial de reproducción reciente?",
-  "Recently played cleared.": "Historial de reproducción reciente borrado."
+  "Top 25 Most Played": "Las 25 más escuchadas",
+  "No Songs": "No hay canciones"
 }
