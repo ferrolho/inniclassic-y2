@@ -543,7 +543,8 @@ class PlayerController(
 
     fun updateVisualizer(fft: ByteArray?) {
         if (visualizerView.visibility == View.VISIBLE) {
-            visualizerView.updateVisualizer(fft, spectrumColor())
+            val gain = AudioPlayerManager.getInstance().getMasterVolume()
+            visualizerView.updateVisualizer(fft, spectrumColor(), com.themoon.y1.views.SpectrumLevel.gainCompensation(gain))
         }
     }
 
