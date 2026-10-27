@@ -387,6 +387,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         BluetoothAvrcpManager.getInstance(this).init()
         restoreVolumeForOutput(force = true)
         AndroidVolumeChangeReceiver.register(applicationContext)
+        com.themoon.y1.managers.ClickSound.load()
         FmRadioManager.getInstance(this).apply {
             volumeGate = { ready -> runOnUiThread { prepareVolumeForFm(ready) } }
             onPoweredDown = { runOnUiThread { leaveFmVolume() } }
@@ -512,8 +513,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             // Settings → Click Volume: a level of its own, not the music volume (see ClickVolume).
             val level = prefs.getInt(ClickVolume.PREF, ClickVolume.DEFAULT)
             val output = currentAudioOutput ?: AudioOutput.SPEAKER
-            audioManager.playSoundEffect(
-                AudioManager.FX_KEY_CLICK,
+            // Our own click on STREAM_MUSIC: STREAM_SYSTEM stays muted, because the ROM clicks there on each press (see ClickSound)
+            com.themoon.y1.managers.ClickSound.play(
                 ClickVolume.clickGain(level, output, currentVirtualVolume.coerceAtLeast(0))
             )
         }
@@ -1073,13 +1074,14 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun updateScreenOffFeedback(screenOn: Boolean) {
         try {
             if (screenOn) {
-                audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, !isSoundEffectEnabled)
+                // Always muted: the ROM plays Android's click on STREAM_SYSTEM on each key press (see ClickSound)
+                audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, true)
                 Settings.System.putInt(
                     contentResolver,
                     Settings.System.SOUND_EFFECTS_ENABLED,
                     // Always off: else Android also plays its own view click (default gain, -6 dB) on each
                     // performClick and list item click, with ours and much louder. Our click (clickFeedback:
-                    // playSoundEffect with a volume) does not read this setting, so Button Sound still works.
+                    // ClickSound) does not read this setting, so Button Sound still works.
                     0
                 )
                 Settings.System.putInt(

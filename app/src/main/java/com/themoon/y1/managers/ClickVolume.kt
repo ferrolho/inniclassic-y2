@@ -6,8 +6,8 @@ import kotlin.math.pow
  * Settings → Click Volume: the level of the button click (FX_KEY_CLICK), independent of the music volume.
  *
  * The music sets its volume with the player gain and keeps the Android index at the top ([VolumeSplit.SOFTWARE]),
- * so the click (STREAM_SYSTEM) always gets the same hardware level. Its level is the `volume` of
- * `AudioManager.playSoundEffect(FX_KEY_CLICK, volume)`, a linear gain on the click sound (1.0 = the full sound).
+ * so the click ([ClickSound], on STREAM_MUSIC) always gets the same hardware level. Its level is a linear gain on
+ * the click sound (1.0 = the full sound), as the `volume` of `AudioManager.playSoundEffect(FX_KEY_CLICK, volume)`.
  *
  * Levels, in dB of that gain: Low -26, Medium -16, High -6. High is Android's default click gain (-6 dB), the click
  * that the user heard on each centre push until Android's own view click was turned off. Each level is 10 dB from
@@ -44,7 +44,7 @@ object ClickVolume {
         return minOf(db, cap)
     }
 
-    /** The `volume` argument of playSoundEffect (linear, 0..1). */
+    /** The linear gain of the click sound (0..1). */
     fun clickGain(level: Int, output: AudioOutput, musicStep: Int): Float =
         10.0.pow(clickDb(level, output, musicStep) / 20.0).toFloat()
 }
