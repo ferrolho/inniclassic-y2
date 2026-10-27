@@ -18,6 +18,7 @@ import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.TextView
 import com.themoon.y1.MainActivity
+import com.themoon.y1.views.WheelDialog
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -489,8 +490,31 @@ class PlayerController(
             onToggleVisualizer = onToggleVisualizer,
             isTotalTimeShown = isTotalTimeShown(),
             onToggleTotalTime = { toggleTotalTime() },
+            lyricsScript = if (lyricsOverlayController.hasRomanised) lyricsScript() else null,
+            onChooseLyricsScript = { showLyricsScriptMenu() },
             localize = localize
         )
+    }
+
+    private fun lyricsScript(): Int = LyricsScript.normalize(
+        activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE).getInt(LyricsScript.PREF, LyricsScript.ORIGINAL)
+    )
+
+    /** Lyrics: Original (native script), Romanised (pinyin, romaji) or Both; the current value has a tick. */
+    private fun showLyricsScriptMenu() {
+        val current = lyricsScript()
+        WheelDialog.show(activity) {
+            title = localize("Lyrics")
+            for (mode in listOf(LyricsScript.ORIGINAL, LyricsScript.ROMANISED, LyricsScript.BOTH)) {
+                val label = localize(LyricsScript.label(mode))
+                addButton(text = if (mode == current) "✓ $label" else label, icon = null) {
+                    activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE).edit()
+                        .putInt(LyricsScript.PREF, mode).commit()
+                    lyricsOverlayController.onScriptChanged()
+                }
+            }
+            negativeButton(localize("Cancel"))
+        }
     }
 
     /**

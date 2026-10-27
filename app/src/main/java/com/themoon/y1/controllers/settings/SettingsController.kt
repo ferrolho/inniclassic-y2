@@ -1455,6 +1455,7 @@ class SettingsController(
                 .remove("video_stretch_fill")
                 .remove("album_tilt_enabled")
                 .remove("show_total_time")
+                .remove("lyrics_script")
                 .remove("backlight_timer_index")
                 .remove("screen_off_control")
                 .remove("repeat_mode")
