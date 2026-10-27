@@ -95,7 +95,7 @@ class SettingsController(
         )
         val TIMEOUT_VALUES = intArrayOf(15000, 30000, 60000, 300000)
         val TIMEOUT_NAMES = arrayOf("15 Sec", "30 Sec", "1 Min", "5 Min")
-        val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
+        val VIBE_STRENGTH_NAMES = com.themoon.y1.managers.ButtonVibration.LABELS
 
         val MUSIC_MENU_ITEMS = arrayOf(
             arrayOf("coverflow", "Cover Flow"),
