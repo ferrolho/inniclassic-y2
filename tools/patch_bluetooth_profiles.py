@@ -6,8 +6,11 @@ Turns off the phone profiles of Bluetooth.apk of the Y2: hands-free (HFP/HSP), p
 
 The Y2 is a music player without a phone. With these profiles on, a car sees the Y2 as a phone and asks for its
 phone book and messages; Settings then shows a dialog that the click wheel cannot answer. AdapterService starts only
-the profile services whose profile_supported_* bool is true (Config.init), and the PBAP receiver checks
-profile_supported_pbap. A2DP and AVRCP (music and remote control) do not change.
+the profile services whose profile_supported_* bool is true (Config.init). The manifest also sets android:enabled of
+HeadsetService, BluetoothMapService and the PBAP activity, service and receiver to these bools, so Android disables
+these components (PBAP is not in Config: its receiver starts it). An explicit `pm enable` of a component (kept in
+/data/system/users/0/package-restrictions.xml) overrides the manifest value. A2DP and AVRCP (music and remote
+control) do not change.
 
 The patch changes only the data bytes of the three bools in resources.arsc and its CRC-32, as
 patch_low_battery_warning.py does for framework-res.apk. resources.arsc must be stored (not compressed).

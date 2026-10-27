@@ -587,6 +587,9 @@ if [ "$TYPE" = "y2" ]; then
 
     # The Y2 has no phone: without HFP, PBAP and MAP a car asks for no phone book or messages,
     # so Settings shows no access dialog (the click wheel cannot answer it). A2DP and AVRCP stay on.
+    # The manifest sets android:enabled of these profile components to the patched bools, so Android
+    # disables them (also the PBAP receiver, which AdapterService does not control). Only an explicit
+    # `pm enable` in /data overrides this.
     echo "==> Turning off the hands-free, phone book and message profiles in Bluetooth.apk"
     sudo python3 -B "$REPO_ROOT/tools/patch_bluetooth_profiles.py" "$MOUNT_SYS/app/Bluetooth.apk"
     sudo chmod 644 "$MOUNT_SYS/app/Bluetooth.apk"
