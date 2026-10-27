@@ -14,6 +14,7 @@ import java.io.File
  * - Browse Album / Browse Artist
  * - Show/Hide Spectrum
  * - Show Total Time / Show Remaining Time
+ * - Lyrics: Original / Romanised / Both (only for a song with romanised lyrics)
  */
 object NowPlayingContextMenu {
 
@@ -31,6 +32,8 @@ object NowPlayingContextMenu {
         onToggleVisualizer: () -> Unit,
         isTotalTimeShown: Boolean,
         onToggleTotalTime: () -> Unit,
+        lyricsScript: Int?,
+        onChooseLyricsScript: () -> Unit,
         localize: (String) -> String
     ) {
         WheelDialog.show(activity) {
@@ -90,6 +93,15 @@ object NowPlayingContextMenu {
                 icon = null
             ) {
                 onToggleTotalTime()
+            }
+
+            if (lyricsScript != null) {
+                addButton(
+                    text = localize("Lyrics") + ": " + localize(LyricsScript.label(lyricsScript)),
+                    icon = null
+                ) {
+                    onChooseLyricsScript()
+                }
             }
 
             negativeButton(localize("Cancel"))
