@@ -534,6 +534,15 @@ class PlayerController(
                 frameAlbumReflection?.visibility = albumVisibility
             }
         }
+        if (showSpectrum) {
+            // The width of the art now (a layout can change it after init), so the text column stays in place
+            val artWidth = frameAlbumArt?.layoutParams?.width
+            val lp = visualizerView.layoutParams
+            if (artWidth != null && artWidth > 0 && lp != null && lp.width != artWidth) {
+                lp.width = artWidth
+                visualizerView.layoutParams = lp
+            }
+        }
         visualizerView.visibility = if (showSpectrum) View.VISIBLE else View.GONE
         visualizerApplied = isOn
         try {
