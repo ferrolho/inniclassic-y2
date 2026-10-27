@@ -23,6 +23,10 @@ object AvrcpMetadataLogic {
         MediaMetadataRetriever.METADATA_KEY_ALBUM to track.album
     )
 
+    /** The title for a log line: at most [max] characters. */
+    fun shortTitle(title: String, max: Int = 40): String =
+        if (title.length <= max) title else title.substring(0, max - 1) + "…"
+
     /** Duration for MetadataEditor.putLong(METADATA_KEY_DURATION), or null when not known yet. */
     fun duration(track: Track): Long? = track.durationMs.takeIf { it > 0 }
 

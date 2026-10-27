@@ -46,4 +46,12 @@ class AvrcpMetadataLogicTest {
         assertEquals(200 to 100, AvrcpMetadataLogic.artSize(200, 100))
         assertNull(AvrcpMetadataLogic.artSize(0, 100))
     }
+
+    @Test
+    fun shortTitleIsCutForTheLog() {
+        assertEquals("Title", AvrcpMetadataLogic.shortTitle("Title"))
+        val cut = AvrcpMetadataLogic.shortTitle("x".repeat(100))
+        assertEquals(40, cut.length)
+        assertEquals('…', cut.last())
+    }
 }
