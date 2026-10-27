@@ -23,12 +23,14 @@ import android.widget.Toast
 import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
+import com.themoon.y1.changeTheme
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.AutoThemeManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.WirelessAdbManager
 import com.themoon.y1.managers.LanguageManager
@@ -187,6 +189,18 @@ class SettingsController(
     override fun onRefreshUI() {
         if (currentSettingsDepth == 0) {
             buildSettingsUI()
+        }
+    }
+
+    // First row of the theme list when it was made; the list still shows while this row is in the container
+    private var themeListFirstRow: View? = null
+
+    override fun onThemeChanged() {
+        when {
+            currentSettingsDepth == 0 -> buildSettingsUI()
+            themeListFirstRow != null && containerSettingsItems.getChildAt(0) === themeListFirstRow -> buildThemeSelectorUI()
+            // Other sub-screens: one level up, as Back does
+            else -> buildSettingsUI()
         }
     }
 
@@ -575,7 +589,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBacklightTimer)
 
-        val btnTheme = createSettingRow(localize("Theme"), ThemeManager.getCurrentTheme().name)
+        val btnTheme = createSettingRow(localize("Theme"), AutoThemeManager.settingsRowValue(prefs, localize))
         btnTheme.setOnClickListener {
             clickFeedback()
             buildThemeSelectorUI()
@@ -964,11 +978,13 @@ class SettingsController(
         val themeFolder = File(activity.filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeFolder)
         containerSettingsItems.removeAllViews()
+        containerSettingsItems.addView(
+            AutoThemeManager.createSelectorRow(activity, prefs, createTablerListButton, clickFeedback, localize)
+        )
 
         for (i in 0 until ThemeManager.availableThemes.size) {
-            val index = i
             val theme = ThemeManager.availableThemes[i]
-            val isSelected = ThemeManager.getCurrentThemeIndex() == i
+            val isSelected = ThemeManager.getCurrentThemeIndex() == i && !AutoThemeManager.isEnabled(prefs)
             val icon = if (isSelected) TablerIcons.CHECK else null
             val btn = createTablerListButton(
                 icon,
@@ -978,52 +994,9 @@ class SettingsController(
             )
             btn.setOnClickListener {
                 clickFeedback()
-                ThemeManager.setThemeIndex(index)
-                try {
-                    val editor = prefs.edit()
-                    editor.putInt("app_theme_index", index)
-                    editor.putString("app_theme_name", ThemeManager.availableThemes[index].name)
-                    editor.putString("current_theme_name", ThemeManager.availableThemes[index].name)
-                    editor.putBoolean("reboot_to_theme", true)
-
-                    val selectedTheme = ThemeManager.availableThemes[index]
-                    var hasThemeBg = false
-                    if (!selectedTheme.bgImage.isNullOrEmpty() && File(selectedTheme.folderPath, selectedTheme.bgImage).exists()) {
-                        hasThemeBg = true
-                    }
-                    if (!hasThemeBg && File(selectedTheme.folderPath, "background.png").exists()) hasThemeBg = true
-                    if (!hasThemeBg && File(selectedTheme.folderPath, "bg.png").exists()) hasThemeBg = true
-
-                    if (hasThemeBg) {
-                        editor.putString("bg_path", "THEME_DEFAULT")
-                    }
-
-                    var hasClock = false
-                    var hasAnalog = false
-                    var hasBattery = false
-                    var hasCircular = false
-                    var hasAlbum = false
-                    var hasFocusImage = false
-
-                    for (el in theme.menuElements) {
-                        if ("widget_clock" == el.type) hasClock = true
-                        if ("widget_analog_clock" == el.type) hasAnalog = true
-                        if ("widget_battery" == el.type) hasBattery = true
-                        if ("widget_circular_battery" == el.type) hasCircular = true
-                        if ("widget_album" == el.type) hasAlbum = true
-                        if ("widget_focus_image" == el.type) hasFocusImage = true
-                    }
-
-                    editor.putBoolean("widget_clock", hasClock)
-                    editor.putBoolean("widget_analog_clock", hasAnalog)
-                    editor.putBoolean("widget_battery", hasBattery)
-                    editor.putBoolean("widget_circular_battery", hasCircular)
-                    editor.putBoolean("widget_album", hasAlbum)
-                    editor.putBoolean("widget_focus_image", hasFocusImage)
-                    editor.commit()
-                } catch (_: Exception) {}
-
-                activity.recreate()
+                AutoThemeManager.turnOff(activity, prefs)
+                // Live: the theme list is made again in the new theme, with the focus on this row
+                mainActivity?.changeTheme(theme.name)
             }
             containerSettingsItems.addView(btn)
         }
@@ -1031,6 +1004,7 @@ class SettingsController(
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
+        themeListFirstRow = containerSettingsItems.getChildAt(0)
     }
 
     private fun buildVibrationSettingsUI() {
@@ -1663,6 +1637,7 @@ class SettingsController(
     }
 
     private fun resetAllAppSettings() {
+        AutoThemeManager.reset(activity, prefs)
         try {
             prefs.edit()
                 .remove(ClockSettings.KEY_24_HOUR_FORMAT)
