@@ -83,6 +83,7 @@ class AudioPlayerManager private constructor() {
     private fun startPeriodicPositionSaver() {
         positionSaveHandler.removeCallbacks(positionSaveRunnable)
         positionSaveHandler.postDelayed(positionSaveRunnable, 5000)
+        MainActivity.instance?.let { PlayHistoryManager.getInstance(it).onPlaybackStarted() }
     }
 
     private fun stopPeriodicPositionSaver() {
@@ -223,13 +224,6 @@ class AudioPlayerManager private constructor() {
                                             duration.toLong(),
                                             pendingScrobblePath
                                         )
-                                        if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
-                                            RecentlyPlayedManager.getInstance(main).onTrackStarted(
-                                                main.currentPlaylist[main.currentIndex],
-                                                pendingScrobbleAlbum,
-                                                pendingScrobbleArtist
-                                            )
-                                        }
                                     }
                                     if (main.currentPlaylist.isNotEmpty()) {
                                         main.updateAudioQualityInfo(main.currentPlaylist[main.currentIndex])
@@ -390,9 +384,8 @@ class AudioPlayerManager private constructor() {
         val isShuffle = main.prefs.getBoolean("shuffle", false)
         val repeatPref = main.prefs.getInt("repeat_mode", 0)
         if (isShuffle) {
-            Collections.shuffle(main.currentPlaylist)
-            main.currentIndex = main.currentPlaylist.indexOf(targetSong)
-            if (main.currentIndex == -1) main.currentIndex = 0
+            shuffleWithFirst(main.currentPlaylist, targetSong)
+            main.currentIndex = 0
         } else {
             main.currentIndex = targetIndex
         }
@@ -570,7 +563,6 @@ class AudioPlayerManager private constructor() {
             val player = legacyPlayer ?: return
             if (player.isPlaying) {
                 isPlayingActive = false
-                RecentlyPlayedManager.getInstance(MainActivity.instance).onPlaybackPausedOrStopped()
                 saveAudiobookBookmarkIfNeeded()
                 player.pause()
                 stopPeriodicPositionSaver()
@@ -582,21 +574,11 @@ class AudioPlayerManager private constructor() {
                 startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
                 savePlaybackPositionOnly(sync = false)
-                MainActivity.instance?.let { main ->
-                    if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
-                        RecentlyPlayedManager.getInstance(main).onTrackStarted(
-                            main.currentPlaylist[main.currentIndex],
-                            pendingScrobbleAlbum,
-                            pendingScrobbleArtist
-                        )
-                    }
-                }
             }
         } else if (exoPlayer != null) {
             val player = exoPlayer ?: return
             if (player.playWhenReady) {
                 isPlayingActive = false
-                RecentlyPlayedManager.getInstance(MainActivity.instance).onPlaybackPausedOrStopped()
                 saveAudiobookBookmarkIfNeeded()
                 player.playWhenReady = false
                 stopPeriodicPositionSaver()
@@ -608,15 +590,6 @@ class AudioPlayerManager private constructor() {
                 startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
                 savePlaybackPositionOnly(sync = false)
-                MainActivity.instance?.let { main ->
-                    if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
-                        RecentlyPlayedManager.getInstance(main).onTrackStarted(
-                            main.currentPlaylist[main.currentIndex],
-                            pendingScrobbleAlbum,
-                            pendingScrobbleArtist
-                        )
-                    }
-                }
             }
         }
         MainActivity.instance?.updatePlayerUI()
@@ -1039,13 +1012,6 @@ class AudioPlayerManager private constructor() {
                         duration.toLong(),
                         pendingScrobblePath
                     )
-                    if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
-                        RecentlyPlayedManager.getInstance(main).onTrackStarted(
-                            main.currentPlaylist[main.currentIndex],
-                            pendingScrobbleAlbum,
-                            pendingScrobbleArtist
-                        )
-                    }
                 }
             } else if (isGaplessQueueActive) {
                 exoPlayer?.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
@@ -1203,7 +1169,6 @@ class AudioPlayerManager private constructor() {
 
     fun releasePlayer() {
         isPlayingActive = false
-        RecentlyPlayedManager.getInstance(MainActivity.instance).onPlaybackPausedOrStopped()
         currentlyPlayingFilePath = null
         stopPeriodicPositionSaver()
         exoPlayer?.release()
@@ -1219,7 +1184,7 @@ class AudioPlayerManager private constructor() {
     fun extractOpusMetadata(file: File): Array<Any?> = extractOpusMetadata(file, true)
 
     fun extractOpusMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val fis = FileInputStream(file)
             val bos = ByteArrayOutputStream()
@@ -1304,6 +1269,8 @@ class AudioPlayerManager private constructor() {
                         tags[8] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("COMPOSER=")) {
                         tags[9] = comment.substring(comment.indexOf("=") + 1)
+                    } else if (upper.startsWith("COMPILATION=")) {
+                        tags[10] = comment.substring(comment.indexOf("=") + 1)
                     } else if (includeArt && upper.startsWith("METADATA_BLOCK_PICTURE=")) {
                         try {
                             val base64Data = comment.substring(23).replace("\\s".toRegex(), "")
@@ -1346,7 +1313,7 @@ class AudioPlayerManager private constructor() {
     fun extractOggVorbisMetadata(file: File): Array<Any?> = extractOggVorbisMetadata(file, true)
 
     fun extractOggVorbisMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val fis = FileInputStream(file)
             val bos = ByteArrayOutputStream()
@@ -1445,6 +1412,8 @@ class AudioPlayerManager private constructor() {
                         tags[8] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("COMPOSER=")) {
                         tags[9] = comment.substring(comment.indexOf("=") + 1)
+                    } else if (upper.startsWith("COMPILATION=")) {
+                        tags[10] = comment.substring(comment.indexOf("=") + 1)
                     } else if (includeArt && upper.startsWith("METADATA_BLOCK_PICTURE=")) {
                         try {
                             val base64Data = comment.substring(23).replace("\\s".toRegex(), "")
@@ -1492,7 +1461,7 @@ class AudioPlayerManager private constructor() {
     fun extractFlacMetadata(file: File): Array<Any?> = extractFlacMetadata(file, true)
 
     fun extractFlacMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val raf = RandomAccessFile(file, "r")
             val header = ByteArray(4)
@@ -1554,6 +1523,8 @@ class AudioPlayerManager private constructor() {
                                 tags[8] = comment.substring(comment.indexOf("=") + 1)
                             } else if (upper.startsWith("COMPOSER=")) {
                                 tags[9] = comment.substring(comment.indexOf("=") + 1)
+                            } else if (upper.startsWith("COMPILATION=")) {
+                                tags[10] = comment.substring(comment.indexOf("=") + 1)
                             }
                             i++
                         }
@@ -1585,7 +1556,7 @@ class AudioPlayerManager private constructor() {
     fun extractAlacMetadata(file: File): Array<Any?> = extractAlacMetadata(file, true)
 
     fun extractAlacMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val raf = RandomAccessFile(file, "r")
             val fileSize = raf.length()
@@ -1609,7 +1580,8 @@ class AudioPlayerManager private constructor() {
 
                 if (type == "\u00A9nam" || type == "\u00A9ART" || type == "\u00A9alb" ||
                     type == "\u00A9day" || type == "\u00A9gen" || (includeArt && type == "covr") ||
-                    type == "trkn" || type == "\u00A9lyr" || type == "aART" || type == "\u00A9wrt"
+                    type == "trkn" || type == "\u00A9lyr" || type == "aART" || type == "\u00A9wrt" ||
+                    type == "cpil"
                 ) {
                     raf.seek(pos + 8)
                     val dataSize = raf.readInt()
@@ -1639,6 +1611,7 @@ class AudioPlayerManager private constructor() {
                                 "\u00A9lyr" -> tags[7] = String(data, Charsets.UTF_8)
                                 "aART" -> tags[8] = String(data, Charsets.UTF_8)
                                 "\u00A9wrt" -> tags[9] = String(data, Charsets.UTF_8)
+                                "cpil" -> tags[10] = if (data[0].toInt() != 0) "1" else "0"
                             }
                         }
                     }
@@ -1864,4 +1837,14 @@ class AudioPlayerManager private constructor() {
             return inst
         }
     }
+}
+
+/**
+ * Shuffles [list] in place with [first] moved to the front, so a shuffled run that starts on
+ * [first] reaches every other track before the list ends.
+ */
+internal fun <T> shuffleWithFirst(list: MutableList<T>, first: T) {
+    list.remove(first)
+    Collections.shuffle(list)
+    list.add(0, first)
 }

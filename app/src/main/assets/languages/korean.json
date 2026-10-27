@@ -170,6 +170,7 @@
   "Folders": "폴더",
   "Artists": "아티스트",
   "Albums": "앨범",
+  "Compilations": "컴필레이션",
   "All Songs": "모든 곡",
   "Playlists": "재생목록",
   "Switch to Audiobooks": "오디오북으로 전환",
@@ -233,6 +234,8 @@
   "HIDDEN": "숨김",
   "SHOW": "표시",
   "Shuffle Mode": "셔플 모드",
+  "Shuffle Songs": "노래 셔플",
+  "No playable audio files found.": "재생 가능한 오디오 파일이 없습니다.",
   "Shuffle": "셔플",
   "Song": "곡",
   "Songs": "곡",
@@ -331,6 +334,9 @@
   "Keyboard Layout": "키보드 배열",
   "Original": "오리지널",
   "QWERTY": "QWERTY",
+  "Group Albums": "앨범 묶기",
+  "By Title": "제목별",
+  "By Title and Artist": "제목 및 아티스트별",
   "Next": "다음",
   "Login": "로그인",
   "Add to Favorites": "즐겨찾기에 추가",
@@ -453,8 +459,6 @@
   "Buy 1 Heart ($1,500)": "하트 1개 구매 ($1,500)",
   "Heart Purchased": "하트 구매 완료",
   "Recently Played": "최근 재생된 음악",
-  "No recently played albums yet.": "최근 재생된 앨범이 없습니다.",
-  "Clear Recently Played": "최근 재생 기록 지우기",
-  "Are you sure you want to clear your recently played history?": "최근 재생 기록을 지우시겠습니까?",
-  "Recently played cleared.": "최근 재생 기록이 삭제되었습니다."
+  "Top 25 Most Played": "가장 많이 재생된 25곡",
+  "No Songs": "노래 없음"
 }
