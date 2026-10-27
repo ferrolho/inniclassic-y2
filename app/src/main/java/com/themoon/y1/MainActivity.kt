@@ -225,7 +225,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var displayedPlayerPath: String? = null
     var nowPlayingBottomState: Int = 0
     var pendingSeekChanged: Boolean = false
-    var isVisualizerShowing: Boolean = false
+    /** Spectrum in place of the album art on Now Playing (Settings → Spectrum), kept in AppPrefs. */
+    var isVisualizerShowing: Boolean
+        get() = ::prefs.isInitialized && prefs.getBoolean(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF, false)
+        set(value) {
+            prefs.edit().putBoolean(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF, value).apply()
+        }
     var audioVisualizer: Visualizer? = null
     var equalizer: Equalizer? = null
     var bassBoost: BassBoost? = null
