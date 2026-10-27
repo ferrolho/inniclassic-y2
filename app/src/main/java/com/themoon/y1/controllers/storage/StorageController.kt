@@ -61,7 +61,7 @@ class StorageController(
         tvStorageHeader?.text = localize("About")
         tvStorageHeader?.setTextColor(ThemeManager.getTextColorPrimary())
 
-        val rowName = createSettingRow(localize("Name"), "iPod")
+        val rowName = createSettingRow(localize("Name"), "Y2")
         rowName.setOnClickListener { clickFeedback() }
         containerStorageItems.addView(rowName)
 
@@ -73,7 +73,7 @@ class StorageController(
         val videos = videosProvider()
         val rowVideos = createSettingRow(localize("Videos"), videos.size.toString())
         rowVideos.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowVideos)
+        if (com.themoon.y1.FeatureVisibility.videosBuilt) containerStorageItems.addView(rowVideos)
 
         val uniqueAlbums = HashSet<String>()
         val uniqueArtists = HashSet<String>()
