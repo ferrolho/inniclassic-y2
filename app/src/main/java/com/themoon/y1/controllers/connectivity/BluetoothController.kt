@@ -22,6 +22,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 import java.lang.reflect.Method
 
@@ -247,11 +248,6 @@ class BluetoothController(
         // after an app restart globalA2dp is null until Bluetooth is turned on or a device is connected here.
         val isConnected = com.themoon.y1.managers.BluetoothAudioState.shared.listShowsConnected(device.address, proxyState)
 
-        var accentColor = 0xFF00FFFF.toInt()
-        try {
-            accentColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-        } catch (ignored: Exception) {}
-
         var devIcon = TablerIcons.BLUETOOTH
         try {
             val btClass = device.bluetoothClass
@@ -261,11 +257,9 @@ class BluetoothController(
             }
         } catch (ignored: Exception) {}
 
-        val btnDevice = if (isConnected) {
-            createTablerListButton(devIcon, name, null, accentColor, accentColor)
-        } else {
-            createTablerListButton(devIcon, name, null, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
-        }
+        // As in the Wi-Fi list: the tick column on the left (tick on the connected device only), the name,
+        // then the device type on the right.
+        val btnDevice = createDeviceRow(name, devIcon, isConnected)
 
         val isConnectedDevice = isConnected
         val btnConnect = if (isConnectedDevice) {
@@ -349,7 +343,7 @@ class BluetoothController(
             }
         } catch (ignored: Exception) {}
 
-        val btnDevice = createTablerListButton(devIcon, displayName, null, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
+        val btnDevice = createDeviceRow(displayName, devIcon, false)
         btnDevice.setOnClickListener {
             clickFeedback()
             connectBluetoothAudio(device)
@@ -358,6 +352,10 @@ class BluetoothController(
         val insertIndex = Math.max(0, containerBtItems.childCount - 1)
         containerBtItems.addView(btnDevice, insertIndex)
     }
+
+    private fun createDeviceRow(name: String, devIcon: Array<String>, isConnected: Boolean): View =
+        ListItemViewFactory.createChoiceRowWithRightIcons(activity, name, isConnected, RowGlyphs.deviceSlots(
+            if (devIcon === TablerIcons.HEADPHONES) RowGlyphs.Kind.HEADPHONES else RowGlyphs.Kind.BLUETOOTH))
 
     fun onDiscoveryFinished() {
         btnScanBt.text = localize("Scan Complete (Retry)")
