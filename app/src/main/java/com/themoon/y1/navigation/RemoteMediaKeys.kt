@@ -28,7 +28,14 @@ object RemoteMediaKeys {
     fun actsWithScreenOff(event: KeyEvent, isScreenOffControlEnabled: Boolean): Boolean =
         actsWithScreenOff(event.keyCode, deviceName(event), isScreenOffControlEnabled)
 
-    private fun deviceName(event: KeyEvent): String? = try {
+    /** What a key does with the screen off, and why, for the log: "acts (remote key)", "ignored (Screen-Off Control Off)". */
+    fun screenOffDecision(keyCode: Int, deviceName: String?, isScreenOffControlEnabled: Boolean): String = when {
+        isMediaKey(keyCode) && !isOwnButtonDevice(deviceName) -> "acts (remote key)"
+        isScreenOffControlEnabled -> "acts (Screen-Off Control On)"
+        else -> "ignored (Screen-Off Control Off)"
+    }
+
+    fun deviceName(event: KeyEvent): String? = try {
         InputDevice.getDevice(event.deviceId)?.name
     } catch (_: Exception) {
         null

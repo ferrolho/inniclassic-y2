@@ -1305,7 +1305,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     ?: context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
                         .getBoolean("screen_off_control", false)
                 // Media keys from a remote (car, Bluetooth headphones, wired headset) always act
-                if (!com.themoon.y1.navigation.RemoteMediaKeys.actsWithScreenOff(event, isScreenOffCtrl)) {
+                val keys = com.themoon.y1.navigation.RemoteMediaKeys
+                val device = keys.deviceName(event)
+                android.util.Log.w("MediaButton", KeyEvent.keyCodeToString(event.keyCode) + " from " + (device ?: "unknown device") +
+                    " with the screen off: " + keys.screenOffDecision(event.keyCode, device, isScreenOffCtrl))
+                if (!keys.actsWithScreenOff(event.keyCode, device, isScreenOffCtrl)) {
                     return
                 }
             }
