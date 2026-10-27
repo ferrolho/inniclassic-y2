@@ -89,10 +89,6 @@ class LyricsOverlayController(
     val hasLyrics: Boolean
         get() = currentLyrics.isNotEmpty() || plainLyrics != null
 
-    /** The track has romanised lyrics: the Now Playing menu then offers the Lyrics setting. */
-    val hasRomanised: Boolean
-        get() = hasLyrics && (romanisedLyrics.isNotEmpty() || romanisedPlain != null)
-
     /** Synced LRC lyrics and M4B chapters follow playback; plain lyrics do not. */
     val isSynced: Boolean
         get() = currentLyrics.isNotEmpty()
@@ -128,18 +124,6 @@ class LyricsOverlayController(
         } else {
             tvLyrics.setTextColor(plainColor)
             tvLyrics.setPadding(20, 40, 20, 40)
-            applyPlainText()
-        }
-        scheduleFrame()
-    }
-
-    /** The Lyrics setting (Original, Romanised, Both) changed: show the lines again in the new form. */
-    fun onScriptChanged() {
-        if (!isShowing()) return
-        if (isSynced) {
-            buildSyncedText()
-            scrollPos = -1f
-        } else {
             applyPlainText()
         }
         scheduleFrame()

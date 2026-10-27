@@ -18,6 +18,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.MainActivity
+import com.themoon.y1.controllers.player.LyricsScript
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
@@ -412,6 +413,16 @@ class SettingsController(
             applyAlbumTiltSetting()
         }
         containerSettingsItems.addView(btnAlbumTilt)
+
+        // Lyrics: Original (native script), Romanised (pinyin, romaji) or Both, for songs with a .romanised.lrc file
+        val btnLyricsScript = createSettingRow(localize("Lyrics"), localize(LyricsScript.label(prefs.getInt(LyricsScript.PREF, LyricsScript.ORIGINAL))))
+        btnLyricsScript.setOnClickListener {
+            clickFeedback()
+            val next = (LyricsScript.normalize(prefs.getInt(LyricsScript.PREF, LyricsScript.ORIGINAL)) + 1) % 3
+            prefs.edit().putInt(LyricsScript.PREF, next).commit()
+            (btnLyricsScript.getChildAt(1) as? TextView)?.text = localize(LyricsScript.label(next))
+        }
+        containerSettingsItems.addView(btnLyricsScript)
 
         val speedLabels = arrayOf("1.0x (Normal)", "1.2x (Fast)", "1.5x (Faster)", "2.0x (Very Fast)")
         val speedValues = floatArrayOf(1.0f, 1.2f, 1.5f, 2.0f)
