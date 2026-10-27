@@ -25,7 +25,7 @@ class CoverMotion(private val random: Random = Random()) {
         const val ZOOM_MAX = 1.5f
 
         /** Time from one key pose to the next. */
-        const val SEGMENT_MS = 16000L
+        const val SEGMENT_MS = 20000L
 
         /** Key poses stay in this part of the free space (the curve between them can go a little further). */
         const val KEY_LIMIT = 0.85f
@@ -39,7 +39,7 @@ class CoverMotion(private val random: Random = Random()) {
 
         /** A longer time between two frames is a pause: the motion then moves by one normal frame only. */
         const val MAX_FRAME_GAP_MS = 250L
-        const val NORMAL_FRAME_MS = 32L
+        const val NORMAL_FRAME_MS = 48L
 
         /** True when the art moves: the setting is on, and the screen is on and not blanked (FakeScreenOff). */
         fun moves(enabled: Boolean, screenOn: Boolean, blanked: Boolean): Boolean = enabled && screenOn && !blanked

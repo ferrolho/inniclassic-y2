@@ -28,8 +28,12 @@ object CoverPane {
     const val PREF = "cover_pan_zoom"
     const val DEFAULT_ON = true
 
-    /** Delay before the next frame: the frame then comes at about every second display refresh (~31 fps). */
-    const val FRAME_DELAY_MS = 17L
+    /**
+     * Delay before the next frame: the frame then comes at about every third display refresh (~21 fps). The Y2
+     * draws the full screen for each frame (~8 ms on its CPU), so fewer frames save battery; the motion is slow
+     * (~5 px/s), so 21 fps is smooth.
+     */
+    const val FRAME_DELAY_MS = 33L
 
     private var prefs: SharedPreferences? = null
     private var enabled = DEFAULT_ON
