@@ -414,18 +414,18 @@ class SettingsController(
         containerSettingsItems.addView(btnAlbumTilt)
 
         // Slow pan and zoom of the art in the split screens (main menu, Music, Audiobooks, Videos), as on the iPod
-        val coverPanZoom = { prefs.getBoolean(com.themoon.y1.views.CoverPane.PREF, com.themoon.y1.views.CoverPane.DEFAULT_ON) }
-        val btnCoverPanZoom = createSettingRow(
-            localize("Album Cover Pan & Zoom"),
-            com.themoon.y1.core.extensions.onOff(coverPanZoom(), localize)
+        val menuCoverMotion = { prefs.getBoolean(com.themoon.y1.views.CoverPane.PREF, com.themoon.y1.views.CoverPane.DEFAULT_ON) }
+        val btnMenuCoverMotion = createSettingRow(
+            localize("Menu Cover Motion"),
+            com.themoon.y1.core.extensions.onOff(menuCoverMotion(), localize)
         )
-        btnCoverPanZoom.setOnClickListener {
+        btnMenuCoverMotion.setOnClickListener {
             clickFeedback()
-            val on = !coverPanZoom()
+            val on = !menuCoverMotion()
             prefs.edit().putBoolean(com.themoon.y1.views.CoverPane.PREF, on).commit()
-            (btnCoverPanZoom.getChildAt(1) as? TextView)?.text = com.themoon.y1.core.extensions.onOff(on, localize)
+            (btnMenuCoverMotion.getChildAt(1) as? TextView)?.text = com.themoon.y1.core.extensions.onOff(on, localize)
         }
-        containerSettingsItems.addView(btnCoverPanZoom)
+        containerSettingsItems.addView(btnMenuCoverMotion)
 
         val speedLabels = arrayOf("1.0x (Normal)", "1.2x (Fast)", "1.5x (Faster)", "2.0x (Very Fast)")
         val speedValues = floatArrayOf(1.0f, 1.2f, 1.5f, 2.0f)

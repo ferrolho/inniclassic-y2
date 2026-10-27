@@ -14,7 +14,7 @@ import java.util.WeakHashMap
 /**
  * The album art in the right pane of the split screens (main menu, Music, Audiobooks, Videos). All of them use one
  * rule: a [CoverArtView] that fills the pane and draws the art with CENTER_CROP and a zoom. With the setting
- * Album Cover Pan & Zoom ([PREF], default on) the art moves slowly ([CoverMotion]), as on the iPod Classic; with it
+ * Menu Cover Motion ([PREF], default on) the art moves slowly ([CoverMotion]), as on the iPod Classic; with it
  * off, the art stays at the centre with the zoom [ZOOM].
  *
  * The motion runs only while a pane is visible and the screen is on (not off and not blanked by FakeScreenOff).
@@ -24,7 +24,7 @@ object CoverPane {
     /** Zoom of the art when it does not move (size of the art / size of the pane). */
     const val ZOOM = 1.35f
 
-    /** AppPrefs key of Settings → Album Cover Pan & Zoom. */
+    /** AppPrefs key of Settings → Menu Cover Motion. */
     const val PREF = "cover_pan_zoom"
     const val DEFAULT_ON = true
 
