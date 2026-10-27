@@ -634,7 +634,6 @@ class AudioPlayerManager private constructor() {
             if (isUsingLegacyPlayer && legacyPlayer != null) {
                 val player = legacyPlayer ?: return
                 if (player.isPlaying) {
-                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
                     saveAudiobookBookmarkIfNeeded()
                     player.pause()
                 }
@@ -642,7 +641,6 @@ class AudioPlayerManager private constructor() {
             } else if (exoPlayer != null) {
                 val player = exoPlayer ?: return
                 if (player.playWhenReady) {
-                    RecentlyPlayedManager.getInstance(main).onPlaybackPausedOrStopped()
                     saveAudiobookBookmarkIfNeeded()
                     player.playWhenReady = false
                 }
