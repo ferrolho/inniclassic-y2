@@ -35,6 +35,7 @@ class BluetoothPairingAgent(
     private val handler = Handler(Looper.getMainLooper())
     private var registered = false
     private var codeDialog: AlertDialog? = null
+    private val accessGuard = BluetoothAccessGuard(activity.applicationContext)
 
     /** Next PIN index to send, per device address (set for a retry). */
     private val nextPinIndex = HashMap<String, Int>()
@@ -65,12 +66,14 @@ class BluetoothPairingAgent(
         }
         activity.registerReceiver(receiver, filter)
         registered = true
+        accessGuard.register()
     }
 
     fun unregister() {
         if (!registered) return
         try { activity.unregisterReceiver(receiver) } catch (_: Exception) {}
         registered = false
+        accessGuard.unregister()
         dismissCode()
         handler.removeCallbacksAndMessages(null)
     }
@@ -83,6 +86,7 @@ class BluetoothPairingAgent(
         val address = device.address
         val action = BluetoothPairingPolicy.actionFor(variant)
         Log.w(TAG, "Pairing request from $address variant=$variant -> $action")
+        accessGuard.protect(device)
 
         try {
             when (action) {
