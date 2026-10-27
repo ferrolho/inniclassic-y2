@@ -101,32 +101,33 @@ class PlayerController(
         LyricsOverlayController(
             activity,
             layoutPlayerMode as ViewGroup,
-            // The art and the song text (the block that holds both) hide while the lyrics show
-            listOfNotNull(frameAlbumArt?.parent?.parent?.parent as? View ?: frameAlbumArt),
+            // The art and the song text (the block that holds both) hide while the lyrics show, and also the
+            // shuffle/repeat icons: the lyrics start directly under the status bar
+            listOfNotNull(
+                frameAlbumArt?.parent?.parent?.parent as? View ?: frameAlbumArt,
+                ivPlayerShuffleStatus?.parent?.parent as? View
+            ),
             region = { lyricsRegion() }
         )
     }
 
     /**
-     * Top and bottom of the full-width lyrics, in layout_player_mode coordinates: under the status bar and the
-     * shuffle/repeat icons, above the progress bar. Null before the first layout.
+     * Top and bottom of the full-width lyrics, in layout_player_mode coordinates: directly under the status bar (the
+     * top fade starts there), and a small gap above the progress bar. Null before the first layout.
      */
     private fun lyricsRegion(): Pair<Int, Int>? {
         val player = layoutPlayerMode
-        val progress = rowPlayerProgress ?: return null
-        if (player.height == 0 || progress.height == 0) return null
+        val bar = playerProgress
+        if (player.height == 0 || bar.height == 0) return null
         val playerPos = IntArray(2).also { player.getLocationInWindow(it) }
         var top = 0
-        activity.findViewById<View>(R.id.layout_status_bar)?.takeIf { it.isShown }?.let { bar ->
-            val pos = IntArray(2).also { bar.getLocationInWindow(it) }
-            top = Math.max(top, pos[1] + bar.height - playerPos[1])
+        activity.findViewById<View>(R.id.layout_status_bar)?.takeIf { it.isShown }?.let { status ->
+            val pos = IntArray(2).also { status.getLocationInWindow(it) }
+            top = Math.max(top, pos[1] + status.height - playerPos[1])
         }
-        (rootView.findViewById<View>(R.id.iv_player_shuffle_status)?.parent?.parent as? View)?.let { icons ->
-            if (icons.parent === player) top = Math.max(top, icons.bottom)
-        }
-        val gap = (4 * activity.resources.displayMetrics.density).toInt()
-        val progressPos = IntArray(2).also { progress.getLocationInWindow(it) }
-        return Pair(top + gap, progressPos[1] - playerPos[1] - gap)
+        val gap = (LyricsScrollView.BOTTOM_GAP_DP * activity.resources.displayMetrics.density).toInt()
+        val barPos = IntArray(2).also { bar.getLocationInWindow(it) }
+        return Pair(top, barPos[1] - playerPos[1] - gap)
     }
 
     var nowPlayingBottomState: Int = 0

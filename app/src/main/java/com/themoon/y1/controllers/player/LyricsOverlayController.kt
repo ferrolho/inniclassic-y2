@@ -33,8 +33,9 @@ import java.util.regex.Pattern
  * Manages the overlay ScrollView and synchronized highlight updates.
  *
  * The lyrics use the full width of Now Playing, as on the iPod Classic: [playerLayout] (a FrameLayout) gets the
- * lyrics view, [albumViews] (the art and the song text) hide while it shows, and [region] gives its top and bottom
- * (under the status bar, above the progress bar) in [playerLayout] coordinates.
+ * lyrics view, [albumViews] (the art, the song text and the shuffle/repeat icons) hide while it shows, and [region]
+ * gives its top and bottom (directly under the status bar, a small gap above the progress bar) in [playerLayout]
+ * coordinates. The lines fade out at both edges ([LyricsScrollView]).
  */
 class LyricsOverlayController(
     private val context: Context,
@@ -43,7 +44,10 @@ class LyricsOverlayController(
     private val region: () -> Pair<Int, Int>? = { null }
 ) {
 
-    val lyricScrollView: ScrollView = ScrollView(context).apply {
+    // Space above the first line and below the last line, so both can scroll clear of the edge fades
+    private val edgePadding = LyricsScrollView.edgePadding(context)
+
+    val lyricScrollView: ScrollView = LyricsScrollView(context).apply {
         visibility = View.GONE
         isScrollbarFadingEnabled = true
     }
@@ -53,7 +57,7 @@ class LyricsOverlayController(
         textSize = TEXT_SIZE_SP
         gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
         setLineSpacing(4f, 1.1f)
-        setPadding(SIDE_PADDING, 40, SIDE_PADDING, 40)
+        setPadding(SIDE_PADDING, edgePadding, SIDE_PADDING, edgePadding)
         typeface = ThemeManager.getCustomFontBold()
     }
 
@@ -134,7 +138,7 @@ class LyricsOverlayController(
             buildSyncedText()
         } else {
             tvLyrics.setTextColor(plainColor)
-            tvLyrics.setPadding(SIDE_PADDING, 40, SIDE_PADDING, 40)
+            tvLyrics.setPadding(SIDE_PADDING, edgePadding, SIDE_PADDING, edgePadding)
         }
         scheduleFrame()
     }
@@ -414,7 +418,7 @@ class LyricsOverlayController(
             lineEnds[i] = sb.length
         }
         tvLyrics.setTextColor(otherLineColor)
-        tvLyrics.setPadding(SIDE_PADDING, 10, SIDE_PADDING, 10)
+        tvLyrics.setPadding(SIDE_PADDING, edgePadding, SIDE_PADDING, edgePadding)
         tvLyrics.setText(sb, TextView.BufferType.SPANNABLE)
         activeSpan = null
         lastLyricIndex = -1
@@ -467,7 +471,10 @@ class LyricsOverlayController(
             val fraction = Math.max(0f, Math.min(1f, (pos - start).toFloat() / Math.max(1, end - start)))
             y += (lineY(i + 1) - y) * fraction
         }
-        return y - lyricScrollView.height / 3f
+        // The glide stops where the sung line would go into a fade: it stays fully visible until the next line
+        val clearTop = lineY(i) - edgePadding
+        val clearBottom = lineBottom(i) + edgePadding - lyricScrollView.height
+        return Math.min(clearTop, Math.max(clearBottom, y - lyricScrollView.height / 3f))
     }
 
     /** Plain lyrics scroll in proportion to the playback position. */
@@ -499,6 +506,12 @@ class LyricsOverlayController(
     private fun lineY(index: Int): Float {
         val layout = tvLyrics.layout ?: return 0f
         return (layout.getLineTop(layout.getLineForOffset(lineStarts[index])) + tvLyrics.totalPaddingTop).toFloat()
+    }
+
+    private fun lineBottom(index: Int): Float {
+        val layout = tvLyrics.layout ?: return 0f
+        val last = Math.max(lineStarts[index], lineEnds[index] - 1)
+        return (layout.getLineBottom(layout.getLineForOffset(last)) + tvLyrics.totalPaddingTop).toFloat()
     }
 
     private fun maxScroll(): Int = Math.max(0, tvLyrics.height - lyricScrollView.height)
