@@ -414,7 +414,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnAlbumTilt)
 
-        // Lyrics: Original (native script), Romanised (pinyin, romaji) or Both, for songs with a .romanised.lrc file
+        // Lyrics: Original (native script), Romanised (pinyin, romaji) or Original + Romanised (both lines), for songs with a .romanised.lrc file
         val btnLyricsScript = createSettingRow(localize("Lyrics"), localize(LyricsScript.label(prefs.getInt(LyricsScript.PREF, LyricsScript.ORIGINAL))))
         btnLyricsScript.setOnClickListener {
             clickFeedback()

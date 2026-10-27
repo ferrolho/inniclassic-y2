@@ -60,6 +60,6 @@ class LyricsScriptTest {
         assertEquals(LyricsScript.ORIGINAL, LyricsScript.normalize(7))
         assertEquals("Original", LyricsScript.label(7))
         assertEquals("Romanised", LyricsScript.label(LyricsScript.ROMANISED))
-        assertEquals("Both", LyricsScript.label(LyricsScript.BOTH))
+        assertEquals("Original + Romanised", LyricsScript.label(LyricsScript.BOTH))
     }
 }

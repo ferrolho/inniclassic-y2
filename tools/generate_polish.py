@@ -103,7 +103,7 @@ polish_dict = {
   "Show Remaining Time": "Pokaż pozostały czas",
   "Lyrics": "Tekst",
   "Romanised": "Latynizacja",
-  "Both": "Oba",
+  "Original + Romanised": "Oryginał + latynizacja",
   "Added to playlist successfully!": "Pomyślnie dodano do playlisty!",
   "On-The-Go": "On-The-Go",
   "Add to On-The-Go": "Dodaj do On-The-Go",

@@ -13,10 +13,10 @@ object LyricsScript {
     const val BOTH = 2
     const val SUFFIX = ".romanised.lrc"
 
-    /** English label of a value (the app translates it). */
+    /** English label of a value (the app translates it). The stored value of [BOTH] stays 2. */
     fun label(mode: Int): String = when (mode) {
         ROMANISED -> "Romanised"
-        BOTH -> "Both"
+        BOTH -> "Original + Romanised"
         else -> "Original"
     }
 

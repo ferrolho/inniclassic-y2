@@ -464,7 +464,7 @@ class LyricsOverlayController(
         for (i in lyricTimestamps.indices) {
             if (i > 0) sb.append("\n\n")
             lineStarts[i] = sb.length
-            // Both: the romanised line under the original, smaller; the highlight covers the pair
+            // Original + Romanised: the romanised line under the original, smaller; the highlight covers the pair
             val (text, romanisedStart) = LyricsScript.line(currentLyrics[lyricTimestamps[i]] ?: "", romanisedLyrics[lyricTimestamps[i]], mode)
             sb.append(text)
             lineEnds[i] = sb.length
@@ -565,7 +565,7 @@ class LyricsOverlayController(
     private fun clampScroll(y: Float): Float = Math.max(0f, Math.min(maxScroll().toFloat(), y))
 
     private companion object {
-        /** Text size of a romanised line under its original line (setting Both). */
+        /** Text size of a romanised line under its original line (setting Original + Romanised). */
         const val ROMANISED_SIZE = 0.8f
     }
 }
