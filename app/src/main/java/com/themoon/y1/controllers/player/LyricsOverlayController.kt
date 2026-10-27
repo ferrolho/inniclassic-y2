@@ -471,7 +471,10 @@ class LyricsOverlayController(
             val fraction = Math.max(0f, Math.min(1f, (pos - start).toFloat() / Math.max(1, end - start)))
             y += (lineY(i + 1) - y) * fraction
         }
-        return y - lyricScrollView.height / 3f
+        // The glide stops where the sung line would go into a fade: it stays fully visible until the next line
+        val clearTop = lineY(i) - edgePadding
+        val clearBottom = lineBottom(i) + edgePadding - lyricScrollView.height
+        return Math.min(clearTop, Math.max(clearBottom, y - lyricScrollView.height / 3f))
     }
 
     /** Plain lyrics scroll in proportion to the playback position. */
@@ -503,6 +506,12 @@ class LyricsOverlayController(
     private fun lineY(index: Int): Float {
         val layout = tvLyrics.layout ?: return 0f
         return (layout.getLineTop(layout.getLineForOffset(lineStarts[index])) + tvLyrics.totalPaddingTop).toFloat()
+    }
+
+    private fun lineBottom(index: Int): Float {
+        val layout = tvLyrics.layout ?: return 0f
+        val last = Math.max(lineStarts[index], lineEnds[index] - 1)
+        return (layout.getLineBottom(layout.getLineForOffset(last)) + tvLyrics.totalPaddingTop).toFloat()
     }
 
     private fun maxScroll(): Int = Math.max(0, tvLyrics.height - lyricScrollView.height)
