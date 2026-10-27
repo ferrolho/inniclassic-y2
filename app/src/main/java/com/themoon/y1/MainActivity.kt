@@ -723,7 +723,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (volumeSplit() != VolumeSplit.SOFTWARE || lastTargetVolume < 0) return
         val maxIndex = try { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { return }
         val delta = VolumeSteps.stepFromIndexChange(prevIndex, newIndex, lastTargetVolume, maxIndex)
-        if (delta != 0) adjustVolume(delta > 0)
+        if (delta == 0) return
+        android.util.Log.w("VolumeKeys", "Android volume key (screen off): music index $prevIndex -> $newIndex, one step " +
+            if (delta > 0) "up" else "down")
+        adjustVolume(delta > 0)
     }
 
     /** Android's music index changes (hidden AudioManager.VOLUME_CHANGED_ACTION). Registered once for the process. */
