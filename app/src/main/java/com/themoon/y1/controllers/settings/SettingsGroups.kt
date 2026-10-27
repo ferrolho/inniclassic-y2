@@ -37,7 +37,7 @@ object SettingsGroups {
             "Time in Title", "Battery", "Battery Percentage"
         )),
         Group("Appearance", listOf(
-            "Theme", "Background", "Toggle Style", "List Edges", "Album Cover Tilt",
+            "Theme", "Background", "Toggle Style", "List Edges", "Album Cover Tilt", "Album Cover Pan & Zoom",
             "Fill Video Screen"
         )),
         Group("Menus", listOf(
