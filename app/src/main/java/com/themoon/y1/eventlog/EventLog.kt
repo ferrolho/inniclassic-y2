@@ -2,6 +2,8 @@ package com.themoon.y1.eventlog
 
 import android.app.Activity
 import android.app.Application
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.ComponentCallbacks2
 import android.content.Context
@@ -9,13 +11,16 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.hardware.input.InputManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
+import android.view.InputDevice
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import com.google.android.exoplayer2.ExoPlaybackException
@@ -27,6 +32,7 @@ import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -72,6 +78,8 @@ object EventLog {
     private val prefLast = HashMap<String, Long>()
     private val prefSkipped = HashMap<String, Int>()
     private var attachedPlayer: Any? = null
+    private val inputNames = HashMap<Int, String?>()
+    private var power: PowerManager? = null
 
     // SharedPreferences keeps its listeners in a WeakHashMap: keep strong references
     private var prefs: SharedPreferences? = null
@@ -103,6 +111,9 @@ object EventLog {
             prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).also {
                 it.registerOnSharedPreferenceChangeListener(prefListener)
             }
+            power = app.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            try { Inputs.start(app) } catch (t: Throwable) { note("input devices not logged: $t") }
+            try { Bluetooth.start(app) } catch (t: Throwable) { note("Bluetooth events not logged: $t") }
             LogcatTap(File(app.filesDir, "event-log")).start()
         } catch (t: Throwable) {
             Log.w(TAG, "event log not started: $t")
@@ -198,9 +209,11 @@ object EventLog {
         try {
             val code = event.keyCode
             val screen = currentScreen()
+            val dev = inputName(event.deviceId)
+            val src = EventLogLogic.keySource(event.deviceId, dev)
             if (EventLogLogic.isWheel(code)) {
                 // Each wheel step is a key down (repeats too: InputRouter turns them into wheel steps)
-                if (event.action == KeyEvent.ACTION_DOWN) wheelStep(EventLogLogic.wheelDir(code), by, screen)
+                if (event.action == KeyEvent.ACTION_DOWN) wheelStep(EventLogLogic.wheelDir(code), by, screen, src)
                 return
             }
             val f = JSONObject().put("k", KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_"))
@@ -222,24 +235,35 @@ object EventLog {
                 }
                 else -> return
             }
-            f.put("by", by).put("s", screen)
+            f.put("by", by).put("s", screen).put("src", src)
+            if (dev != null && src != "own") f.put("dev", dev)
+            // Android screen off: Bluetooth and wired keys come here only when the app has the key focus
+            if (power?.isScreenOn == false) f.put("off", true)
             // Keys from `adb shell input` and from the test interface: not from the buttons
             if (event.deviceId == KeyCharacterMap.VIRTUAL_KEYBOARD) f.put("virt", true)
             emit("key", f)
         } catch (_: Throwable) {}
     }
 
-    private fun wheelStep(dir: Int, by: String, screen: String) {
+    /** Input device name by id (main thread). The ids of a boot are not used again. */
+    private fun inputName(id: Int): String? {
+        if (inputNames.containsKey(id)) return inputNames[id]
+        val name = try { InputDevice.getDevice(id)?.name } catch (_: Throwable) { null }
+        if (name != null) inputNames[id] = name
+        return name
+    }
+
+    private fun wheelStep(dir: Int, by: String, screen: String, src: String) {
         synchronized(lock) {
             val up = SystemClock.uptimeMillis()
             val w = wheel
-            if (w != null && w.continuesWith(dir, by, screen, up)) {
+            if (w != null && w.continuesWith(dir, by, screen, up, src)) {
                 w.count++
                 w.lastUp = up
                 return
             }
             closeWheelLocked()
-            wheel = EventLogLogic.WheelBurst(dir, by, screen, up, System.currentTimeMillis())
+            wheel = EventLogLogic.WheelBurst(dir, by, screen, up, System.currentTimeMillis(), src)
             writer?.removeCallbacks(wheelCheck)
             writer?.postDelayed(wheelCheck, EventLogLogic.WHEEL_GAP_MS + 100)
         }
@@ -264,6 +288,7 @@ object EventLog {
             .put("ms", w.lastUp - w.startUp)
             .put("by", w.by)
             .put("s", w.screen)
+        if (w.src != "own") f.put("src", w.src)
         enqueueLocked("wheel", f, w.startUp, w.startWall)
     }
 
@@ -510,13 +535,16 @@ object EventLog {
 
     // --- warnings, errors, crashes, stalls ---
 
-    internal fun logcat(level: Char, tag: String, tid: Int, time: String, message: String) {
-        emit("log", JSONObject()
+    /** A logcat entry. [proc]: the other process (Bluetooth) that wrote it; null for this process. */
+    internal fun logcat(level: Char, tag: String, tid: Int, time: String, message: String, proc: String? = null, pid: Int = 0) {
+        val f = JSONObject()
             .put("lvl", level.toString())
             .put("tag", tag)
             .put("msg", EventLogLogic.cut(EventLogLogic.redact(message), EventLogLogic.MAX_LOG_MESSAGE))
             .put("tid", tid)
-            .put("lt", time))
+            .put("lt", time)
+        if (proc != null) f.put("proc", proc).put("pid", pid)
+        emit("log", f)
     }
 
     internal fun note(text: String) {
@@ -606,6 +634,202 @@ object EventLog {
         override fun onReceive(context: Context, intent: Intent) {
             emit("display", JSONObject().put("on", intent.action == Intent.ACTION_SCREEN_ON))
             if (intent.action == Intent.ACTION_SCREEN_OFF) flush(sync = false)
+        }
+    }
+
+    // --- input devices (a Bluetooth AVRCP or a wired ACCDET key device that comes and goes) ---
+
+    private object Inputs : InputManager.InputDeviceListener {
+        fun start(app: Application) {
+            val im = app.getSystemService(Context.INPUT_SERVICE) as? InputManager ?: return
+            val all = JSONArray()
+            for (id in im.inputDeviceIds) {
+                val name = inputName(id)
+                all.put(JSONObject().put("id", id).put("dev", name ?: JSONObject.NULL).put("src", EventLogLogic.keySource(id, name)))
+            }
+            emit("input", JSONObject().put("a", "list").put("devices", all))
+            im.registerInputDeviceListener(this, mainHandler)
+        }
+
+        private fun log(a: String, id: Int, name: String?) {
+            emit("input", JSONObject().put("a", a).put("id", id).put("dev", name ?: JSONObject.NULL)
+                .put("src", EventLogLogic.keySource(id, name)))
+        }
+
+        override fun onInputDeviceAdded(deviceId: Int) {
+            inputNames.remove(deviceId)
+            log("added", deviceId, inputName(deviceId))
+        }
+
+        override fun onInputDeviceRemoved(deviceId: Int) {
+            log("removed", deviceId, inputNames.remove(deviceId))
+        }
+
+        override fun onInputDeviceChanged(deviceId: Int) {}
+    }
+
+    // --- Bluetooth (broadcasts of the stack; our own answers come from the BtPairing, BtAccess, BtAvrcp log lines) ---
+
+    /** The Bluetooth processes that the logcat tap follows (at the start and after each change). */
+    internal fun bluetoothPids(pids: Map<Int, String>) {
+        val f = JSONObject()
+        for ((pid, name) in pids.toSortedMap()) f.put(pid.toString(), name)
+        emit("bt", JSONObject().put("a", "procs").put("procs", f))
+    }
+
+    private object Bluetooth : BroadcastReceiver() {
+        // Hidden or MediaTek actions and extras of Android 4.4
+        private const val A2DP_CONNECTION = "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED"
+        private const val A2DP_PLAYING = "android.bluetooth.a2dp.profile.action.PLAYING_STATE_CHANGED"
+        private const val HFP_CONNECTION = "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED"
+        private const val HFP_AUDIO = "android.bluetooth.headset.profile.action.AUDIO_STATE_CHANGED"
+        private const val HID_CONNECTION = "android.bluetooth.input.profile.action.CONNECTION_STATE_CHANGED"
+        private const val ACCESS_REQUEST = "android.bluetooth.device.action.CONNECTION_ACCESS_REQUEST"
+        private const val ACCESS_REPLY = "android.bluetooth.device.action.CONNECTION_ACCESS_REPLY"
+        private const val ACCESS_CANCEL = "android.bluetooth.device.action.CONNECTION_ACCESS_CANCEL"
+        private const val MTK_PROFILE_STATE = "android.bluetooth.profilemanager.action.STATE_CHANGED"
+        private const val MTK_PROFILE_CHANGED = "android.bluetooth.profilemanager.action.PROFILE_CHANGED"
+        private const val EXTRA_REASON = "android.bluetooth.device.extra.REASON"
+        private const val EXTRA_ACCESS_TYPE = "android.bluetooth.device.extra.ACCESS_REQUEST_TYPE"
+        private const val EXTRA_ACCESS_RESULT = "android.bluetooth.device.extra.CONNECTION_ACCESS_RESULT"
+        private const val EXTRA_STATE = "android.bluetooth.profile.extra.STATE"
+        private const val EXTRA_PREVIOUS_STATE = "android.bluetooth.profile.extra.PREVIOUS_STATE"
+
+        fun start(app: Application) {
+            val filter = IntentFilter().apply {
+                addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+                addAction(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+                addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)
+                addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+                addAction(BluetoothDevice.ACTION_PAIRING_REQUEST)
+                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+                addAction(A2DP_CONNECTION)
+                addAction(A2DP_PLAYING)
+                addAction(HFP_CONNECTION)
+                addAction(HFP_AUDIO)
+                addAction(HID_CONNECTION)
+                addAction(ACCESS_REQUEST)
+                addAction(ACCESS_REPLY)
+                addAction(ACCESS_CANCEL)
+                addAction(MTK_PROFILE_STATE)
+                addAction(MTK_PROFILE_CHANGED)
+                // The pairing request is an ordered broadcast: see it before BluetoothPairingAgent (999) aborts it.
+                // This receiver only reads it.
+                priority = IntentFilter.SYSTEM_HIGH_PRIORITY
+            }
+            app.registerReceiver(this, filter)
+            snapshot("start")
+        }
+
+        /** Adapter state, scan mode and paired devices. */
+        @Suppress("MissingPermission")
+        private fun snapshot(why: String) {
+            try {
+                val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+                val f = JSONObject().put("a", "snapshot").put("why", why)
+                    .put("state", EventLogLogic.btAdapterState(adapter.state))
+                    .put("scan", EventLogLogic.btScanMode(adapter.scanMode))
+                val bonded = JSONArray()
+                if (adapter.isEnabled) {
+                    f.put("name", adapter.name ?: JSONObject.NULL)
+                    adapter.bondedDevices?.forEach { bonded.put(device(JSONObject(), it)) }
+                }
+                emit("bt", f.put("bonded", bonded))
+            } catch (t: Throwable) {
+                emit("bt", JSONObject().put("a", "snapshot").put("error", t.toString()))
+            }
+        }
+
+        @Suppress("MissingPermission")
+        private fun device(f: JSONObject, d: BluetoothDevice, intentName: String? = null): JSONObject {
+            val name = intentName ?: try { d.name } catch (_: Throwable) { null }
+            f.put("dev", name ?: JSONObject.NULL)
+            try { EventLogLogic.btDeviceClass(d.bluetoothClass?.deviceClass)?.let { f.put("cls", it) } } catch (_: Throwable) {}
+            f.put("addr", d.address)
+            return f
+        }
+
+        private fun Intent.int(name: String): Int = getIntExtra(name, Int.MIN_VALUE)
+
+        private fun JSONObject.state(key: String, value: Int, name: (Int) -> String): JSONObject =
+            if (value == Int.MIN_VALUE) this else put(key, name(value))
+
+        override fun onReceive(context: Context, intent: Intent) {
+            try {
+                val f = JSONObject()
+                when (intent.action) {
+                    BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                        val state = intent.int(BluetoothAdapter.EXTRA_STATE)
+                        f.put("a", "adapter").state("state", state, EventLogLogic::btAdapterState)
+                            .state("prev", intent.int(BluetoothAdapter.EXTRA_PREVIOUS_STATE), EventLogLogic::btAdapterState)
+                        // The stack processes start and stop with the adapter: find their pids again
+                        writer?.post { LogcatTap.instance?.refreshBluetoothPids() }
+                        if (state == BluetoothAdapter.STATE_ON) {
+                            writer?.postDelayed({ LogcatTap.instance?.refreshBluetoothPids() }, 5000)
+                            mainHandler?.postDelayed({ snapshot("on") }, 1000)
+                        }
+                    }
+                    BluetoothAdapter.ACTION_SCAN_MODE_CHANGED -> f.put("a", "scan")
+                        .state("mode", intent.int(BluetoothAdapter.EXTRA_SCAN_MODE), EventLogLogic::btScanMode)
+                    BluetoothAdapter.ACTION_DISCOVERY_STARTED -> f.put("a", "discovery").put("on", true)
+                    BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> f.put("a", "discovery").put("on", false)
+                    BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED -> f.put("a", "connection")
+                        .state("state", intent.int(BluetoothAdapter.EXTRA_CONNECTION_STATE), EventLogLogic::btProfileState)
+                        .state("prev", intent.int(BluetoothAdapter.EXTRA_PREVIOUS_CONNECTION_STATE), EventLogLogic::btProfileState)
+                    BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                        f.put("a", "bond")
+                            .state("state", intent.int(BluetoothDevice.EXTRA_BOND_STATE), EventLogLogic::btBondState)
+                            .state("prev", intent.int(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE), EventLogLogic::btBondState)
+                            .state("reason", intent.int(EXTRA_REASON), EventLogLogic::btUnbondReason)
+                    }
+                    BluetoothDevice.ACTION_PAIRING_REQUEST -> {
+                        f.put("a", "pair")
+                            .state("variant", intent.int(BluetoothDevice.EXTRA_PAIRING_VARIANT), EventLogLogic::btPairingVariant)
+                        val key = intent.int(BluetoothDevice.EXTRA_PAIRING_KEY)
+                        if (key != Int.MIN_VALUE) f.put("key", key)
+                        f.put("ordered", isOrderedBroadcast)
+                    }
+                    BluetoothDevice.ACTION_ACL_CONNECTED -> f.put("a", "acl").put("state", "CONNECTED")
+                    BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED -> f.put("a", "acl").put("state", "DISCONNECT_REQUESTED")
+                    BluetoothDevice.ACTION_ACL_DISCONNECTED -> f.put("a", "acl").put("state", "DISCONNECTED")
+                    A2DP_CONNECTION, HFP_CONNECTION, HID_CONNECTION -> {
+                        val a = when (intent.action) { A2DP_CONNECTION -> "a2dp"; HFP_CONNECTION -> "hfp"; else -> "hid" }
+                        f.put("a", a)
+                            .state("state", intent.int(EXTRA_STATE), EventLogLogic::btProfileState)
+                            .state("prev", intent.int(EXTRA_PREVIOUS_STATE), EventLogLogic::btProfileState)
+                    }
+                    A2DP_PLAYING -> f.put("a", "a2dpPlay")
+                        .state("state", intent.int(EXTRA_STATE), EventLogLogic::btA2dpPlaying)
+                        .state("prev", intent.int(EXTRA_PREVIOUS_STATE), EventLogLogic::btA2dpPlaying)
+                    HFP_AUDIO -> f.put("a", "hfpAudio")
+                        .state("state", intent.int(EXTRA_STATE), EventLogLogic::btHfpAudio)
+                        .state("prev", intent.int(EXTRA_PREVIOUS_STATE), EventLogLogic::btHfpAudio)
+                    ACCESS_REQUEST, ACCESS_REPLY, ACCESS_CANCEL -> {
+                        f.put("a", when (intent.action) { ACCESS_REQUEST -> "access"; ACCESS_REPLY -> "accessReply"; else -> "accessCancel" })
+                            .state("type", intent.int(EXTRA_ACCESS_TYPE), EventLogLogic::btAccessType)
+                            .state("result", intent.int(EXTRA_ACCESS_RESULT), EventLogLogic::btAccessResult)
+                    }
+                    else -> {
+                        // MediaTek profile manager: extras not known, log them all
+                        f.put("a", "mtk").put("action", intent.action?.substringAfterLast('.') ?: JSONObject.NULL)
+                        intent.extras?.let { x ->
+                            for (k in x.keySet()) {
+                                if (k == BluetoothDevice.EXTRA_DEVICE) continue
+                                @Suppress("DEPRECATION")
+                                f.put(k.substringAfterLast('.'), EventLogLogic.cut(x.get(k).toString(), 100))
+                            }
+                        }
+                    }
+                }
+                intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)?.let {
+                    device(f, it, intent.getStringExtra(BluetoothDevice.EXTRA_NAME))
+                }
+                emit("bt", f)
+            } catch (_: Throwable) {}
         }
     }
 }

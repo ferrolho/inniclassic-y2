@@ -107,6 +107,88 @@ class EventLogLogicTest {
     }
 
     @Test
+    fun wheelBurstEndsWhenTheSourceChanges() {
+        val b = EventLogLogic.WheelBurst(1, "none", "Player", 1000L, 0L, "own")
+        assertTrue(b.continuesWith(1, "none", "Player", 1100L, "own"))
+        assertFalse(b.continuesWith(1, "none", "Player", 1100L, "virtual"))
+    }
+
+    @Test
+    fun keySourceComesFromTheInputDevice() {
+        assertEquals("own", EventLogLogic.keySource(3, "mtk-tpd-kpd"))
+        assertEquals("own", EventLogLogic.keySource(4, "mtk-kpd"))
+        assertEquals("own", EventLogLogic.keySource(5, "mtk-tpd"))
+        assertEquals("bluetooth", EventLogLogic.keySource(9, "AVRCP"))
+        assertEquals("wired", EventLogLogic.keySource(6, "ACCDET"))
+        assertEquals("virtual", EventLogLogic.keySource(-1, "Virtual"))
+        assertEquals("virtual", EventLogLogic.keySource(-1, null))
+        assertEquals("unknown", EventLogLogic.keySource(12, null))
+        assertEquals("other", EventLogLogic.keySource(2, "hwmdata"))
+    }
+
+    @Test
+    fun bluetoothValuesHaveNames() {
+        assertEquals("ON", EventLogLogic.btAdapterState(12))
+        assertEquals("BONDING", EventLogLogic.btBondState(11))
+        assertEquals("AUTH_FAILED", EventLogLogic.btUnbondReason(1))
+        assertEquals("REMOTE_AUTH_CANCELED", EventLogLogic.btUnbondReason(8))
+        assertEquals("PASSKEY_CONFIRMATION", EventLogLogic.btPairingVariant(2))
+        assertEquals("CONNECTED", EventLogLogic.btProfileState(2))
+        assertEquals("PLAYING", EventLogLogic.btA2dpPlaying(10))
+        assertEquals("DISCOVERABLE", EventLogLogic.btScanMode(23))
+        assertEquals("PHONEBOOK", EventLogLogic.btAccessType(2))
+        assertEquals("NO", EventLogLogic.btAccessResult(2))
+        // Values that are not known stay numbers
+        assertEquals("42", EventLogLogic.btBondState(42))
+    }
+
+    @Test
+    fun bluetoothDeviceClassIsShort() {
+        assertEquals("car 0x420", EventLogLogic.btDeviceClass(0x0420))
+        assertEquals("headphones 0x418", EventLogLogic.btDeviceClass(0x0418))
+        assertEquals("phone 0x20c", EventLogLogic.btDeviceClass(0x020C))
+        assertEquals("computer 0x10c", EventLogLogic.btDeviceClass(0x010C))
+        assertNull(EventLogLogic.btDeviceClass(null))
+    }
+
+    @Test
+    fun bluetoothProcessesAreFound() {
+        assertEquals("com.mediatek.bluetooth", EventLogLogic.bluetoothProcess("com.mediatek.bluetooth\u0000"))
+        assertEquals("com.android.bluetooth", EventLogLogic.bluetoothProcess("com.android.bluetooth"))
+        assertEquals("com.mediatek.bluetooth:remote", EventLogLogic.bluetoothProcess("com.mediatek.bluetooth:remote\u0000"))
+        assertEquals("mtkbt", EventLogLogic.bluetoothProcess("/system/bin/mtkbt\u0000"))
+        assertNull(EventLogLogic.bluetoothProcess("system_server\u0000"))
+        assertNull(EventLogLogic.bluetoothProcess("com.android.bluetoothx"))
+        assertNull(EventLogLogic.bluetoothProcess(""))
+        assertNull(EventLogLogic.bluetoothProcess(null))
+    }
+
+    @Test
+    fun bluetoothTagsOfOtherProcessesAreFound() {
+        assertTrue(EventLogLogic.isBluetoothTag("BluetoothManagerService"))
+        assertTrue(EventLogLogic.isBluetoothTag("A2dpAudioInterface"))
+        assertTrue(EventLogLogic.isBluetoothTag("BtPairing"))
+        assertTrue(EventLogLogic.isBluetoothTag("[AVRCP]"))
+        assertFalse(EventLogLogic.isBluetoothTag("InputReader"))
+        assertFalse(EventLogLogic.isBluetoothTag("ADB_SERVICES"))
+    }
+
+    @Test
+    fun rateWindowDropsLinesOverTheLimitAndReportsThemOnce() {
+        val r = EventLogLogic.RateWindow(windowMs = 1000, max = 2)
+        assertTrue(r.take(0))
+        assertTrue(r.take(10))
+        assertFalse(r.take(20))
+        assertFalse(r.take(30))
+        assertEquals(0, r.endedDropped)
+        // Next window: the 2 dropped lines are reported once
+        assertTrue(r.take(1100))
+        assertEquals(2, r.endedDropped)
+        assertTrue(r.take(1200))
+        assertEquals(0, r.endedDropped)
+    }
+
+    @Test
     fun uptimeIsReadFromTheLine() {
         assertEquals(12345L, EventLogLogic.uptimeOf(line(12345)))
         assertNull(EventLogLogic.uptimeOf("{\"ev\":\"dropped\"}"))
