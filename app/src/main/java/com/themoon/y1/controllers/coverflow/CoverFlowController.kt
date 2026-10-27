@@ -557,6 +557,14 @@ class CoverFlowController(
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            // Open the album on release (onKeyUp); on press, the release went to the album list and played a song
+            return true
+        }
+        return false
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (currentCoverFlowIndex in uniqueAlbumList.indices) {
                 clickFeedback()
                 val chosen = uniqueAlbumList[currentCoverFlowIndex]

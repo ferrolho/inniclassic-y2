@@ -570,24 +570,12 @@ class MusicQuizController(
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            val current = activity.currentFocus
-            current?.performClick()
+            // The focused button clicks on release. A click here also came with each key repeat of a hold.
             return true
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            when (currentScreenMode) {
-                MODE_LEADERBOARD -> {
-                    showStartHub()
-                }
-                MODE_GAME -> {
-                    exitQuiz()
-                }
-                else -> {
-                    exitQuiz()
-                }
-            }
-            return true
+            return false // Back on release: the router calls onBackPressed
         }
 
         return true
