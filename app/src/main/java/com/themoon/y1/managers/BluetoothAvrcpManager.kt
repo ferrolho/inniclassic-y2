@@ -245,6 +245,7 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
                 editor.putBitmap(android.media.RemoteControlClient.MetadataEditor.BITMAP_KEY_ARTWORK, it)
             }
             editor.apply()
+            android.util.Log.w(TAG, "AVRCP track data sent: \"" + AvrcpMetadataLogic.shortTitle(track.title) + "\"")
             lastTrack = track
             lastArtSource = art
         } catch (e: Exception) {

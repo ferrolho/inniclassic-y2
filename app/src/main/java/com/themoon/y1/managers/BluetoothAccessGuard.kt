@@ -96,8 +96,10 @@ class BluetoothAccessGuard(private val context: Context) {
     private fun onAccessRequest(intent: Intent) {
         val type = intent.getIntExtra(EXTRA_ACCESS_REQUEST_TYPE, BluetoothAccessPolicy.REQUEST_TYPE_PROFILE_CONNECTION)
         val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-        Log.w(TAG, "Access request type=$type from ${device?.address}")
-        if (!BluetoothAccessPolicy.rejects(type)) return
+        val rejects = BluetoothAccessPolicy.rejects(type)
+        Log.w(TAG, "Access request type=$type from ${device?.address}: " +
+            if (rejects) "answer No, close Settings" else "no answer (the system asks)")
+        if (!rejects) return
         device?.let { turnOffHandsFree(it) }
         worker.execute {
             // The services (PBAP, MAP, HFP phone book) do not read the device from the reply.
