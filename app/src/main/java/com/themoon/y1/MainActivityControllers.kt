@@ -203,8 +203,6 @@ internal fun MainActivity.initControllers() {
         clickFeedback = { clickFeedback() },
         onAdjustVolume = { adjustVolume(it) },
         onTogglePlayback = { AudioPlayerManager.getInstance().playOrPauseMusic() },
-        onNextTrack = { AudioPlayerManager.getInstance().nextTrack() },
-        onPreviousTrack = { AudioPlayerManager.getInstance().prevTrack() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onBrowseAlbum = { album ->
             changeScreen(MainActivity.STATE_BROWSER)
@@ -219,7 +217,8 @@ internal fun MainActivity.initControllers() {
             browserController.buildVirtualSongs()
         },
         onToggleFavorite = { toggleFavorite() },
-        onAddToOnTheGo = { showAddToPlaylistDialog(it) },
+        onAddToOnTheGo = { playlistController.addSongToOnTheGo(it) },
+        onAddToPlaylist = { showAddToPlaylistDialog(it) },
         onToggleVisualizer = { toggleVisualizer() },
         localize = { t(it) }
     )

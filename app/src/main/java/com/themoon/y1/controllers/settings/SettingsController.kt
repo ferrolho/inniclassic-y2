@@ -19,6 +19,8 @@ import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
+import com.themoon.y1.controllers.player.NowPlayingTime
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
@@ -470,6 +472,24 @@ class SettingsController(
             ).show()
         }
         containerSettingsItems.addView(btnSpeed)
+
+        // Now Playing display options (before: in the Now Playing menu)
+        val btnSpectrum = createSettingRow(localize("Spectrum"), onOff(mainActivity?.isVisualizerShowing == true, localize))
+        btnSpectrum.setOnClickListener {
+            clickFeedback()
+            mainActivity?.toggleVisualizer()
+            (btnSpectrum.getChildAt(1) as? TextView)?.text = onOff(mainActivity?.isVisualizerShowing == true, localize)
+        }
+        containerSettingsItems.addView(btnSpectrum)
+
+        val btnTotalTime = createSettingRow(localize("Total Time"), onOff(prefs.getBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false), localize))
+        btnTotalTime.setOnClickListener {
+            clickFeedback()
+            val show = !prefs.getBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false)
+            prefs.edit().putBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, show).commit()
+            (btnTotalTime.getChildAt(1) as? TextView)?.text = onOff(show, localize)
+        }
+        containerSettingsItems.addView(btnTotalTime)
 
         var isSoundEffectEnabled = prefs.getBoolean("sound", true)
         val btnSound = createSettingRow(
@@ -1611,6 +1631,8 @@ class SettingsController(
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
                 .remove("album_tilt_enabled")
+                .remove("show_total_time")
+                .remove(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF)
                 .remove("backlight_timer_index")
                 .remove("screen_off_control")
                 .remove("double_click_favorite")
