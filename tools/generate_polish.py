@@ -101,6 +101,8 @@ polish_dict = {
   "Hide Spectrum": "Ukryj widmo",
   "Show Total Time": "Pokaż całkowity czas",
   "Show Remaining Time": "Pokaż pozostały czas",
+  "Spectrum": "Widmo",
+  "Total Time": "Całkowity czas",
   "Added to playlist successfully!": "Pomyślnie dodano do playlisty!",
   "On-The-Go": "On-The-Go",
   "Add to On-The-Go": "Dodaj do On-The-Go",

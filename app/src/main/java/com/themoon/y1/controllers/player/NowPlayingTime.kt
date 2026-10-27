@@ -9,3 +9,9 @@ object NowPlayingTime {
     fun rightText(positionMs: Int, durationMs: Int, showTotal: Boolean, format: (Int) -> String): String =
         if (showTotal) format(durationMs) else "-" + format(Math.max(0, durationMs - positionMs))
 }
+
+/** Spectrum in place of the album art on Now Playing (Settings → Spectrum). */
+object NowPlayingSpectrum {
+    /** AppPrefs key: true shows the spectrum. Default false (album art). */
+    const val PREF = "show_spectrum"
+}

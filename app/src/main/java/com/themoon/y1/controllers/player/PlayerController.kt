@@ -485,10 +485,6 @@ class PlayerController(
             onAddToPlaylist = onAddToPlaylist,
             onBrowseAlbum = onBrowseAlbum,
             onBrowseArtist = onBrowseArtist,
-            isSpectrumShowing = main.isVisualizerShowing,
-            onToggleVisualizer = onToggleVisualizer,
-            isTotalTimeShown = isTotalTimeShown(),
-            onToggleTotalTime = { toggleTotalTime() },
             localize = localize
         )
     }
@@ -567,13 +563,6 @@ class PlayerController(
 
     private fun isTotalTimeShown(): Boolean =
         activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE).getBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false)
-
-    private fun toggleTotalTime() {
-        activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE).edit()
-            .putBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, !isTotalTimeShown()).commit()
-        updatePlayerUI()
-        updateNowPlayingBottomBarState()
-    }
 
     /** Right-hand time of the progress and scrub rows; AudioPlayerManager uses it too. */
     fun rightTimeText(positionMs: Int, durationMs: Int): String =

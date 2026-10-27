@@ -12,8 +12,7 @@ import java.io.File
  * - Add to On-The-Go playlist
  * - Add to Playlist
  * - Browse Album / Browse Artist
- * - Show/Hide Spectrum
- * - Show Total Time / Show Remaining Time
+ * Only actions on the current song: the display options (Spectrum, Total Time) are in Settings.
  */
 object NowPlayingContextMenu {
 
@@ -27,10 +26,6 @@ object NowPlayingContextMenu {
         onAddToPlaylist: (file: File) -> Unit,
         onBrowseAlbum: (albumName: String) -> Unit,
         onBrowseArtist: (artistName: String) -> Unit,
-        isSpectrumShowing: Boolean,
-        onToggleVisualizer: () -> Unit,
-        isTotalTimeShown: Boolean,
-        onToggleTotalTime: () -> Unit,
         localize: (String) -> String
     ) {
         WheelDialog.show(activity) {
@@ -76,20 +71,6 @@ object NowPlayingContextMenu {
                         onBrowseArtist(artist)
                     }
                 }
-            }
-
-            addButton(
-                text = if (isSpectrumShowing) localize("Hide Spectrum") else localize("Show Spectrum"),
-                icon = null
-            ) {
-                onToggleVisualizer()
-            }
-
-            addButton(
-                text = if (isTotalTimeShown) localize("Show Remaining Time") else localize("Show Total Time"),
-                icon = null
-            ) {
-                onToggleTotalTime()
             }
 
             negativeButton(localize("Cancel"))
