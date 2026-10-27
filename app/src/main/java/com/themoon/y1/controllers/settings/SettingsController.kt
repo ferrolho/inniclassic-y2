@@ -378,6 +378,7 @@ class SettingsController(
             clickFeedback()
             isSoundCheckEnabled = !isSoundCheckEnabled
             prefs.edit().putBoolean("sound_check_enabled", isSoundCheckEnabled).commit()
+            mainActivity?.isSoundCheckEnabled = isSoundCheckEnabled
             val tvStatus = btnSoundCheck.getChildAt(1) as? TextView
             tvStatus?.text = if (isSoundCheckEnabled) localize("ON") else localize("OFF")
             AudioEffectManager.getInstance().applySoundCheck()
@@ -476,6 +477,20 @@ class SettingsController(
             tvStatus?.text = if (isScreenOffControlEnabled) localize("ON") else localize("OFF")
         }
         containerSettingsItems.addView(btnScreenOffCtrl)
+
+        var isDoubleClickFavoriteEnabled = prefs.getBoolean("double_click_favorite", true)
+        val btnDoubleClickFavorite = createSettingRow(
+            localize("Double-Click to Favorite"),
+            com.themoon.y1.core.extensions.onOff(isDoubleClickFavoriteEnabled, localize)
+        )
+        btnDoubleClickFavorite.setOnClickListener {
+            clickFeedback()
+            isDoubleClickFavoriteEnabled = !isDoubleClickFavoriteEnabled
+            prefs.edit().putBoolean("double_click_favorite", isDoubleClickFavoriteEnabled).commit()
+            val tvStatus = btnDoubleClickFavorite.getChildAt(1) as? TextView
+            tvStatus?.text = com.themoon.y1.core.extensions.onOff(isDoubleClickFavoriteEnabled, localize)
+        }
+        containerSettingsItems.addView(btnDoubleClickFavorite)
 
         var isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
         val btnUsbPrompt = createSettingRow(
@@ -613,14 +628,14 @@ class SettingsController(
         val btnServerMenu = createSettingRow(localize("Web Server"), "〉 ")
         btnServerMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(8) // STATE_WEBSERVER
+            onNavigateToScreen(MainActivity.STATE_WEBSERVER)
         }
         containerSettingsItems.addView(btnServerMenu)
 
         val btnWifiMenu = createSettingRow(localize("Wi-Fi"), "〉 ")
         btnWifiMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(6) // STATE_WIFI
+            onNavigateToScreen(MainActivity.STATE_WIFI)
         }
         containerSettingsItems.addView(btnWifiMenu)
 
@@ -665,7 +680,7 @@ class SettingsController(
         val btnBtMenu = createSettingRow(localize("Bluetooth"), "〉 ")
         btnBtMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(5) // STATE_BLUETOOTH
+            onNavigateToScreen(MainActivity.STATE_BLUETOOTH)
         }
         containerSettingsItems.addView(btnBtMenu)
 
@@ -700,7 +715,7 @@ class SettingsController(
                     .setNegativeButton(localize("Cancel"), null)
                     .show()
             } else {
-                onNavigateToScreen(7) // STATE_WIFI_KEYBOARD
+                onNavigateToScreen(MainActivity.STATE_WIFI_KEYBOARD)
             }
         }
         containerSettingsItems.addView(btnLastFmAccount)
@@ -708,7 +723,7 @@ class SettingsController(
         val btnBrightMenu = createSettingRow(localize("Display Brightness"), "〉 ")
         btnBrightMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(3) // STATE_BRIGHTNESS
+            onNavigateToScreen(MainActivity.STATE_BRIGHTNESS)
         }
         containerSettingsItems.addView(btnBrightMenu)
 
@@ -731,7 +746,7 @@ class SettingsController(
         val btnStorageMenu = createSettingRow(localize("About"), "〉 ")
         btnStorageMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(4) // STATE_STORAGE
+            onNavigateToScreen(MainActivity.STATE_STORAGE)
         }
         containerSettingsItems.addView(btnStorageMenu)
 
@@ -946,6 +961,7 @@ class SettingsController(
         )
         btnToggle.setOnClickListener {
             isVibrationEnabled = !isVibrationEnabled
+            mainActivity?.isVibrationEnabled = isVibrationEnabled
             clickFeedback()
             val tv = btnToggle.getChildAt(1) as? TextView
             tv?.text = if (isVibrationEnabled) localize("ON") else localize("OFF")
@@ -968,6 +984,7 @@ class SettingsController(
         )
         btnStrength.setOnClickListener {
             vibrationStrengthLevel = (vibrationStrengthLevel + 1) % 3
+            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
             clickFeedback()
             val tv = btnStrength.getChildAt(1) as? TextView
             tv?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
@@ -1456,6 +1473,7 @@ class SettingsController(
                 .remove("album_tilt_enabled")
                 .remove("backlight_timer_index")
                 .remove("screen_off_control")
+                .remove("double_click_favorite")
                 .remove("repeat_mode")
                 .remove("repeat")
                 .remove("loop_scroll_on")
@@ -1465,6 +1483,7 @@ class SettingsController(
                 .commit()
         } catch (_: Exception) {}
 
+        mainActivity?.isSoundCheckEnabled = false
         AudioEffectManager.getInstance().applySoundCheck()
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
