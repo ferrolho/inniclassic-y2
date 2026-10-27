@@ -668,7 +668,7 @@ object EventLog {
         override fun onInputDeviceChanged(deviceId: Int) {}
     }
 
-    // --- Bluetooth (broadcasts of the stack; our own answers come from the BtPairing, BtAccess, BtAvrcp log lines) ---
+    // --- Bluetooth (broadcasts of the stack; our own answers come from the BtPairing and BtAvrcp log lines) ---
 
     /** The Bluetooth processes that the logcat tap follows (at the start and after each change). */
     internal fun bluetoothPids(pids: Map<Int, String>) {
