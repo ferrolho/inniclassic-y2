@@ -32,6 +32,7 @@ import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.AutoThemeManager
+import com.themoon.y1.managers.CellRadioManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.WirelessAdbManager
 import com.themoon.y1.managers.LanguageManager
@@ -765,6 +766,23 @@ class SettingsController(
             onNavigateToScreen(MainActivity.STATE_WIFI)
         }
         containerSettingsItems.addView(btnWifiMenu)
+
+        val btnCellRadio = createSettingRow(
+            localize("Cell Radio"),
+            com.themoon.y1.core.extensions.onOff(CellRadioManager.isCellRadioOn(activity), localize)
+        )
+        btnCellRadio.setOnClickListener {
+            clickFeedback()
+            val turnOn = !CellRadioManager.isCellRadioOn(activity)
+            CellRadioManager.setCellRadioOn(activity, turnOn) { isOn ->
+                val tvStatus = btnCellRadio.getChildAt(1) as? TextView
+                tvStatus?.text = com.themoon.y1.core.extensions.onOff(isOn, localize)
+                if (isOn != turnOn) {
+                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        containerSettingsItems.addView(btnCellRadio)
 
         val btnJellyfin = createSettingRow(
             localize("Jellyfin Sync"),
