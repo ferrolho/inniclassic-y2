@@ -24,6 +24,7 @@ import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.BluetoothDiscoverableLogic
+import com.themoon.y1.managers.AudioOutputLossManager
 import com.themoon.y1.managers.BluetoothDiscoverableManager
 import com.themoon.y1.managers.BluetoothPairingAgent
 import com.themoon.y1.controllers.ScreenController
@@ -110,6 +111,7 @@ class BluetoothController(
             startBluetoothScan(userAction = true)
         }
         BluetoothDiscoverableManager.init(activity)
+        AudioOutputLossManager.init(activity)
     }
 
     override fun onEnter(state: ScreenState) {
