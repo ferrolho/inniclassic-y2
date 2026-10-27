@@ -6,12 +6,14 @@ import com.themoon.y1.views.WheelDialog
 import java.io.File
 
 /**
- * Context menu displayed on long pressing center or play/pause button in Now Playing screen.
+ * Context menu displayed on long pressing the center button in Now Playing screen.
  * Replicates iPod Classic context actions:
  * - Add/Remove from Favorites
  * - Add to On-The-Go playlist
+ * - Add to Playlist
  * - Browse Album / Browse Artist
- * - Toggle Audio Visualizer
+ * - Show/Hide Spectrum
+ * - Show Total Time / Show Remaining Time
  */
 object NowPlayingContextMenu {
 
@@ -22,9 +24,13 @@ object NowPlayingContextMenu {
         isFavorite: Boolean,
         onToggleFavorite: () -> Unit,
         onAddToOnTheGo: (file: File) -> Unit,
+        onAddToPlaylist: (file: File) -> Unit,
         onBrowseAlbum: (albumName: String) -> Unit,
         onBrowseArtist: (artistName: String) -> Unit,
+        isSpectrumShowing: Boolean,
         onToggleVisualizer: () -> Unit,
+        isTotalTimeShown: Boolean,
+        onToggleTotalTime: () -> Unit,
         localize: (String) -> String
     ) {
         WheelDialog.show(activity) {
@@ -42,6 +48,13 @@ object NowPlayingContextMenu {
                 icon = null
             ) {
                 onAddToOnTheGo(songFile)
+            }
+
+            addButton(
+                text = localize("Add to Playlist"),
+                icon = null
+            ) {
+                onAddToPlaylist(songFile)
             }
 
             if (songItem != null) {
@@ -66,10 +79,17 @@ object NowPlayingContextMenu {
             }
 
             addButton(
-                text = localize("Toggle Visualizer"),
+                text = if (isSpectrumShowing) localize("Hide Spectrum") else localize("Show Spectrum"),
                 icon = null
             ) {
                 onToggleVisualizer()
+            }
+
+            addButton(
+                text = if (isTotalTimeShown) localize("Show Remaining Time") else localize("Show Total Time"),
+                icon = null
+            ) {
+                onToggleTotalTime()
             }
 
             negativeButton(localize("Cancel"))
