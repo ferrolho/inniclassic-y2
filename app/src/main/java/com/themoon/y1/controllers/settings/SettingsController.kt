@@ -464,7 +464,7 @@ class SettingsController(
             val tvStatus = btnVideoFill.getChildAt(1) as? TextView
             tvStatus?.text = onOff(newState, localize)
         }
-        containerSettingsItems.addView(btnVideoFill)
+        if (com.themoon.y1.FeatureVisibility.videosBuilt) containerSettingsItems.addView(btnVideoFill)
 
         var isAlbumTiltEnabled = prefs.getBoolean("album_tilt_enabled", true)
         val btnAlbumTilt = createSettingRow(
@@ -1476,7 +1476,7 @@ class SettingsController(
 
         val buttons = ArrayList<ThemeManager.MenuElement>()
         for (el in ThemeManager.getCurrentTheme().menuElements) {
-            if (el.type == "button") buttons.add(el)
+            if (el.type == "button" && com.themoon.y1.FeatureVisibility.isBuilt(el.action)) buttons.add(el)
         }
         sortMenuElements(buttons)
 
