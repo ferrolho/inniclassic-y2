@@ -31,11 +31,16 @@ import java.util.regex.Pattern
 /**
  * Controller and parser for synchronized LRC, embedded USLT ID3, and M4B chapter lyrics.
  * Manages the overlay ScrollView and synchronized highlight updates.
+ *
+ * The lyrics use the full width of Now Playing, as on the iPod Classic: [playerLayout] (a FrameLayout) gets the
+ * lyrics view, [albumViews] (the art and the song text) hide while it shows, and [region] gives its top and bottom
+ * (under the status bar, above the progress bar) in [playerLayout] coordinates.
  */
 class LyricsOverlayController(
     private val context: Context,
-    private val playerInnerLayout: ViewGroup,
-    private val albumViews: List<View> = emptyList()
+    private val playerLayout: ViewGroup,
+    private val albumViews: List<View> = emptyList(),
+    private val region: () -> Pair<Int, Int>? = { null }
 ) {
 
     val lyricScrollView: ScrollView = ScrollView(context).apply {
@@ -45,10 +50,10 @@ class LyricsOverlayController(
 
     val tvLyrics: TextView = TextView(context).apply {
         setTextColor(0xFFFFFFFF.toInt())
-        textSize = 16f
+        textSize = TEXT_SIZE_SP
         gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
-        setLineSpacing(10f, 1.2f)
-        setPadding(20, 40, 20, 40)
+        setLineSpacing(4f, 1.1f)
+        setPadding(SIDE_PADDING, 40, SIDE_PADDING, 40)
         typeface = ThemeManager.getCustomFontBold()
     }
 
@@ -90,12 +95,6 @@ class LyricsOverlayController(
         get() = currentLyrics.isNotEmpty()
 
     init {
-        // Take the place and size of the album art (and its reflection) when shown
-        val visLp = ViewGroup.MarginLayoutParams(
-            albumViews.firstOrNull()?.layoutParams?.width ?: ViewGroup.LayoutParams.MATCH_PARENT,
-            if (albumViews.isEmpty()) ViewGroup.LayoutParams.MATCH_PARENT
-            else albumViews.sumOf { it.layoutParams.height + ((it.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin ?: 0) }
-        )
         lyricScrollView.addView(
             tvLyrics,
             FrameLayout.LayoutParams(
@@ -103,13 +102,29 @@ class LyricsOverlayController(
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
-        playerInnerLayout.addView(lyricScrollView, 0, visLp)
+        playerLayout.addView(
+            lyricScrollView,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+    }
+
+    /** Puts the lyrics view between the status bar and the progress bar, over the full width. */
+    private fun placeInRegion() {
+        val lp = lyricScrollView.layoutParams as? FrameLayout.LayoutParams ?: return
+        val (top, bottom) = region() ?: return
+        if (bottom - top < 40) return
+        if (lp.topMargin == top && lp.height == bottom - top) return
+        lp.gravity = Gravity.TOP
+        lp.topMargin = top
+        lp.height = bottom - top
+        lyricScrollView.layoutParams = lp
     }
 
     fun show() {
         if (!hasLyrics) return
         if (!colorsOverridden) applyThemeColors()
-        albumViews.forEach { it.visibility = View.GONE }
+        placeInRegion()
+        albumViews.forEach { it.visibility = View.INVISIBLE }
         lyricScrollView.visibility = View.VISIBLE
         manualLyricIndex = -1
         manualScrollY = -1f
@@ -119,7 +134,7 @@ class LyricsOverlayController(
             buildSyncedText()
         } else {
             tvLyrics.setTextColor(plainColor)
-            tvLyrics.setPadding(20, 40, 20, 40)
+            tvLyrics.setPadding(SIDE_PADDING, 40, SIDE_PADDING, 40)
         }
         scheduleFrame()
     }
@@ -399,7 +414,7 @@ class LyricsOverlayController(
             lineEnds[i] = sb.length
         }
         tvLyrics.setTextColor(otherLineColor)
-        tvLyrics.setPadding(20, 10, 20, 10)
+        tvLyrics.setPadding(SIDE_PADDING, 10, SIDE_PADDING, 10)
         tvLyrics.setText(sb, TextView.BufferType.SPANNABLE)
         activeSpan = null
         lastLyricIndex = -1
@@ -489,4 +504,10 @@ class LyricsOverlayController(
     private fun maxScroll(): Int = Math.max(0, tvLyrics.height - lyricScrollView.height)
 
     private fun clampScroll(y: Float): Float = Math.max(0f, Math.min(maxScroll().toFloat(), y))
+
+    private companion object {
+        /** Full-width lyrics: about the size of the iPod list text, so a line reads from arm's length. */
+        const val TEXT_SIZE_SP = 22f
+        const val SIDE_PADDING = 24
+    }
 }
