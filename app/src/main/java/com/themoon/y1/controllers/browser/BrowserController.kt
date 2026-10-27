@@ -1133,7 +1133,7 @@ class BrowserController(
 
         if (!browserCoverPaneSetUp && ivBrowserCover != null) {
             browserCoverPaneSetUp = true
-            com.themoon.y1.views.CoverPane.attach(frame, ivBrowserCover)
+            com.themoon.y1.views.CoverPane.attach(ivBrowserCover)
         }
         onRefreshCoverPane?.invoke()
     }

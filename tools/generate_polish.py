@@ -365,6 +365,7 @@ polish_dict = {
   "Album Art & Info Updated!": "Okładka albumu i informacje zostały zaktualizowane!",
   "Auto Fetch Album Art": "Pobieraj okładki albumów",
   "Album Cover Tilt": "Przechylenie okładki albumu",
+  "Album Cover Pan & Zoom": "Ruch okładki albumu",
   "Clear": "Wyczyść",
   "Clear Cache": "Wyczyść pamięć podręczną",
   "Cache cleared.": "Pamięć podręczna wyczyszczona.",
