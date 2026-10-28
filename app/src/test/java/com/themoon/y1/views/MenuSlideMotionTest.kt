@@ -1,0 +1,100 @@
+package com.themoon.y1.views
+
+import com.themoon.y1.views.MenuSlideMotion.Kind
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class MenuSlideMotionTest {
+
+    private val d = FloatArray(2)
+    private val o = FloatArray(3)
+
+    @Test
+    fun curves() {
+        assertEquals(0f, MenuSlideMotion.decelerate(0f), 1e-6f)
+        assertEquals(0.75f, MenuSlideMotion.decelerate(0.5f), 1e-6f)
+        assertEquals(1f, MenuSlideMotion.decelerate(2f), 1e-6f)
+        assertEquals(0.25f, MenuSlideMotion.accelerate(0.5f), 1e-6f)
+        assertEquals(0f, MenuSlideMotion.accelerate(-1f), 1e-6f)
+    }
+
+    @Test
+    fun paneSlideFitsTheIpodFrames() {
+        // iPod main menu -> Music, measured each 33.4 ms from about 0.4 frame after the start:
+        // 0.31, 0.50, 0.66, 0.80, 0.89, 0.95 (±0.03)
+        val measured = floatArrayOf(0.31f, 0.50f, 0.66f, 0.80f, 0.885f, 0.95f)
+        for (i in measured.indices) {
+            val t = ((i + 1.1f) * 33.37f).toLong()
+            MenuSlideMotion.depth(Kind.PANE, true, t, d)
+            assertEquals("frame ${i + 1}", measured[i], d[0], 0.05f)
+        }
+    }
+
+    @Test
+    fun pushAndPopEnds() {
+        for (k in Kind.values()) {
+            MenuSlideMotion.depth(k, true, 0L, d)
+            assertEquals(0f, d[0], 1e-6f)
+            assertEquals(0f, d[1], 1e-6f)
+            MenuSlideMotion.depth(k, true, MenuSlideMotion.durationMs(k, true), d)
+            assertEquals(1f, d[0], 1e-6f)
+            assertEquals(1f, d[1], 1e-6f)
+            MenuSlideMotion.depth(k, false, 0L, d)
+            assertEquals(1f, d[0], 1e-6f)
+            assertEquals(1f, d[1], 1e-6f)
+            MenuSlideMotion.depth(k, false, MenuSlideMotion.durationMs(k, false), d)
+            assertEquals(0f, d[0], 1e-6f)
+            assertEquals(0f, d[1], 1e-6f)
+            assertFalse(MenuSlideMotion.running(k, true, MenuSlideMotion.durationMs(k, true)))
+            assertTrue(MenuSlideMotion.running(k, false, 0L))
+        }
+    }
+
+    @Test
+    fun coverFlowArtFollowsTheListAndBackIsTheReverse() {
+        MenuSlideMotion.depth(Kind.COVER_FLOW, true, 100L, d)
+        assertTrue(d[1] < d[0]) // the art pane starts later
+        assertEquals(0.25f, d[0], 1e-6f) // accelerates
+        // Back: the art pane comes in first
+        MenuSlideMotion.depth(Kind.COVER_FLOW, false, 100L, d)
+        assertTrue(d[1] < d[0])
+    }
+
+    @Test
+    fun offsets() {
+        // Split -> split: only the 240 px list pane moves, A out to the left, B in from the right
+        MenuSlideMotion.offsets(Kind.PANE, 0.5f, 0.5f, 480f, 240f, o)
+        assertEquals(-120f, o[0], 1e-4f)
+        assertEquals(120f, o[1], 1e-4f)
+        // Split -> full: B covers the art first; the list pane moves only when B reaches it
+        MenuSlideMotion.offsets(Kind.SPLIT_TO_FULL, 0.25f, 0.25f, 480f, 240f, o)
+        assertEquals(360f, o[1], 1e-4f)
+        assertEquals(0f, o[0], 1e-4f)
+        MenuSlideMotion.offsets(Kind.SPLIT_TO_FULL, 0.75f, 0.75f, 480f, 240f, o)
+        assertEquals(120f, o[1], 1e-4f)
+        assertEquals(-120f, o[0], 1e-4f)
+        // Full width
+        MenuSlideMotion.offsets(Kind.FULL, 1f, 1f, 480f, 0f, o)
+        assertEquals(-480f, o[0], 1e-4f)
+        assertEquals(0f, o[1], 1e-4f)
+        // Cover Flow: the list pane goes left, the art pane right
+        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 0.5f, 480f, 240f, o)
+        assertEquals(-240f, o[0], 1e-4f)
+        assertEquals(120f, o[2], 1e-4f)
+    }
+
+    @Test
+    fun kinds() {
+        assertEquals(Kind.PANE, MenuSlideMotion.kindOf(240, 241, false, false))
+        assertEquals(Kind.SPLIT_TO_FULL, MenuSlideMotion.kindOf(240, null, false, false))
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, null, false, false))
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, 240, false, false))
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(240, 200, false, false))
+        assertEquals(Kind.COVER_FLOW, MenuSlideMotion.kindOf(240, null, false, true))
+        assertNull(MenuSlideMotion.kindOf(null, null, false, true))
+        assertNull(MenuSlideMotion.kindOf(null, null, true, false))
+    }
+}
