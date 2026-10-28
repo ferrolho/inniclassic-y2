@@ -696,6 +696,8 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_SETTINGS", "SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)
+            // Opened going down: the first row (Back from a row's screen selects that row, NavigationManager)
+            settingsController.lastSettingsFocusIndex = 0
             settingsController.buildSettingsUI()
         }
         "OPEN_RADIO", "RADIO" -> {

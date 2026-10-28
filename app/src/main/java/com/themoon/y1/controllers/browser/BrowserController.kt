@@ -130,6 +130,8 @@ class BrowserController(
             when (val mode = state.mode) {
                 is BrowserMode.Root -> {
                     isAudiobookLibraryMode = false
+                    // Opened going down: the first row. Back from a deeper screen selects its row (NavigationManager).
+                    lastBrowserFocusText = ""
                     buildFileBrowserUI()
                 }
                 is BrowserMode.Folder -> {
@@ -201,6 +203,19 @@ class BrowserController(
             }
         } else {
             buildFileBrowserUI()
+        }
+    }
+
+    /**
+     * The Music lists change in this screen without a new [ScreenState]: Back from Now Playing must come back
+     * to the list that shows now (an album, a genre...), not to the Music menu. The audiobook lists stay as before.
+     */
+    override fun backState(state: ScreenState): ScreenState {
+        if (state !is ScreenState.Browser || isAudiobookLibraryMode) return state
+        return when (val mode = currentBrowserMode) {
+            is BrowserMode.Folder -> ScreenState.Browser(BrowserMode.Folder(currentFolder))
+            is BrowserMode.Audiobooks, is BrowserMode.CoverFlow -> state
+            else -> ScreenState.Browser(mode)
         }
     }
 
@@ -1334,7 +1349,8 @@ class BrowserController(
                     }
                     "ALL" -> {
                         currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                        lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("All Songs")
+                        // The Music menu row is "Songs" (the list title is "All Songs")
+                        lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("Songs")
                         buildFileBrowserUI()
                     }
                     "RECENT" -> {
@@ -1360,7 +1376,12 @@ class BrowserController(
                         virtualQueryValue = exitedAlbum
                         buildVirtualCategories("ALBUM")
                     }
-                    "ARTIST" -> {
+                    "ARTIST" -> if (categoryArtistFilterIsTrackArtist && categoryArtistFilter == virtualQueryValue) {
+                        // All Songs of an artist: back to the albums of the artist, on All Songs
+                        currentBrowserMode = BrowserMode.Albums(categoryArtistFilter, true)
+                        virtualQueryValue = ALL_SONGS_SENTINEL
+                        buildVirtualCategories("ALBUM")
+                    } else {
                         val exitedArtist = virtualQueryValue
                         currentBrowserMode = if (categoryArtistFilterIsTrackArtist) BrowserMode.TrackArtists else BrowserMode.Artists
                         virtualQueryValue = exitedArtist
