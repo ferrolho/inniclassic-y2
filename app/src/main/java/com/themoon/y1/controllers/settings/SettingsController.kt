@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.settings
 
+import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -204,81 +205,10 @@ class SettingsController(
             return true
         }
 
-        if (containerSettingsItems.childCount == 0) return false
-        val isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
-        val curFocus = containerSettingsItems.findFocus()
-        val currentIndex = if (curFocus != null) containerSettingsItems.indexOfChild(curFocus) else -1
-
-        if (delta < 0) {
-            if (currentIndex > 0) {
-                for (i in currentIndex - 1 downTo 0) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (isLoopScrollOn && currentIndex >= 0) {
-                for (i in containerSettingsItems.childCount - 1 downTo currentIndex + 1) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (currentIndex == -1) {
-                for (i in 0 until containerSettingsItems.childCount) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        } else {
-            if (currentIndex in 0 until containerSettingsItems.childCount - 1) {
-                for (i in currentIndex + 1 until containerSettingsItems.childCount) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (isLoopScrollOn && currentIndex >= 0) {
-                for (i in 0 until currentIndex) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (currentIndex == -1) {
-                for (i in 0 until containerSettingsItems.childCount) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        }
-        return false
+        val i = RowFocus.step(containerSettingsItems, delta) ?: return false
+        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+        clickFeedback()
+        return true
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

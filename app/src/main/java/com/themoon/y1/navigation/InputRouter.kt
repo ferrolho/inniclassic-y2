@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.PowerManager
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewGroup
 import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
@@ -190,29 +189,11 @@ class InputRouter private constructor() {
                 return true
             }
 
-            val focused = activeController?.rootView?.findFocus()
-            val parent = focused?.parent as? ViewGroup
-            if (parent is LinearLayout) {
-                val idx = parent.indexOfChild(focused)
-                if (delta < 0) {
-                    for (i in idx - 1 downTo 0) {
-                        val child = parent.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
-                            return true
-                        }
-                    }
-                } else {
-                    for (i in idx + 1 until parent.childCount) {
-                        val child = parent.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
-                            return true
-                        }
-                    }
-                }
+            // A screen with no own wheel code: one step in the list of the selected row
+            val rows = activeController?.rootView?.findFocus()?.parent as? LinearLayout
+            if (rows != null && RowFocus.step(rows, delta) != null) {
+                (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+                return true
             }
         }
         if (activeController?.onKeyDown(keyCode, event) == true) {
