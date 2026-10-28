@@ -55,6 +55,7 @@
   "Artists": "Wykonawcy",
   "Album Artists": "Wykonawcy albumów",
   "Albums": "Albumy",
+  "Compilations": "Składanki",
   "Songs": "Utwory",
   "Song": "Utwór",
   "File": "Plik",
@@ -121,6 +122,7 @@
   "Added to Queue": "Dodano do kolejki",
   "Shuffle": "Wymieszaj",
   "Shuffle Mode": "Tryb losowy",
+  "Shuffle Songs": "Wymieszaj utwory",
   "Repeat": "Powtarzaj",
   "Repeat Mode": "Tryb powtarzania",
   "OFF": "WYŁ.",
@@ -515,6 +517,9 @@
   "Keyboard Layout": "Układ klawiatury",
   "Original": "Oryginalna",
   "QWERTY": "QWERTY",
+  "Group Albums": "Grupuj albumy",
+  "By Title": "Według tytułu",
+  "By Title and Artist": "Według tytułu i wykonawcy",
   "Next": "Dalej",
   "Login": "Zaloguj",
   "Add to Favorites": "Dodaj do ulubionych",
@@ -631,8 +636,6 @@
   "Buy 1 Heart ($1,500)": "Kup 1 serce ($1 500)",
   "Heart Purchased": "Kupiono serce",
   "Recently Played": "Ostatnio odtwarzane",
-  "No recently played albums yet.": "Brak ostatnio odtwarzanych albumów.",
-  "Clear Recently Played": "Wyczyść ostatnio odtwarzane",
-  "Are you sure you want to clear your recently played history?": "Czy na pewno chcesz wyczyścić historię ostatnio odtwarzanych?",
-  "Recently played cleared.": "Wyczyszczono ostatnio odtwarzane."
+  "Top 25 Most Played": "Top 25 najczęściej odtwarzanych",
+  "No Songs": "Brak utworów"
 }
