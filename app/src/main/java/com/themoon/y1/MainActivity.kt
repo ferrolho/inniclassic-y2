@@ -704,7 +704,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             val artist = song?.artist ?: t("Unknown Artist")
             val album = song?.album ?: t("Unknown Album")
             val bmp = (ivAlbumArt.drawable as? BitmapDrawable)?.bitmap
-            BluetoothAvrcpManager.getInstance(this).updateMetadata(title, artist, album, bmp)
+            BluetoothAvrcpManager.getInstance(this).updateMetadata(file.absolutePath, title, artist, album, bmp)
         }
     }
 

@@ -30,6 +30,36 @@ object AvrcpMetadataLogic {
     /** Duration for MetadataEditor.putLong(METADATA_KEY_DURATION), or null when not known yet. */
     fun duration(track: Track): Long? = track.durationMs.takeIf { it > 0 }
 
+    /**
+     * Longest time that the track data of a new track waits for its duration. After this time the
+     * title, artist and album go to the car without the duration.
+     */
+    const val MAX_DURATION_WAIT_MS = 1500L
+
+    enum class Action { SEND, WAIT, SKIP }
+
+    /**
+     * The AVRCP service of the Y2 ROM (AOSP 4.4 `Avrcp.updateMetadata`) tells the car "track changed"
+     * only when the title, artist (key 13) or album changes. The car then reads the track data one time.
+     * A duration that comes in a later update does not get to the car.
+     */
+    fun isNewTrack(last: Track?, next: Track): Boolean =
+        last == null || last.title != next.title || last.artist != next.artist || last.album != next.album
+
+    /**
+     * What to do with [next]: SKIP when nothing changed since [last]; WAIT when it is a new track and its
+     * duration is not known yet, until [waitedMs] gets to [MAX_DURATION_WAIT_MS]; else SEND.
+     */
+    fun action(last: Track?, next: Track, artChanged: Boolean, waitedMs: Long): Action = when {
+        next == last && !artChanged -> Action.SKIP
+        isNewTrack(last, next) && duration(next) == null && waitedMs < MAX_DURATION_WAIT_MS -> Action.WAIT
+        else -> Action.SEND
+    }
+
+    /** The log line of one send: title and duration ("-" when not known). */
+    fun logLine(track: Track): String =
+        "AVRCP track data sent: \"" + shortTitle(track.title) + "\" duration " + (duration(track)?.let { "$it ms" } ?: "-")
+
     fun playState(hasTrack: Boolean, isPlaying: Boolean): Int = when {
         !hasTrack -> RemoteControlClient.PLAYSTATE_STOPPED
         isPlaying -> RemoteControlClient.PLAYSTATE_PLAYING

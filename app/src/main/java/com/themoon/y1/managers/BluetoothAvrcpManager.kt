@@ -133,6 +133,15 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
     private var mediaButtonReceiver: android.content.ComponentName? = null
     private var lastTrack: AvrcpMetadataLogic.Track? = null
     private var lastArtSource: android.graphics.Bitmap? = null
+    // A new track whose data waits for its duration, and the time when the wait started.
+    private var waitingTrack: AvrcpMetadataLogic.Track? = null
+    private var waitStartMs = 0L
+    private val waitTimeout = Runnable {
+        val waited = waitingTrack
+        MainActivity.instance?.sendBluetoothMetaToCar()
+        // No send (no track now): stop the wait, so that the play state goes out again.
+        if (waitingTrack === waited) stopWait()
+    }
     private var a2dpWatchRegistered = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -217,22 +226,45 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
         hasAudioFocus = false
         lastTrack = null
         lastArtSource = null
+        stopWait()
         MainActivity.instance?.let { main ->
             try { main.updatePlayerUI() } catch (_: Exception) {}
         }
     }
 
-    fun updateMetadata(title: String?, artist: String?, album: String?, albumArtBmp: android.graphics.Bitmap?) {
+    /**
+     * Sends the track data of the file at [path]. The duration comes from the player only when the
+     * player holds this file. The data of a new track waits for the duration (at most
+     * [AvrcpMetadataLogic.MAX_DURATION_WAIT_MS]), because the car reads the data only at a track change.
+     */
+    fun updateMetadata(path: String, title: String?, artist: String?, album: String?, albumArtBmp: android.graphics.Bitmap?) {
         if (remoteControlClient == null) initRemoteControlClient()
         val rcc = remoteControlClient ?: return
         val track = AvrcpMetadataLogic.Track(
             title = title ?: "Unknown Title",
             artist = artist ?: "Unknown Artist",
             album = album ?: "Unknown Album",
-            durationMs = AudioPlayerManager.getInstance().getDuration().toLong()
+            durationMs = AudioPlayerManager.getInstance().getDurationOf(path).toLong()
         )
         val art = albumArtBmp?.takeIf { !it.isRecycled }
-        if (track == lastTrack && art === lastArtSource) return
+        val now = android.os.SystemClock.uptimeMillis()
+        val waited = if (AvrcpMetadataLogic.isNewTrack(waitingTrack, track)) 0L else now - waitStartMs
+        when (AvrcpMetadataLogic.action(lastTrack, track, art !== lastArtSource, waited)) {
+            AvrcpMetadataLogic.Action.SKIP -> {
+                stopWait()
+                return
+            }
+            AvrcpMetadataLogic.Action.WAIT -> {
+                if (waited == 0L) {
+                    waitingTrack = track
+                    waitStartMs = now
+                    handler.removeCallbacks(waitTimeout)
+                    handler.postDelayed(waitTimeout, AvrcpMetadataLogic.MAX_DURATION_WAIT_MS)
+                }
+                return
+            }
+            AvrcpMetadataLogic.Action.SEND -> stopWait()
+        }
         try {
             val editor = rcc.editMetadata(true)
             for ((key, value) in AvrcpMetadataLogic.strings(track)) editor.putString(key, value)
@@ -245,12 +277,20 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
                 editor.putBitmap(android.media.RemoteControlClient.MetadataEditor.BITMAP_KEY_ARTWORK, it)
             }
             editor.apply()
-            android.util.Log.w(TAG, "AVRCP track data sent: \"" + AvrcpMetadataLogic.shortTitle(track.title) + "\"")
+            android.util.Log.w(TAG, AvrcpMetadataLogic.logLine(track))
             lastTrack = track
             lastArtSource = art
         } catch (e: Exception) {
             android.util.Log.w(TAG, "Metadata update failed", e)
+            return
         }
+        // The play state and position after the track data: the ROM sets the position to 0 at a track change.
+        updatePlaybackState(AudioPlayerManager.getInstance().isPlaying())
+    }
+
+    private fun stopWait() {
+        handler.removeCallbacks(waitTimeout)
+        waitingTrack = null
     }
 
     private fun artworkCopy(source: android.graphics.Bitmap?): android.graphics.Bitmap? {
@@ -289,6 +329,8 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
         if (remoteControlClient == null) initRemoteControlClient()
         val rcc = remoteControlClient ?: return
         if (isPlaying) requestAudioFocus()
+        // The track data of a new track waits for its duration: send the play state after it.
+        if (waitingTrack != null) return
         val player = AudioPlayerManager.getInstance()
         val hasTrack = player.getDuration() > 0 || lastTrack != null
         val state = AvrcpMetadataLogic.playState(hasTrack, isPlaying)
