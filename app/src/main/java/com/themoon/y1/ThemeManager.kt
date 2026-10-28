@@ -51,7 +51,6 @@ object ThemeManager {
     class ThemeData(
         var folderPath: String,
         var name: String,
-        var bgImage: String,
         var customFont: Typeface,
         var textPrimary: Int,
         var textSecondary: Int,
@@ -98,7 +97,7 @@ object ThemeManager {
     )
 
     private val DEFAULT_FALLBACK_THEME = ThemeData(
-        "", "Classic Light", "", Typeface.DEFAULT,
+        "", "Classic Light", Typeface.DEFAULT,
         0xFF1C1C1E.toInt(), 0xFF666666.toInt(), 0xFFFFFFFF.toInt(), 0xFFC8C9C8.toInt(),
         0x00FFFFFF, 0xFF2588DC.toInt(), Color.WHITE, 0
     ).apply {
@@ -289,12 +288,9 @@ object ThemeManager {
                                 }
                             }
 
-                            val parsedBgImage = json.optString("bg_image", "")
-
                             val theme = ThemeData(
                                 subFolder.absolutePath,
                                 normalizedName,
-                                parsedBgImage,
                                 parsedFont,
                                 parsedTextPrimary, parsedTextSecondary,
                                 parsedOverlayBg, parsedStatusBarBg,
@@ -380,7 +376,7 @@ object ThemeManager {
     }
 
     /**
-     * Makes [name] the current theme and saves it, with its background and main menu widgets, as a tap
+     * Makes [name] the current theme and saves it, with its main menu widgets, as a tap
      * in Settings → Theme does. False if the theme is not installed or is already the current theme.
      */
     fun selectTheme(prefs: SharedPreferences, name: String): Boolean {
@@ -394,7 +390,6 @@ object ThemeManager {
                 .putInt("app_theme_index", index)
                 .putString("app_theme_name", theme.name)
                 .putString("current_theme_name", theme.name)
-            if (hasThemeBackground(theme)) editor.putString("bg_path", "THEME_DEFAULT")
             val types = theme.menuElements.map { it.type }.toSet()
             for (widget in WIDGET_TYPES) editor.putBoolean(widget, widget in types)
             editor.commit()
@@ -402,11 +397,6 @@ object ThemeManager {
         }
         if (changed) themeGeneration++
         return changed
-    }
-
-    fun hasThemeBackground(theme: ThemeData): Boolean {
-        if (theme.bgImage.isNotEmpty() && File(theme.folderPath, theme.bgImage).exists()) return true
-        return File(theme.folderPath, "background.png").exists() || File(theme.folderPath, "bg.png").exists()
     }
 
     fun setThemeIndex(index: Int) {

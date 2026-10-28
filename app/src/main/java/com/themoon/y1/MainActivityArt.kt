@@ -16,35 +16,6 @@ internal fun MainActivity.createStatusBarBackground(): GradientDrawable {
 internal fun MainActivity.updateMainMenuBackgroundInternal() {
     val bgView = ivMainBg ?: return
     try {
-        val savedBgPath = prefs.getString("bg_path", null)
-        val currentTheme = ThemeManager.getCurrentTheme()
-
-        if ("THEME_DEFAULT" == savedBgPath) {
-            var themeBg: Bitmap? = null
-            if (!currentTheme.bgImage.isNullOrEmpty()) {
-                val bgFile = File(currentTheme.folderPath, currentTheme.bgImage)
-                if (bgFile.exists()) {
-                    themeBg = BitmapFactory.decodeFile(bgFile.absolutePath)
-                }
-            }
-            if (themeBg == null) themeBg = ThemeManager.getCustomIcon("background.png", this, 0)
-            if (themeBg == null) themeBg = ThemeManager.getCustomIcon("bg.png", this, 0)
-            if (themeBg != null) {
-                bgView.setImageBitmap(themeBg)
-                return
-            }
-        } else if (!savedBgPath.isNullOrEmpty()) {
-            val bgFile = File(savedBgPath)
-            if (bgFile.exists()) {
-                val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                val customBg = BitmapFactory.decodeFile(savedBgPath, opts)
-                if (customBg != null) {
-                    bgView.setImageBitmap(customBg)
-                    return
-                }
-            }
-        }
-
         val sourceBitmap = if (lastAlbumArtBytes != null && lastAlbumArtBytes!!.isNotEmpty()) {
             val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
             BitmapFactory.decodeByteArray(lastAlbumArtBytes, 0, lastAlbumArtBytes!!.size, opts)
