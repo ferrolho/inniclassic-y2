@@ -132,6 +132,14 @@ object MenuSlideMotion {
     }
 
     /**
+     * The columns of a list pane [pane] px wide, moved by [offset] px, that show: the columns left of the pane edge
+     * (the art pane does not move, and a list never draws over it). From the left edge of the pane bitmap to the
+     * returned column. Between split screens B's list comes in at the pane edge (offset = [pane]: no column shows),
+     * not from the right edge of the screen.
+     */
+    fun paneColumns(offset: Float, pane: Float): Float = (pane - offset).coerceIn(0f, pane)
+
+    /**
      * The kind of slide between A and B. [paneA], [paneB]: the x of the art pane of each screen (its list pane
      * width), or null when the screen has no art pane; [coverFlowB]: B is Cover Flow. Null: no slide (a cut).
      */

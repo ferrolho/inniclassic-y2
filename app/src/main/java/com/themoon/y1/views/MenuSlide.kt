@@ -254,7 +254,7 @@ class MenuSlide private constructor(
         if (capturing || phase == Phase.IDLE) return
         val old = bmpOld ?: return
         if (phase != Phase.RUN) {
-            drawPart(canvas, old, 0f, 0, old.width)
+            drawPart(canvas, old, 0f, 0, old.width.toFloat())
             return
         }
         val new = bmpNew ?: return
@@ -263,31 +263,34 @@ class MenuSlide private constructor(
         val w = a.width
         when (kind) {
             Kind.PANE -> {
-                drawPart(canvas, a, off[0], 0, pane)
-                drawPart(canvas, b, off[1], 0, pane)
+                // Both lists only in the list pane: B comes in at the pane edge, not over the art.
+                val p = pane.toFloat()
+                drawPart(canvas, a, off[0], 0, MenuSlideMotion.paneColumns(off[0], p))
+                drawPart(canvas, b, off[1], 0, MenuSlideMotion.paneColumns(off[1], p))
             }
             Kind.FULL -> {
-                drawPart(canvas, a, off[0], 0, w)
-                drawPart(canvas, b, off[1], 0, w)
+                drawPart(canvas, a, off[0], 0, w.toFloat())
+                drawPart(canvas, b, off[1], 0, w.toFloat())
             }
             Kind.SPLIT_TO_FULL -> {
-                drawPart(canvas, a, 0f, pane, w)
-                drawPart(canvas, a, off[0], 0, pane)
-                drawPart(canvas, b, off[1], 0, w)
+                drawPart(canvas, a, 0f, pane, w.toFloat())
+                drawPart(canvas, a, off[0], 0, pane.toFloat())
+                drawPart(canvas, b, off[1], 0, w.toFloat())
             }
             Kind.COVER_FLOW -> {
-                drawPart(canvas, b, 0f, 0, w)
+                drawPart(canvas, b, 0f, 0, w.toFloat())
                 super.dispatchDraw(canvas)
-                drawPart(canvas, a, off[0], 0, pane)
+                drawPart(canvas, a, off[0], 0, pane.toFloat())
             }
         }
     }
 
     /** Draws columns [from]..[to] of a screen bitmap, moved by [dx], in the slide area (below the status bar). */
-    private fun drawPart(canvas: Canvas, bmp: Bitmap, dx: Float, from: Int, to: Int) {
+    private fun drawPart(canvas: Canvas, bmp: Bitmap, dx: Float, from: Int, to: Float) {
+        if (to <= from) return
         val save = canvas.save()
         canvas.translate(dx, top.toFloat())
-        canvas.clipRect(from, 0, to, bmp.height)
+        canvas.clipRect(from.toFloat(), 0f, to, bmp.height.toFloat())
         canvas.drawBitmap(bmp, 0f, 0f, null)
         canvas.restoreToCount(save)
     }

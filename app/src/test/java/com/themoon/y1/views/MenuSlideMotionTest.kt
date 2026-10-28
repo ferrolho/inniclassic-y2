@@ -87,6 +87,24 @@ class MenuSlideMotionTest {
     }
 
     @Test
+    fun paneSlideStaysInTheListPane() {
+        // Start of a push: B is at the pane edge (none of it shows), A shows in full
+        MenuSlideMotion.offsets(Kind.PANE, 0f, 0f, 480f, 240f, o)
+        assertEquals(240f, MenuSlideMotion.paneColumns(o[0], 240f), 1e-4f)
+        assertEquals(0f, MenuSlideMotion.paneColumns(o[1], 240f), 1e-4f)
+        // Half way: B shows at screen x 120..240 (its columns 0..120), A at 0..120; neither goes over the art
+        MenuSlideMotion.offsets(Kind.PANE, 0.5f, 0.5f, 480f, 240f, o)
+        val bCols = MenuSlideMotion.paneColumns(o[1], 240f)
+        assertEquals(120f, bCols, 1e-4f)
+        assertEquals(240f, o[1] + bCols, 1e-4f)
+        assertEquals(o[1], o[0] + MenuSlideMotion.paneColumns(o[0], 240f), 1e-4f) // no gap between A and B
+        // End: B shows in full
+        MenuSlideMotion.offsets(Kind.PANE, 1f, 1f, 480f, 240f, o)
+        assertEquals(240f, MenuSlideMotion.paneColumns(o[1], 240f), 1e-4f)
+        assertEquals(0f, MenuSlideMotion.paneColumns(480f, 240f), 1e-4f)
+    }
+
+    @Test
     fun kinds() {
         assertEquals(Kind.PANE, MenuSlideMotion.kindOf(240, 241, false, false))
         assertEquals(Kind.SPLIT_TO_FULL, MenuSlideMotion.kindOf(240, null, false, false))
