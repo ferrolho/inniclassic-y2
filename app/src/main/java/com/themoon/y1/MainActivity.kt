@@ -207,7 +207,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var isPendingJellyfinFetchLibrariesAfterWifi: Boolean = false
     var isPendingJellyfinQuickConnectAfterWifi: Boolean = false
     var currentSettingsDepth: Int = 0
-    var lastSettingsFocusIndex: Int = 0
     var lastMainMenuFocusIndex: Int = 0
     var currentSystemBrightness: Int = 255
     var currentEqPresetIndex: Int = 0
