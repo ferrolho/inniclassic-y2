@@ -236,7 +236,7 @@ class BrowserController(
     }
 
     override fun onThemeChanged() {
-        // Not onEnter: it clears the filters of the category lists. The list position is kept (ListPosition).
+        // Not onEnter: it clears the filters of the category lists. The row is kept (MainActivityTheme, ListRows).
         when (currentBrowserMode) {
             is BrowserMode.Artists -> buildVirtualCategories("ARTIST")
             is BrowserMode.TrackArtists -> buildVirtualCategories("TRACK_ARTIST")
