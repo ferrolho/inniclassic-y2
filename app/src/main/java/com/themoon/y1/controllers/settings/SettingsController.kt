@@ -4,10 +4,13 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.AudioManager
 import android.os.Build
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -29,6 +32,7 @@ import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
+import com.themoon.y1.managers.WirelessAdbManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
 import com.themoon.y1.models.AlbumKey
@@ -706,6 +710,29 @@ class SettingsController(
             onNavigateToScreen(MainActivity.STATE_WEBSERVER)
         }
         containerSettingsItems.addView(btnServerMenu)
+
+        // adb over Wi-Fi until the next restart (never persistent: root adb has no key check on this ROM).
+        val btnWirelessAdb = createSettingRow(localize("Wireless ADB"), WirelessAdbManager.label(WirelessAdbManager.currentPort(), localize))
+        // The address goes on the left of the value (of the switch), as the time left on the Bluetooth Discoverable row.
+        val tvAdbAddress = addValueNote(btnWirelessAdb)
+        fun showAdbState(port: Int?) {
+            (btnWirelessAdb.getChildAt(btnWirelessAdb.childCount - 1) as? TextView)?.text = WirelessAdbManager.label(port, localize)
+            val address = WirelessAdbManager.addressLabel(port, WirelessAdbManager.wifiIp(activity))
+            tvAdbAddress.text = address ?: ""
+            tvAdbAddress.visibility = if (address == null) View.GONE else View.VISIBLE
+        }
+        showAdbState(WirelessAdbManager.currentPort())
+        btnWirelessAdb.setOnClickListener {
+            clickFeedback()
+            val turnOn = WirelessAdbManager.currentPort() == null
+            WirelessAdbManager.setOn(activity, turnOn) { port ->
+                showAdbState(port)
+                if ((port != null) != turnOn) {
+                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        containerSettingsItems.addView(btnWirelessAdb)
 
         val btnWifiMenu = createSettingRow(localize("Wi-Fi"), "〉 ")
         btnWifiMenu.setOnClickListener {
@@ -1697,5 +1724,46 @@ class SettingsController(
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
         buildSettingsUI()
+    }
+
+    /**
+     * A text on the left of the value of a setting row [row], in the value's text style, with its digits on the
+     * centre line of the row (as the row title and the switch). Hidden until the caller gives it a text.
+     */
+    private fun addValueNote(row: LinearLayout): TextView {
+        val value = row.getChildAt(row.childCount - 1) as? TextView
+        val note = TextView(activity).apply {
+            if (value != null) {
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, value.textSize)
+                typeface = value.typeface
+                setTextColor(value.currentTextColor)
+            }
+            includeFontPadding = false
+            val padRight = (8 * activity.resources.displayMetrics.density).toInt()
+            val rowHeight = row.layoutParams?.height ?: 0
+            if (rowHeight > 0) {
+                // Full row height, gravity TOP, and a top padding that puts the centre of the cap height ("H")
+                // on the centre line of the row, in all themes.
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                gravity = Gravity.TOP or Gravity.END
+                val path = Path()
+                paint.getTextPath("H", 0, 1, 0f, 0f, path)
+                val bounds = RectF()
+                path.computeBounds(bounds, true)
+                val top = Math.round(rowHeight / 2f + paint.fontMetricsInt.ascent - bounds.top / 2f).coerceAtLeast(0)
+                setPadding(0, top, padRight, 0)
+            } else {
+                setPadding(0, 0, padRight, 0)
+            }
+            visibility = View.GONE
+        }
+        row.addView(note, row.childCount - 1)
+        // The row changes the value colour when it gets or loses the focus: give the same colour to the note.
+        val rowFocusListener = row.onFocusChangeListener
+        row.setOnFocusChangeListener { v, hasFocus ->
+            rowFocusListener?.onFocusChange(v, hasFocus)
+            if (value != null) note.setTextColor(value.currentTextColor)
+        }
+        return note
     }
 }
