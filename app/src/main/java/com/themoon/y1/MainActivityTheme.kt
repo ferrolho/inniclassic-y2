@@ -8,7 +8,6 @@ import android.widget.ListView
 import android.widget.TextView
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.views.QwertyKeyboardView
-import java.io.File
 
 /**
  * Theme change without an activity restart. All theme colours and fonts come from [ThemeManager] at run
@@ -35,17 +34,15 @@ object LiveTheme {
  */
 fun MainActivity.changeTheme(name: String): Boolean {
     if (ThemeManager.findThemeIndexByName(name) < 0) return false
-    val oldBackground = themeBackgroundKey()
     ThemeManager.selectTheme(prefs, name)
-    val backgroundChanged = themeBackgroundKey() != oldBackground
     window.decorView.post {
-        if (!isFinishing) applyThemeLive(backgroundChanged)
+        if (!isFinishing) applyThemeLive()
     }
     return true
 }
 
 /** Applies the current theme to all views now (main thread). */
-fun MainActivity.applyThemeLive(backgroundChanged: Boolean = false) {
+fun MainActivity.applyThemeLive() {
     val t0 = SystemClock.uptimeMillis()
     step("divider") {
         // The song list (MainActivityControllers) has a gap between rows, except in the Classic themes
@@ -54,7 +51,6 @@ fun MainActivity.applyThemeLive(backgroundChanged: Boolean = false) {
     }
     step("keyboard font") { setKeyboardFont(layoutWifiKeyboard) }
     step("battery") { batteryIconView?.invalidate() }
-    if (backgroundChanged) step("background") { updateMainMenuBackground() }
     // Before applyTheme(), as at a screen change: Now Playing colours, then the layouts that applyTheme() runs
     step("now playing") { playerController.applyThemeColors() }
     step("chrome") { applyTheme() }
@@ -76,16 +72,6 @@ private inline fun step(name: String, block: () -> Unit) {
     } catch (e: Exception) {
         Log.e("InniClassic", "Live theme change: $name failed", e)
     }
-}
-
-/** What the main menu background shows: a change of it needs a new decode. */
-private fun MainActivity.themeBackgroundKey(): String {
-    val path = prefs.getString("bg_path", null)
-    if (path != "THEME_DEFAULT") return "path:$path"
-    val theme = ThemeManager.getCurrentTheme()
-    val names = listOf(theme.bgImage, "background.png", "bg.png").filter { it.isNotEmpty() }
-    val file = names.map { File(theme.folderPath, it) }.firstOrNull { it.exists() }
-    return "theme:" + (file?.absolutePath ?: "none")
 }
 
 /** The Wi-Fi keyboard keys take the theme font only when they are made. */
