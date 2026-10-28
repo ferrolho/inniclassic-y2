@@ -68,6 +68,7 @@ import com.themoon.y1.controllers.videos.VideoPlayerController
 import com.themoon.y1.managers.AssetInstaller
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.BluetoothAvrcpManager
+import com.themoon.y1.managers.BluetoothPairingAgent
 import com.themoon.y1.managers.ExternalSdMountMonitor
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
@@ -319,6 +320,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var otaUpdateManager: OtaUpdateManager? = null
     var externalSdMountMonitor: ExternalSdMountMonitor? = null
     private var powerMenuInterceptor: PowerMenuInterceptor? = null
+    private var pairingAgent: BluetoothPairingAgent? = null
     var powerBacklightManager: PowerBacklightManager? = null
 
     internal val usbStorageManager by lazy {
@@ -747,7 +749,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             val artist = song?.artist ?: t("Unknown Artist")
             val album = song?.album ?: t("Unknown Album")
             val bmp = (ivAlbumArt.drawable as? BitmapDrawable)?.bitmap
-            BluetoothAvrcpManager.getInstance(this).updateMetadata(title, artist, album, bmp)
+            BluetoothAvrcpManager.getInstance(this).updateMetadata(file.absolutePath, title, artist, album, bmp)
         }
     }
 
@@ -1163,7 +1165,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
                     if (bondState == BluetoothDevice.BOND_BONDED) {
                         val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                        if (device != null) {
+                        // Connect audio only when the Y2 started the pairing. A car that started it
+                        // connects its profiles itself; a second connection at the same time fails.
+                        if (device != null && bluetoothController.takeY2BondRequest(device)) {
                             bluetoothController.connectBluetoothAudio(device)
                         }
                     }
@@ -1194,17 +1198,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     bluetoothController.clearTargetDeviceForAudio()
-                }
-                "android.bluetooth.device.action.PAIRING_REQUEST" -> {
-                    val pairingDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                    if (pairingDevice != null) {
-                        try {
-                            val confirmMethod = pairingDevice.javaClass.getMethod("setPairingConfirmation", Boolean::class.javaPrimitiveType)
-                            confirmMethod.invoke(pairingDevice, true)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
                 }
                 WifiManager.WIFI_STATE_CHANGED_ACTION -> {
                     val state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN)
@@ -1302,7 +1295,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
-            addAction("android.bluetooth.device.action.PAIRING_REQUEST")
             addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
             addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
             addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION)
@@ -1318,6 +1310,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             addAction("com.themoon.y1.RESCAN_LIBRARY")
         }
         registerReceiver(systemStatusReceiver, filter)
+        pairingAgent = BluetoothPairingAgent(this, ::t).also { it.register() }
     }
 
     override fun onDestroy() {
@@ -1333,6 +1326,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         audioVisualizer?.release()
         audioVisualizer = null
         AudioPlayerManager.getInstance().releasePlayer()
+        pairingAgent?.unregister()
         NavigationManager.getInstance().reset()
         instance = null
     }
