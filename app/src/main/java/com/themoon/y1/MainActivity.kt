@@ -151,6 +151,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val trackNumberMap: HashMap<String, Int> = HashMap()
     }
 
+    private var menuSlide: com.themoon.y1.views.MenuSlide? = null
     var currentScreenState: Int = STATE_MENU
     var currentBrowserMode: Int = BROWSER_ROOT
     val currentPlaylist: ArrayList<File> = ArrayList()
@@ -383,6 +384,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 applyTheme()
             }
         })
+        // The iPod menu slides: one layer over the screens, below the status bar area
+        menuSlide = com.themoon.y1.views.MenuSlide.attach(
+            findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ViewGroup,
+            findViewById(R.id.layout_status_bar)
+        )
 
         val savedBacklightIdx = prefs.getInt(BacklightTimer.PREF_INDEX, BacklightTimer.DEFAULT_INDEX)
         powerBacklightManager = PowerBacklightManager.getInstance(this).apply {
@@ -648,6 +654,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // A key during a menu slide ends the slide at once, then acts on the new screen as normal
+        if (event.action == KeyEvent.ACTION_DOWN) menuSlide?.finishNow()
         return InputRouter.getInstance().dispatchKeyEvent(
             event = event,
             context = this,
@@ -1486,6 +1494,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun onDestroy() {
+        menuSlide?.let { NavigationManager.getInstance().removeDirectionListener(it) }
         updateScreenOffFeedback(true)
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)
         super.onDestroy()
