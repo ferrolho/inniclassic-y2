@@ -135,7 +135,7 @@ object TestHookLogic {
         "double_click_favorite", "time_in_title_bar", "is_24h_format", "is_24_hour_format",
         "screen_off_control", "loop_scroll_on", "app_theme_name", "current_theme_name",
         "album_tilt_effect", "shuffle", "repeat_mode", "backlight_timer_index", "volume_limit_max",
-        "app_language", "language", "auto_theme_enabled", "bg_path"
+        "app_language", "language", "auto_theme_enabled"
     )
 
     private val SECRET_PARTS = listOf("password", "token", "secret", "apikey", "api_key", "session")
