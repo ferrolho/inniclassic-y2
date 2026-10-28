@@ -454,6 +454,8 @@ internal fun MainActivity.initControllers() {
         rootView = layoutWebServerMode as ViewGroup,
         onServerStateChanged = { running ->
             isServerRunning = running
+            // The server holds the screen on: the app's own Backlight timer runs only now.
+            if (running) powerBacklightManager?.resetTimer() else powerBacklightManager?.cancelTimer()
         },
         onScanMediaRequested = { startMediaLibraryScan() },
         clickFeedback = { clickFeedback() },
@@ -570,7 +572,7 @@ internal fun MainActivity.initControllers() {
             browserController.isPickingBackground = true
             browserController.buildFolderBrowserUI()
         },
-        resetBacklightTimer = { powerBacklightManager?.resetTimer() },
+        resetBacklightTimer = { powerBacklightManager?.applyBacklightSetting() },
         applySoundSetting = {
             isSoundEffectEnabled = prefs.getBoolean("sound", true)
             updateScreenOffFeedback(true)
