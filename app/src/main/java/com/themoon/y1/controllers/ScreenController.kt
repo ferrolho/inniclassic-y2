@@ -14,6 +14,9 @@ interface ScreenController {
     fun onExit() {}
     fun onRefreshUI() {}
 
+    /** The library cache finished loading after the screen was built: show the library data again. */
+    fun onLibraryLoaded() {}
+
     fun dispatchKeyEvent(event: KeyEvent): Boolean = false
     fun onWheel(delta: Int, event: KeyEvent): Boolean = false
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = false
