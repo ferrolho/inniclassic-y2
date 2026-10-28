@@ -77,7 +77,10 @@ object ListRows {
             val child = list.getChildAt(index - list.firstVisiblePosition)
             if (child != null && child.hasFocus()) return true
             val rowHeight = list.getChildAt(0)?.height ?: 0
-            if (list is ListView) list.setSelectionFromTop(index, key.topIn(list.height, rowHeight))
+            // A ListView-typed call: on the smart-cast list the call goes to AbsListView.setSelectionFromTop
+            // (API 21), which Android 4.4 does not have (NoSuchMethodError stops the app)
+            val listView: ListView? = list as? ListView
+            if (listView != null) listView.setSelectionFromTop(index, key.topIn(list.height, rowHeight))
             else list.setSelection(index)
             list.post { list.getChildAt(index - list.firstVisiblePosition)?.requestFocus() }
             return true
