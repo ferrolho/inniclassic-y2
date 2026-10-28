@@ -60,6 +60,10 @@ class CoverFlowController(
         buildCoverFlowUI()
     }
 
+    override fun onLibraryLoaded() {
+        buildCoverFlowUI()
+    }
+
     override fun onExit() {
         cancelAllAnimations()
         coverFlowContainer?.removeAllViews()

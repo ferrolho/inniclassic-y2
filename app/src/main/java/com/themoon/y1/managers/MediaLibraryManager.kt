@@ -3,6 +3,7 @@ package com.themoon.y1.managers
 import android.content.Context
 import android.util.Log
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -214,6 +215,7 @@ class MediaLibraryManager private constructor() {
                 var genre = "Unknown Genre"
                 var albumArtist: String? = null
                 var composer: String? = null
+                var compilation = false
                 var trackNum = 0
 
                 try {
@@ -225,6 +227,7 @@ class MediaLibraryManager private constructor() {
                     var g: String? = null
                     var aa: String? = null
                     var cp: String? = null
+                    var cpl: String? = null
                     var trackStr: String? = null
 
                     val apm = AudioPlayerManager.getInstance()
@@ -238,6 +241,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else if (lower.endsWith(".flac")) {
                         val tags = apm.extractFlacMetadata(f, false)
                         if (tags[0] != null) t = tags[0] as? String
@@ -248,6 +252,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else if (lower.endsWith(".m4a") || lower.endsWith(".m4b")) {
                         val tags = apm.extractAlacMetadata(f, false)
                         if (tags[0] != null) t = tags[0] as? String
@@ -258,6 +263,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else if (lower.endsWith(".ogg")) {
                         val tags = apm.extractOggVorbisMetadata(f, false)
                         if (tags[0] != null) t = tags[0] as? String
@@ -268,6 +274,7 @@ class MediaLibraryManager private constructor() {
                         if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
                         if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
                         if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
                     } else {
                         var mmr: android.media.MediaMetadataRetriever? = null
                         var fis: java.io.FileInputStream? = null
@@ -284,6 +291,7 @@ class MediaLibraryManager private constructor() {
                             g = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_GENRE)
                             aa = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
                             cp = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPOSER)
+                            cpl = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPILATION)
                         } catch (_: Throwable) {
                         } finally {
                             try { fis?.close() } catch (_: Throwable) {}
@@ -319,6 +327,7 @@ class MediaLibraryManager private constructor() {
                     if (!g.isNullOrBlank()) genre = g
                     albumArtist = if (!aa.isNullOrBlank()) aa else artist
                     if (!cp.isNullOrBlank()) composer = cp
+                    compilation = com.themoon.y1.models.Compilations.parseFlag(cpl)
 
                     if (!trackStr.isNullOrEmpty()) {
                         trackNum = try {
@@ -329,6 +338,7 @@ class MediaLibraryManager private constructor() {
                 } catch (_: Throwable) {}
 
                 val song = SongItem(f, title, artist, album, year, genre, albumArtist, composer)
+                song.compilationTag = compilation
                 targetList.add(song)
                 existingPaths.add(fileKey)
                 existingPaths.add(f.absolutePath)
@@ -409,19 +419,32 @@ class MediaLibraryManager private constructor() {
                 val trackNum = trackNumberMap[song.file.absolutePath] ?: 0
                 w.write(",\"trackNum\":")
                 w.write(trackNum.toString())
+                // Only for compilation tracks: a missing field reads as false (also in caches from before).
+                if (song.compilationTag) w.write(",\"compilation\":true")
                 w.write("}")
             }
         }
     }
 
-    fun loadLibraryCache(): Boolean {
+    /** Song lists read from .y1_library_cache.json, not yet applied to the shared library lists. */
+    class LibraryCache(
+        val music: List<SongItem>,
+        val books: List<SongItem>,
+        val trackNumbers: Map<String, Int>
+    )
+
+    /**
+     * Reads the cache file and checks that each file still exists. This does file I/O for each
+     * track, so call it on a worker thread. It does not change the shared library lists.
+     */
+    fun readLibraryCache(): LibraryCache? {
         var cacheFile = StoragePaths.primaryFile(".y1_library_cache.json")
         if (!cacheFile.exists() || cacheFile.length() == 0L) {
             val secFile = File(StoragePaths.SECONDARY_PATH, ".y1_library_cache.json")
             if (secFile.exists() && secFile.length() > 0L) {
                 cacheFile = secFile
             } else {
-                return false
+                return null
             }
         }
         return try {
@@ -432,32 +455,56 @@ class MediaLibraryManager private constructor() {
                     sb.append(line)
                 }
             }
-            val root = JSONObject(sb.toString())
-            jsonToSongList(root.optJSONArray("music"), musicLibrary, isAudiobook = false)
-            jsonToSongList(root.optJSONArray("books"), audiobookLibrary, isAudiobook = true)
-            rebuildUniqueAlbumList()
-            true
+            parseLibraryCache(JSONObject(sb.toString()))
         } catch (t: Throwable) {
             Log.e(tag, "Failed to load library cache: ${t.message}")
-            false
+            null
         }
     }
 
-    private fun jsonToSongList(arr: JSONArray?, target: MutableList<SongItem>, isAudiobook: Boolean) {
-        if (arr == null) return
+    internal fun parseLibraryCache(
+        root: JSONObject,
+        isUsable: (File, Boolean) -> Boolean = ::isUsableCachedFile
+    ): LibraryCache {
+        val trackNumbers = HashMap<String, Int>()
+        val music = jsonToSongList(root.optJSONArray("music"), trackNumbers, isAudiobook = false, isUsable = isUsable)
+        val books = jsonToSongList(root.optJSONArray("books"), trackNumbers, isAudiobook = true, isUsable = isUsable)
+        return LibraryCache(music, books, trackNumbers)
+    }
+
+    /** Puts [cache] into the shared library lists. Call it on the main thread when no scan is running. */
+    fun applyLibraryCache(cache: LibraryCache) {
+        synchronized(musicLibrary) {
+            musicLibrary.clear()
+            musicLibrary.addAll(cache.music)
+        }
+        synchronized(audiobookLibrary) {
+            audiobookLibrary.clear()
+            audiobookLibrary.addAll(cache.books)
+        }
+        trackNumberMap.putAll(cache.trackNumbers)
+        rebuildUniqueAlbumList()
+    }
+
+    private fun isUsableCachedFile(f: File, isAudiobook: Boolean): Boolean {
+        if (!f.exists() || f.length() < 1024L) return false
+        return if (isAudiobook) StoragePaths.isUnderAudiobooks(f) else StoragePaths.isUnderMusic(f)
+    }
+
+    private fun jsonToSongList(
+        arr: JSONArray?,
+        trackNumbers: MutableMap<String, Int>,
+        isAudiobook: Boolean,
+        isUsable: (File, Boolean) -> Boolean
+    ): List<SongItem> {
+        val target = ArrayList<SongItem>()
+        if (arr == null) return target
         val seen = HashSet<String>()
-        target.clear()
         for (i in 0 until arr.length()) {
             try {
                 val o = arr.getJSONObject(i)
                 val f = File(o.getString("path"))
-                if (!f.exists() || f.length() < 1024L) continue
-
-                if (isAudiobook) {
-                    if (!StoragePaths.isUnderAudiobooks(f)) continue
-                } else {
-                    if (!StoragePaths.isUnderMusic(f)) continue
-                }
+                if (!isUsable(f, isAudiobook)) continue
 
                 val key = normalizePathKey(f)
                 if (!seen.add(key)) continue
@@ -472,10 +519,12 @@ class MediaLibraryManager private constructor() {
                     o.optString("albumArtist", ""),
                     o.optString("composer", "")
                 )
+                song.compilationTag = o.optBoolean("compilation", false)
                 target.add(song)
-                trackNumberMap[f.absolutePath] = o.optInt("trackNum", 0)
+                trackNumbers[f.absolutePath] = o.optInt("trackNum", 0)
             } catch (ignored: Throwable) {}
         }
+        return target
     }
 
     fun rebuildUniqueAlbumList() {
@@ -490,8 +539,7 @@ class MediaLibraryManager private constructor() {
         val albumMap = LinkedHashMap<String, ArrayList<SongItem>>()
         for (song in combinedLibrary) {
             if (song.file == null) continue
-            val album = if (!song.album.isNullOrBlank()) song.album.trim() else "Unknown Album"
-            val key = album.lowercase(java.util.Locale.US)
+            val key = AlbumKey.of(song)
             val list = albumMap.getOrPut(key) { ArrayList() }
             list.add(song)
         }
