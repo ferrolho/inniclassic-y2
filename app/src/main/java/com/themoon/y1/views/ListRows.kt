@@ -8,6 +8,7 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
+import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.RowKey
 
 /**
@@ -16,6 +17,14 @@ import com.themoon.y1.navigation.RowKey
  * [ScrollView] (main menu, Music menu, Settings).
  */
 object ListRows {
+
+    /** Changes at each [select] and [cancelPending]: a selection that waits for a layout runs only while it is the last. */
+    private var generation = 0
+
+    /** Another list opens: a [select] that still waits must not select a row in it. */
+    fun cancelPending() {
+        generation++
+    }
 
     /** The row that has the focus under [root], or null if the focus is not in a list that shows. */
     fun selected(root: View): RowKey? {
@@ -49,12 +58,14 @@ object ListRows {
     fun select(root: View, key: RowKey) {
         val observer = root.viewTreeObserver
         if (!observer.isAlive) return
+        val mine = ++generation
+        val step = Runnable { if (mine == generation) apply(root, key) }
         observer.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
                 @Suppress("DEPRECATION")
                 root.viewTreeObserver.removeGlobalOnLayoutListener(this)
-                apply(root, key)
-                root.post { apply(root, key); root.post { apply(root, key) } }
+                step.run()
+                root.post { step.run(); root.post(step) }
             }
         })
         root.requestLayout()
@@ -70,7 +81,7 @@ object ListRows {
             // Rows that are not on the screen have no view: take the text of the item when the adapter gives one
             for (i in 0 until adapter.count) {
                 val visible = list.getChildAt(i - list.firstVisiblePosition)
-                texts.add(if (visible != null) rowText(visible) else adapter.getItem(i)?.toString())
+                texts.add(if (visible != null) rowText(visible) else itemText(adapter.getItem(i)))
             }
             val index = key.indexIn(texts)
             if (index < 0) return false
@@ -109,6 +120,13 @@ object ListRows {
             for (i in 0 until root.childCount) shownList(root.getChildAt(i))?.let { return it }
         }
         return null
+    }
+
+    /** The text of a list item that has no row view now: a song title or a name ("__..." items have no text). */
+    private fun itemText(item: Any?): String? = when (item) {
+        is SongItem -> item.title
+        is String -> item.takeUnless { it.startsWith("__") }
+        else -> item?.toString()
     }
 
     /**

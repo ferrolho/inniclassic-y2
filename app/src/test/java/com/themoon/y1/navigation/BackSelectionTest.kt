@@ -4,12 +4,17 @@ import android.view.ViewGroup
 import com.themoon.y1.controllers.ScreenController
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** The Back rule: Back selects the row that opened the deeper screen; going down selects no kept row. */
+/**
+ * The back stack is the one way back: each list that opens going down (a screen, a Music level, a Settings group or
+ * row screen) is an entry with its route key and its selected row. Back builds the list again from the key and
+ * selects the row; going down selects no kept row; the main menu is the bottom entry.
+ */
 class BackSelectionTest {
 
     private class FakeList(
@@ -17,13 +22,15 @@ class BackSelectionTest {
     ) : ScreenController {
         var row: RowKey? = null
         val selected = ArrayList<RowKey>()
-        var back: ((ScreenState) -> ScreenState)? = null
+        val entered = ArrayList<ScreenState>()
 
+        override fun onEnter(state: ScreenState) {
+            entered.add(state)
+        }
         override fun selectedRow(): RowKey? = row
         override fun selectRow(row: RowKey) {
             selected.add(row)
         }
-        override fun backState(state: ScreenState): ScreenState = back?.invoke(state) ?: state
     }
 
     private val nav = NavigationManager.getInstance()
@@ -33,6 +40,7 @@ class BackSelectionTest {
     private val player = FakeList()
     private val settings = FakeList()
     private val bluetooth = FakeList()
+    private val keyboard = FakeList()
 
     @Before
     fun setUp() {
@@ -44,6 +52,7 @@ class BackSelectionTest {
         nav.registerController(ScreenState.Player::class.java, player)
         nav.registerController(ScreenState.Settings::class.java, settings)
         nav.registerController(ScreenState.Bluetooth::class.java, bluetooth)
+        nav.registerController(ScreenState.WifiKeyboard::class.java, keyboard)
     }
 
     @After
@@ -51,11 +60,13 @@ class BackSelectionTest {
         nav.reset()
     }
 
+    private fun music(mode: BrowserMode) = ScreenState.Browser(mode)
+
     @Test
     fun backSelectsTheRowThatOpenedEachScreen() {
         nav.navigateTo(ScreenState.MainMenu)
         menu.row = RowKey("Music", 1, 37)
-        nav.navigateTo(ScreenState.Browser(BrowserMode.Root))
+        nav.navigateTo(music(BrowserMode.Root))
         browser.row = RowKey("Playlists", 1, 37)
         nav.navigateTo(ScreenState.Playlists)
         playlists.row = RowKey("Rock", 4, 148)
@@ -70,20 +81,110 @@ class BackSelectionTest {
         assertEquals(listOf(RowKey("Playlists", 1, 37)), browser.selected)
         assertTrue(nav.popBackStack())
         assertEquals(listOf(RowKey("Music", 1, 37)), menu.selected)
+        assertFalse(nav.popBackStack())
     }
 
     @Test
-    fun theMainMenuKeepsItsRowAlsoWhenItClearsTheBackStack() {
+    fun eachMusicLevelIsAnEntryThatBackBuildsAgainFromItsKey() {
+        val genres = music(BrowserMode.Genres)
+        val fado = music(BrowserMode.GenreArtists("Fado"))
+        val allSongs = music(BrowserMode.Songs("GENRE", "Fado", genre = "Fado"))
+        nav.navigateTo(ScreenState.MainMenu)
+        menu.row = RowKey("Music", 1, 37)
+        nav.navigateTo(music(BrowserMode.Root))
+        browser.row = RowKey("Genres", 8, 296)
+        nav.navigateTo(genres)
+        browser.row = RowKey("Fado", 12, 148)
+        nav.navigateTo(fado)
+        browser.row = RowKey(null, 0, 0) // All Songs
+        nav.navigateTo(allSongs)
+        browser.row = RowKey("Barco Negro", 3, 111)
+        nav.navigateTo(ScreenState.Player)
+
+        // Back step by step: the same controller builds each list again from its key, then selects its row
+        browser.entered.clear()
+        assertTrue(nav.navigateBack())
+        assertEquals(allSongs, nav.currentState)
+        assertTrue(nav.navigateBack())
+        assertTrue(nav.navigateBack())
+        assertTrue(nav.navigateBack())
+        assertEquals(listOf(allSongs, fado, genres, music(BrowserMode.Root)), browser.entered)
+        assertEquals(
+            listOf(RowKey("Barco Negro", 3, 111), RowKey(null, 0, 0), RowKey("Fado", 12, 148), RowKey("Genres", 8, 296)),
+            browser.selected
+        )
+        assertTrue(nav.navigateBack())
+        assertEquals(ScreenState.MainMenu, nav.currentState)
+        assertEquals(listOf(RowKey("Music", 1, 37)), menu.selected)
+    }
+
+    @Test
+    fun theMainMenuIsTheBottomEntryAlsoWhenAScreenGoesThereDirectly() {
         nav.navigateTo(ScreenState.MainMenu)
         menu.row = RowKey("Settings", 7, 259)
         nav.navigateTo(ScreenState.Settings())
+        settings.row = RowKey("Connectivity", 7, 259)
+        nav.navigateTo(ScreenState.Settings(SettingsSubMode.Group("Connectivity")))
         settings.row = RowKey("Bluetooth", 0, 0)
         nav.navigateTo(ScreenState.Bluetooth)
 
-        // A screen that goes to the main menu directly (not with Back) also comes to the row that opened it
+        // Not with Back: all entries go, and the main menu selects the row that opened Settings
         nav.navigateTo(ScreenState.MainMenu)
         assertEquals(listOf(RowKey("Settings", 7, 259)), menu.selected)
         assertTrue(settings.selected.isEmpty())
+        assertNull(nav.previousState())
+        assertFalse(nav.popBackStack())
+    }
+
+    @Test
+    fun settingsGroupsAndRowScreensAreEntries() {
+        val root = ScreenState.Settings()
+        val page = ScreenState.Settings(SettingsSubMode.Page("DateTime"))
+        val year = ScreenState.Settings(SettingsSubMode.Page("DateTime", "Year"))
+        nav.navigateTo(ScreenState.MainMenu)
+        nav.navigateTo(root)
+        settings.row = RowKey("Date & Time", 9, 333)
+        nav.navigateTo(page)
+        settings.row = RowKey("Year", 1, 37)
+        nav.navigateTo(year)
+        assertEquals(page, nav.previousState())
+
+        // A value was chosen: Back to the Date & Time list, on its Year row
+        assertTrue(nav.popBackStack())
+        assertEquals(page, settings.entered.last())
+        assertEquals(RowKey("Year", 1, 37), settings.selected.last())
+        assertTrue(nav.popBackStack())
+        assertEquals(root, settings.entered.last())
+        assertEquals(RowKey("Date & Time", 9, 333), settings.selected.last())
+    }
+
+    @Test
+    fun popBackStackToSkipsTheEntriesAboveIt() {
+        val page = ScreenState.Settings(SettingsSubMode.Page("Background"))
+        nav.navigateTo(ScreenState.MainMenu)
+        nav.navigateTo(page)
+        settings.row = RowKey("Select New Background", 0, 0)
+        nav.navigateTo(music(BrowserMode.Folder(java.io.File("/sdcard"), pickImage = true)))
+        nav.navigateTo(music(BrowserMode.Folder(java.io.File("/sdcard/Pictures"), pickImage = true)))
+
+        assertTrue(nav.popBackStackTo { it !is ScreenState.Browser })
+        assertEquals(page, nav.currentState)
+        assertEquals(listOf(RowKey("Select New Background", 0, 0)), settings.selected)
+        assertEquals(ScreenState.MainMenu, nav.previousState())
+    }
+
+    @Test
+    fun aScreenThatTakesThePlaceOfAnotherAddsNoEntry() {
+        // Music -> Search -> keyboard; the result list takes the place of the keyboard
+        nav.navigateTo(ScreenState.MainMenu)
+        nav.navigateTo(music(BrowserMode.Root))
+        browser.row = RowKey("Search", 14, 296)
+        nav.navigateTo(ScreenState.WifiKeyboard(""))
+        nav.navigateTo(music(BrowserMode.Songs("SEARCH", "fado")), addToBackStack = false)
+
+        assertTrue(nav.popBackStack())
+        assertEquals(music(BrowserMode.Root), nav.currentState)
+        assertEquals(listOf(RowKey("Search", 14, 296)), browser.selected)
     }
 
     @Test
@@ -104,23 +205,9 @@ class BackSelectionTest {
     }
 
     @Test
-    fun backComesToTheListThatTheScreenShowsNow() {
-        nav.navigateTo(ScreenState.MainMenu)
-        nav.navigateTo(ScreenState.Browser(BrowserMode.Root))
-        // The Music browser changed its list in place (Genres -> Fado -> All Songs)
-        browser.back = { ScreenState.Browser(BrowserMode.VirtualSongs) }
-        browser.row = RowKey("A Fadista", 1, 37)
-        nav.navigateTo(ScreenState.Player)
-
-        assertTrue(nav.popBackStack())
-        assertEquals(ScreenState.Browser(BrowserMode.VirtualSongs), nav.currentState)
-        assertEquals(listOf(RowKey("A Fadista", 1, 37)), browser.selected)
-    }
-
-    @Test
     fun aScreenWithNoSelectedRowGetsNoRow() {
         nav.navigateTo(ScreenState.MainMenu)
-        nav.navigateTo(ScreenState.Browser(BrowserMode.Root))
+        nav.navigateTo(music(BrowserMode.Root))
         nav.navigateTo(ScreenState.Player)
         assertTrue(nav.popBackStack())
         assertTrue(browser.selected.isEmpty())
@@ -142,6 +229,8 @@ class BackSelectionTest {
         assertEquals(4, RowKey("Intro", 4).indexIn(songs))
         assertEquals(2, RowKey("Intro", 2).indexIn(songs))
         assertEquals(1, RowKey("Song", 0).indexIn(songs))
+        // Rows added above it while the list was away: still found by its text
+        assertEquals(5, RowKey("Settings", 3).indexIn(listOf("Now Playing", "Music", "Videos", "Photos", "Podcasts", "Settings")))
     }
 
     @Test

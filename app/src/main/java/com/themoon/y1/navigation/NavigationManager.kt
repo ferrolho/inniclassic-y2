@@ -3,21 +3,24 @@ package com.themoon.y1.navigation
 import android.view.View
 import android.view.ViewGroup
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.views.ListRows
 import java.util.ArrayDeque
 
 /**
  * Coordinates transitions between screen states, manages backstack history,
  * and notifies active ScreenController instances.
+ *
+ * The back stack is the one record of the way back, as on the iPod: each list that opens going down (a screen,
+ * a Music level, a Settings group or row screen) is a [ScreenState]. The list that it leaves is kept as an entry
+ * with its selected row; Back takes the top entry, the controller builds that list again from the state, and the
+ * row is selected again at the same height. The main menu is the bottom entry.
  */
 class NavigationManager private constructor() {
 
-    /** A screen to come back to, and its selected row when the deeper screen opened. */
+    /** A list to come back to (its route key), and its selected row when the deeper list opened. */
     data class BackEntry(val state: ScreenState, val row: RowKey?)
 
     private val backStack = ArrayDeque<BackEntry>()
-
-    /** The selected main menu row when the main menu last opened a screen (the main menu clears the back stack). */
-    private var mainMenuRow: RowKey? = null
     private val controllerMap = HashMap<Class<out ScreenState>, ScreenController>()
 
     var currentState: ScreenState? = null
@@ -44,8 +47,8 @@ class NavigationManager private constructor() {
     }
 
     /**
-     * Back rule (as on the iPod): a screen that opens going down selects its first row; Back selects again the
-     * row that opened the deeper screen. [returnRow] is that row when Back comes to [newState].
+     * Back rule (as on the iPod): a list that opens going down selects its first row; Back selects again the
+     * row that opened the deeper list. [returnRow] is that row when Back comes to [newState].
      */
     private fun navigate(newState: ScreenState, addToBackStack: Boolean, returnRow: RowKey?) {
         if (newState == currentState && activeController != null) {
@@ -53,14 +56,15 @@ class NavigationManager private constructor() {
             return
         }
 
+        ListRows.cancelPending()
         val previous = currentState
-        val leaving = activeController
-        val row = if (previous != null && addToBackStack) leaving?.selectedRow() else null
-        if (previous is ScreenState.MainMenu && addToBackStack) mainMenuRow = row
+        var back = returnRow
         if (newState is ScreenState.MainMenu) {
+            // The bottom entry: going to the main menu (with Back or directly) takes all entries off
+            if (back == null) back = backStack.lastOrNull { it.state is ScreenState.MainMenu }?.row
             backStack.clear()
         } else if (previous != null && addToBackStack) {
-            backStack.push(BackEntry(leaving?.backState(previous) ?: previous, row))
+            backStack.push(BackEntry(activeController?.backState(previous) ?: previous, activeController?.selectedRow()))
         }
 
         activeController?.onExit()
@@ -83,7 +87,6 @@ class NavigationManager private constructor() {
         }
 
         controller?.onEnter(newState)
-        val back = if (newState is ScreenState.MainMenu) mainMenuRow else returnRow
         if (back != null) controller?.selectRow(back)
         if (previous != null) {
             transitionListener?.onScreenTransition(previous, newState)
@@ -104,6 +107,15 @@ class NavigationManager private constructor() {
         return true
     }
 
+    /** The state of the top back-stack entry (where Back goes), or null. */
+    fun previousState(): ScreenState? = backStack.peek()?.state
+
+    /** Back to the nearest entry that [where] accepts; the entries above it go. Without one: to the main menu. */
+    fun popBackStackTo(where: (ScreenState) -> Boolean): Boolean {
+        while (backStack.isNotEmpty() && !where(backStack.peek().state)) backStack.pop()
+        return popBackStack()
+    }
+
     fun navigateBack(): Boolean {
         if (activeController?.onBackPressed() == true) {
             return true
@@ -118,7 +130,6 @@ class NavigationManager private constructor() {
 
     fun reset() {
         backStack.clear()
-        mainMenuRow = null
         currentState = null
         activeController = null
         controllerMap.clear()
