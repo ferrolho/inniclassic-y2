@@ -1337,7 +1337,8 @@ class BrowserController(
                     }
                     "ALL" -> {
                         currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                        lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("All Songs")
+                        // The Music menu row is "Songs" (the list title is "All Songs")
+                        lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("Songs")
                         buildFileBrowserUI()
                     }
                     "RECENT" -> {
@@ -1357,7 +1358,12 @@ class BrowserController(
                         virtualQueryValue = exitedAlbum
                         buildVirtualCategories("ALBUM")
                     }
-                    "ARTIST" -> {
+                    "ARTIST" -> if (categoryArtistFilterIsTrackArtist && categoryArtistFilter == virtualQueryValue) {
+                        // All Songs of an artist: back to the albums of the artist, on All Songs
+                        currentBrowserMode = BrowserMode.Albums(categoryArtistFilter, true)
+                        virtualQueryValue = ALL_SONGS_SENTINEL
+                        buildVirtualCategories("ALBUM")
+                    } else {
                         val exitedArtist = virtualQueryValue
                         currentBrowserMode = if (categoryArtistFilterIsTrackArtist) BrowserMode.TrackArtists else BrowserMode.Artists
                         virtualQueryValue = exitedArtist
