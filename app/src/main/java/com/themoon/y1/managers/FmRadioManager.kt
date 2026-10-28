@@ -32,6 +32,15 @@ class FmRadioManager private constructor(context: Context) {
     private var radioWakeLock: PowerManager.WakeLock? = null
     private var currentMasterVolume: Float = 1.0f
 
+    /**
+     * Called (main thread) before the FM audio starts, with the start as argument. MainActivity sets the volume for
+     * FM (the index does the attenuation) and runs the start when the index is down. Null = start at once.
+     */
+    var volumeGate: ((Runnable) -> Unit)? = null
+
+    /** Called after FM powers down (MainActivity sets the music volume again). */
+    var onPoweredDown: (() -> Unit)? = null
+
     init {
         try {
             fmNativeClass = Class.forName("com.mediatek.FMRadio.FMRadioNative")
@@ -257,10 +266,18 @@ class FmRadioManager private constructor(context: Context) {
             player.setAudioStreamType(streamFm)
             VirtualVolumeManager.getInstance().registerMediaPlayer(player)
             player.prepare()
-            player.start()
-            applyMasterVolume()
-
-            routeFmAudio()
+            val start = Runnable {
+                if (fmPlayer !== player || !isPowerUp) return@Runnable
+                try {
+                    player.start()
+                    applyMasterVolume()
+                    routeFmAudio()
+                } catch (t: Throwable) {
+                    lastError = "Audio Routing Failed: " + t.message
+                }
+            }
+            val gate = volumeGate
+            if (gate != null) gate(start) else start.run()
         } catch (t: Throwable) {
             lastError = "Audio Routing Failed: " + t.message
         }
@@ -377,6 +394,7 @@ class FmRadioManager private constructor(context: Context) {
             isPowerUp = false
             isDeviceOpen = false
         } catch (ignored: Throwable) {}
+        if (!isPowerUp) onPoweredDown?.invoke()
     }
 
     fun tune(freq: Float): Boolean {
