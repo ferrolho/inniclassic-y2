@@ -97,7 +97,6 @@ import com.themoon.y1.navigation.LetterJump
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
-import com.themoon.y1.views.ImageEffects
 import com.themoon.y1.views.ListItemViewFactory
 import java.io.File
 import java.util.ArrayList
@@ -272,10 +271,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var layoutVideoPlayerMode: View
     lateinit var layoutVolumeOverlay: View
 
-    var ivMainBg: ImageView? = null
     lateinit var ivAlbumArt: ImageView
     var ivAlbumReflection: ImageView? = null
-    lateinit var ivPlayerBgBlur: ImageView
     lateinit var ivPauseOverlay: ImageView
     lateinit var tvPlayerTitle: TextView
     lateinit var tvPlayerArtist: TextView
@@ -499,7 +496,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         } catch (_: Exception) {}
 
         updateStatusBarClock()
-        updateMainMenuBackground()
         changeScreen(STATE_MENU)
         applyTheme()
         com.themoon.y1.managers.AutoThemeManager.start(this)
@@ -942,9 +938,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     fun findFolderCover(folder: File?): File? = MediaLibraryManager.getInstance().findFolderCover(folder)
 
-    fun applyGaussianBlur(original: Bitmap?): Bitmap? = ImageEffects.applyGaussianBlur(this, original)
 
-    fun updateMainMenuBackground() = updateMainMenuBackgroundInternal()
     fun applyTheme() = applyThemeInternal()
     fun applyCachedCoverArt(imagePath: String) = applyCachedCoverArtInternal(imagePath)
     fun fetchRandomIdleCoverAsync() = fetchRandomIdleCoverAsyncInternal()

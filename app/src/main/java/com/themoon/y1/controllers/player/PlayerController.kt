@@ -69,7 +69,6 @@ class PlayerController(
     private val frameAlbumArt: FrameLayout? = rootView.findViewById(R.id.frame_album_art)
     private val frameAlbumReflection: FrameLayout? = rootView.findViewById(R.id.frame_album_reflection)
     private val ivPauseOverlay: ImageView? = rootView.findViewById(R.id.iv_pause_overlay)
-    private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
     private val visualizerView = AudioVisualizerView(activity).apply { visibility = View.GONE }
     private var visualizerApplied = false
     // Spectrum colour: main colour of the cover (Palette), cached per track path
