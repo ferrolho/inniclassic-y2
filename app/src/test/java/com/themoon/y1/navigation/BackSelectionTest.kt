@@ -40,7 +40,7 @@ class BackSelectionTest {
     private val player = FakeList()
     private val settings = FakeList()
     private val bluetooth = FakeList()
-    private val keyboard = FakeList()
+    private val other = FakeList()
 
     @Before
     fun setUp() {
@@ -52,7 +52,7 @@ class BackSelectionTest {
         nav.registerController(ScreenState.Player::class.java, player)
         nav.registerController(ScreenState.Settings::class.java, settings)
         nav.registerController(ScreenState.Bluetooth::class.java, bluetooth)
-        nav.registerController(ScreenState.WifiKeyboard::class.java, keyboard)
+        nav.registerController(ScreenState.Storage::class.java, other)
     }
 
     @After
@@ -175,11 +175,11 @@ class BackSelectionTest {
 
     @Test
     fun aScreenThatTakesThePlaceOfAnotherAddsNoEntry() {
-        // Music -> Search -> keyboard; the result list takes the place of the keyboard
+        // Music -> Search -> keyboard (here Storage); the result list takes the place of the keyboard
         nav.navigateTo(ScreenState.MainMenu)
         nav.navigateTo(music(BrowserMode.Root))
         browser.row = RowKey("Search", 14, 296)
-        nav.navigateTo(ScreenState.WifiKeyboard(""))
+        nav.navigateTo(ScreenState.Storage)
         nav.navigateTo(music(BrowserMode.Songs("SEARCH", "fado")), addToBackStack = false)
 
         assertTrue(nav.popBackStack())
