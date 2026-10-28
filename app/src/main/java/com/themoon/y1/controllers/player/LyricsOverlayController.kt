@@ -91,6 +91,12 @@ class LyricsOverlayController(
         scheduleFrame()
     }
 
+    // Settings → Lyrics Keep Screen On: held while the lyrics show and music plays (renewed at each progress tick)
+    private val screenHold = LyricsScreenHold(context)
+
+    private fun keepScreenOnSetting(): Boolean = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        .getBoolean(LyricsKeepScreenOn.PREF, LyricsKeepScreenOn.DEFAULT)
+
     val hasLyrics: Boolean
         get() = currentLyrics.isNotEmpty() || plainLyrics != null
 
@@ -145,6 +151,7 @@ class LyricsOverlayController(
 
     fun hide() {
         lyricScrollView.visibility = View.GONE
+        screenHold.update(false)
         lyricScrollView.removeCallbacks(followPlayback)
         lyricScrollView.removeCallbacks(frameTask)
         frameScheduled = false
@@ -406,6 +413,7 @@ class LyricsOverlayController(
         progressTime = SystemClock.uptimeMillis()
         progressPlaying = playing
         if (isShowing()) scheduleFrame()
+        screenHold.update(LyricsKeepScreenOn.shouldHold(keepScreenOnSetting(), isShowing(), playing))
     }
 
     /** All synced lines in one text, so the view can glide between them. */
