@@ -738,8 +738,7 @@ class AudioPlayerManager private constructor() {
         val effectiveSeekMs = if (initialSeekMs > 0) {
             initialSeekMs
         } else if (isAudiobookOrPodcast) {
-            val p = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
-            if (p > 0) p.toLong() else AudiobookManager.getInstance(main).getSavedPosition(track.absolutePath).toLong()
+            main.prefs.getInt("book_pos_" + track.absolutePath, 0).toLong()
         } else {
             0L
         }
@@ -1101,7 +1100,6 @@ class AudioPlayerManager private constructor() {
                     val filePath = main.currentPlaylist[main.currentIndex].absolutePath
                     val isAudiobook = isAudiobookPath(filePath, main)
                     if (tracksBookmark(filePath, main)) {
-                        AudiobookManager.getInstance(main).saveBookmark(filePath, getCurrentPosition(), main.currentIndex)
                         val editor = main.prefs.edit()
                             .putInt("book_pos_$filePath", getCurrentPosition())
                             .putInt("book_dur_$filePath", getDuration())
