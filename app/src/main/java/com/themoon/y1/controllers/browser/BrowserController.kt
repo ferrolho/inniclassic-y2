@@ -37,6 +37,7 @@ import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.LetterJump
+import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.ClassicMenuStyle
@@ -104,7 +105,6 @@ class BrowserController(
     var categoryArtistFilter: String = ""
     var categoryArtistFilterIsTrackArtist: Boolean = false
     var categoryGenreFilter: String = ""
-    var lastBrowserFocusText: String = ""
     var virtualListSelectedIndex: Int = 0
 
     private val currentScrollIndexList = ArrayList<String>()
@@ -124,14 +124,17 @@ class BrowserController(
         const val ALL_SONGS_SENTINEL = "__ALL_SONGS__"
     }
 
+    /**
+     * Builds the list that [state] names (its route key): a list that opens going down, or the list that Back
+     * comes back to (NavigationManager then selects the row that opened the deeper list).
+     */
     override fun onEnter(state: ScreenState) {
         if (state is ScreenState.Browser) {
             currentBrowserMode = state.mode
+            isAudiobookLibraryMode = state.audiobooks || state.mode is BrowserMode.Audiobooks
+            isPickingBackground = (state.mode as? BrowserMode.Folder)?.pickImage == true
             when (val mode = state.mode) {
-                is BrowserMode.Root -> {
-                    isAudiobookLibraryMode = false
-                    buildFileBrowserUI()
-                }
+                is BrowserMode.Root -> buildFileBrowserUI()
                 is BrowserMode.Folder -> {
                     currentFolder = mode.dir
                     buildFolderBrowserUI()
@@ -175,6 +178,7 @@ class BrowserController(
                 is BrowserMode.GenreAlbums -> {
                     categoryGenreFilter = mode.genre
                     categoryArtistFilter = mode.artist ?: ""
+                    categoryArtistFilterIsTrackArtist = true
                     virtualQueryValue = ""
                     buildVirtualCategories("GENRE_ALBUM")
                 }
@@ -186,16 +190,23 @@ class BrowserController(
                     virtualQueryValue = ""
                     buildVirtualCategories("YEAR")
                 }
+                is BrowserMode.Songs -> {
+                    virtualQueryType = mode.type
+                    virtualQueryValue = mode.value
+                    virtualQueryAlbumArtist = mode.albumArtist
+                    categoryArtistFilter = mode.artist
+                    categoryArtistFilterIsTrackArtist = mode.byTrackArtist
+                    categoryGenreFilter = mode.genre
+                    currentBrowserMode = BrowserMode.VirtualSongs
+                    buildVirtualSongs()
+                }
                 is BrowserMode.VirtualSongs -> buildVirtualSongs()
                 is BrowserMode.Favorites -> buildVirtualSongsForFavorites()
                 is BrowserMode.RecentlyAdded -> {
                     virtualQueryType = "RECENT"
                     buildVirtualSongs()
                 }
-                is BrowserMode.Audiobooks -> {
-                    isAudiobookLibraryMode = true
-                    buildFileBrowserUI()
-                }
+                is BrowserMode.Audiobooks -> buildFileBrowserUI()
                 is BrowserMode.CoverFlow -> onCoverFlowRequested()
                 else -> buildFileBrowserUI()
             }
@@ -203,6 +214,14 @@ class BrowserController(
             buildFileBrowserUI()
         }
     }
+
+    /** Opens the list [mode] one level down. The back stack keeps this list and its row (NavigationManager). */
+    fun openList(mode: BrowserMode) = onNavigateToScreen(ScreenState.Browser(mode, isAudiobookLibraryMode))
+
+    /** Opens a song list one level down, with the filters of this list (see [BrowserMode.Songs]). */
+    fun openSongs(type: String, value: String, albumArtist: String = "") = openList(
+        BrowserMode.Songs(type, value, albumArtist, categoryArtistFilter, categoryArtistFilterIsTrackArtist, categoryGenreFilter)
+    )
 
     override fun onExit() {
         hideBrowserCoverPane()
@@ -263,7 +282,6 @@ class BrowserController(
                 val btnCoverFlow = createListButtonWithIcon("\uE3B6", localize("Cover Flow"), null)
                 btnCoverFlow.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Cover Flow")
                     onCoverFlowRequested()
                 }
                 containerBrowserItems.addView(btnCoverFlow)
@@ -273,7 +291,6 @@ class BrowserController(
                 val btnM3u = createListButtonWithIcon("\uE05F", localize("Playlists"), null)
                 btnM3u.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Playlists")
                     onPlaylistsRequested()
                 }
                 containerBrowserItems.addView(btnM3u)
@@ -283,12 +300,7 @@ class BrowserController(
                 val btnTrackArtist = createListButtonWithIcon("\uE7FD", localize("Artists"), null)
                 btnTrackArtist.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Artists")
-                    currentBrowserMode = BrowserMode.TrackArtists
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("TRACK_ARTIST")
+                    openList(BrowserMode.TrackArtists)
                 }
                 containerBrowserItems.addView(btnTrackArtist)
             }
@@ -297,12 +309,7 @@ class BrowserController(
                 val btnArtist = createListButtonWithIcon("\uE7FD", localize("Album Artists"), null)
                 btnArtist.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Album Artists")
-                    currentBrowserMode = BrowserMode.Artists
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ARTIST")
+                    openList(BrowserMode.Artists)
                 }
                 containerBrowserItems.addView(btnArtist)
             }
@@ -311,12 +318,7 @@ class BrowserController(
                 val btnAlbum = createListButtonWithIcon("\uE019", localize("Albums"), null)
                 btnAlbum.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Albums")
-                    currentBrowserMode = BrowserMode.Albums()
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ALBUM")
+                    openList(BrowserMode.Albums())
                 }
                 containerBrowserItems.addView(btnAlbum)
             }
@@ -325,12 +327,7 @@ class BrowserController(
                 val btnCompilations = createListButtonWithIcon("\uE019", localize("Compilations"), null)
                 btnCompilations.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Compilations")
-                    currentBrowserMode = BrowserMode.Compilations
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ALBUM")
+                    openList(BrowserMode.Compilations)
                 }
                 containerBrowserItems.addView(btnCompilations)
             }
@@ -339,10 +336,7 @@ class BrowserController(
                 val btnAll = createListButtonWithIcon("\uE03D", localize("Songs"), null)
                 btnAll.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Songs")
-                    currentBrowserMode = BrowserMode.VirtualSongs
-                    virtualQueryType = "ALL"
-                    buildVirtualSongs()
+                    openList(BrowserMode.Songs("ALL"))
                 }
                 containerBrowserItems.addView(btnAll)
             }
@@ -351,7 +345,6 @@ class BrowserController(
                 val btnShuffle = createListButtonWithIcon("\uE043", localize("Shuffle Songs"), null)
                 btnShuffle.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Shuffle Songs")
                     onShuffleSongsRequested()
                 }
                 containerBrowserItems.addView(btnShuffle)
@@ -361,13 +354,7 @@ class BrowserController(
                 val btnGenre = createListButtonWithIcon("\uE030", localize("Genres"), null)
                 btnGenre.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Genres")
-                    currentBrowserMode = BrowserMode.Genres
-                    virtualQueryValue = ""
-                    categoryGenreFilter = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("GENRE")
+                    openList(BrowserMode.Genres)
                 }
                 containerBrowserItems.addView(btnGenre)
             }
@@ -376,10 +363,7 @@ class BrowserController(
                 val btnComposer = createListButtonWithIcon("\uE7FD", localize("Composers"), null)
                 btnComposer.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Composers")
-                    currentBrowserMode = BrowserMode.Composers
-                    virtualQueryValue = ""
-                    buildVirtualCategories("COMPOSER")
+                    openList(BrowserMode.Composers)
                 }
                 containerBrowserItems.addView(btnComposer)
             }
@@ -388,10 +372,7 @@ class BrowserController(
                 val btnYears = createListButtonWithIcon("\uE8B6", localize("Years"), null)
                 btnYears.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Years")
-                    currentBrowserMode = BrowserMode.Years
-                    virtualQueryValue = ""
-                    buildVirtualCategories("YEAR")
+                    openList(BrowserMode.Years)
                 }
                 containerBrowserItems.addView(btnYears)
             }
@@ -400,10 +381,7 @@ class BrowserController(
                 val btnRecent = createListButtonWithIcon("\uE8B6", localize("Recently Added"), null)
                 btnRecent.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Recently Added")
-                    currentBrowserMode = BrowserMode.RecentlyAdded
-                    virtualQueryType = "RECENT"
-                    buildVirtualSongs()
+                    openList(BrowserMode.RecentlyAdded)
                 }
                 containerBrowserItems.addView(btnRecent)
             }
@@ -412,9 +390,7 @@ class BrowserController(
                 val btnFav = createListButtonWithIcon("\uE8B6", localize("My Favorites"), null)
                 btnFav.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("My Favorites")
-                    currentBrowserMode = BrowserMode.Favorites
-                    buildVirtualSongsForFavorites()
+                    openList(BrowserMode.Favorites)
                 }
                 containerBrowserItems.addView(btnFav)
             }
@@ -423,10 +399,7 @@ class BrowserController(
                 val btnFolders = createListButtonWithIcon("\uE8B6", localize("Folders"), null)
                 btnFolders.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Folders")
-                    currentBrowserMode = BrowserMode.Folder(StoragePaths.getPrimaryRoot())
-                    currentFolder = StoragePaths.getPrimaryRoot()
-                    buildFileBrowserUI()
+                    openList(BrowserMode.Folder(StoragePaths.getPrimaryRoot()))
                 }
                 containerBrowserItems.addView(btnFolders)
             }
@@ -435,7 +408,6 @@ class BrowserController(
                 val btnSearch = createListButtonWithIcon("\uE8B6", localize("Search"), null)
                 btnSearch.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Search")
                     onSearchRequested()
                 }
                 containerBrowserItems.addView(btnSearch)
@@ -513,22 +485,14 @@ class BrowserController(
             val btnBook = createListButtonWithIcon("\uE86D", localize("Books"), null)
             btnBook.setOnClickListener {
                 clickFeedback()
-                lastBrowserFocusText = localize("Books")
-                currentBrowserMode = BrowserMode.Albums()
-                virtualQueryValue = ""
-                categoryArtistFilter = ""
-                buildVirtualCategories("ALBUM")
+                openList(BrowserMode.Albums())
             }
             containerBrowserItems.addView(btnBook)
 
             val btnAuthor = createListButtonWithIcon("\uE7FD", localize("Authors"), null)
             btnAuthor.setOnClickListener {
                 clickFeedback()
-                lastBrowserFocusText = localize("Authors")
-                currentBrowserMode = BrowserMode.Artists
-                virtualQueryValue = ""
-                categoryArtistFilter = ""
-                buildVirtualCategories("ARTIST")
+                openList(BrowserMode.Artists)
             }
             containerBrowserItems.addView(btnAuthor)
         }
@@ -637,11 +601,8 @@ class BrowserController(
         val adapter = CategoryListAdapter(categories, type, isAudiobookLibraryMode, albumArtists = albumArtists)
         listVirtualSongs?.adapter = adapter
 
-        val albumIndex = categories.indices.firstOrNull {
-            categories[it] == virtualQueryValue && albumArtists?.get(it).equals(virtualQueryAlbumArtist, ignoreCase = true)
-        }
-        val targetIndex = albumIndex ?: categories.indexOf(virtualQueryValue)
-        virtualListSelectedIndex = if (targetIndex >= 0) targetIndex else 0
+        // A list opens at its first row; Back selects its row again (NavigationManager)
+        virtualListSelectedIndex = 0
         listVirtualSongs?.post {
             navigateVirtualListTo(virtualListSelectedIndex)
         }
@@ -866,23 +827,7 @@ class BrowserController(
                 setTextColor(0xFFFF5555.toInt())
                 background = createButtonBackground(ThemeManager.getListButtonNormalBg())
                 setOnClickListener {
-                    clickFeedback()
-                    if (currentFolder.absolutePath == StoragePaths.getPrimaryRoot().absolutePath ||
-                        StoragePaths.isAnyStorageRoot(currentFolder.absolutePath) ||
-                        StoragePaths.isVideosRoot(currentFolder.absolutePath) ||
-                        StoragePaths.isAudiobooksRoot(currentFolder.absolutePath)
-                    ) {
-                        if (isPickingBackground) {
-                            isPickingBackground = false
-                            onNavigateToScreen(ScreenState.Settings())
-                        } else {
-                            currentBrowserMode = BrowserMode.Root
-                            buildFileBrowserUI()
-                        }
-                    } else {
-                        currentFolder = currentFolder.parentFile ?: StoragePaths.getPrimaryRoot()
-                        buildFileBrowserUI()
-                    }
+                    onBackPressed()
                 }
             }
             containerBrowserItems.addView(btnEmpty)
@@ -941,8 +886,7 @@ class BrowserController(
             val b = createListButtonWithIcon("\uE2C7", folder.name, null)
             b.setOnClickListener {
                 clickFeedback()
-                currentFolder = folder
-                buildFileBrowserUI()
+                openList(BrowserMode.Folder(folder, isPickingBackground))
             }
             containerBrowserItems.addView(b)
         }
@@ -961,7 +905,8 @@ class BrowserController(
                     }
                     Toast.makeText(activity, localize("Background Applied!"), Toast.LENGTH_SHORT).show()
                     isPickingBackground = false
-                    onNavigateToScreen(ScreenState.Settings())
+                    // Back to the Settings screen that opened the picker, over all its folder levels
+                    NavigationManager.getInstance().popBackStackTo { it !is ScreenState.Browser }
                 }
                 containerBrowserItems.addView(b)
             }
@@ -1049,7 +994,7 @@ class BrowserController(
                     curPlaylist[curIndex].name
                 } else ""
 
-                if (lastBrowserFocusText.isNotEmpty() || playingFileName.isNotEmpty()) {
+                if (playingFileName.isNotEmpty()) {
                     for (i in 0 until containerBrowserItems.childCount) {
                         val v = containerBrowserItems.getChildAt(i)
                         var itemText = ""
@@ -1064,11 +1009,7 @@ class BrowserController(
                             cleanItemText = cleanItemText.substring(0, cleanItemText.indexOf("  ⏱")).trim()
                         }
 
-                        if (lastBrowserFocusText.isNotEmpty() && cleanItemText == lastBrowserFocusText) {
-                            v.requestFocus()
-                            sv.scrollTo(0, v.top)
-                            break
-                        } else if (lastBrowserFocusText.isEmpty() && playingFileName.isNotEmpty() && cleanItemText == playingFileName) {
+                        if (cleanItemText == playingFileName) {
                             v.requestFocus()
                             sv.scrollTo(0, v.top)
                             break
@@ -1282,195 +1223,11 @@ class BrowserController(
         }
     }
 
+    /** Back: the list of the top back-stack entry (NavigationManager builds it again and selects its row). */
     override fun onBackPressed(): Boolean {
         clickFeedback()
-        val mode = currentBrowserMode
-        when (mode) {
-            is BrowserMode.Root, is BrowserMode.Audiobooks -> {
-                isAudiobookLibraryMode = false
-                onNavigateBackToMenu()
-                return true
-            }
-            is BrowserMode.Folder -> {
-                val isAtFolderRoot = if (isAudiobookLibraryMode) {
-                    currentFolder.absolutePath == StoragePaths.getAudiobooksDir().absolutePath
-                } else {
-                    currentFolder.absolutePath == StoragePaths.getPrimaryRoot().absolutePath
-                }
-                if (isAtFolderRoot || StoragePaths.isAnyStorageRoot(currentFolder.absolutePath)) {
-                    currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                    lastBrowserFocusText = localize("Folders")
-                    buildFileBrowserUI()
-                } else {
-                    val exitedName = currentFolder.name
-                    val parent = currentFolder.parentFile
-                    if (parent == null) {
-                        isAudiobookLibraryMode = false
-                        onNavigateBackToMenu()
-                    } else {
-                        currentFolder = parent
-                        lastBrowserFocusText = exitedName
-                        buildFileBrowserUI()
-                    }
-                }
-                return true
-            }
-            is BrowserMode.VirtualSongs -> {
-                when (virtualQueryType) {
-                    "COVER_FLOW_ALBUM" -> onNavigateBackToMenu()
-                    "GENRE_ALBUM_SONGS" -> {
-                        currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter, categoryArtistFilter)
-                        buildVirtualCategories("GENRE_ALBUM")
-                    }
-                    "GENRE_ARTIST_SONGS" -> {
-                        currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter, categoryArtistFilter)
-                        virtualQueryValue = ALL_SONGS_SENTINEL
-                        buildVirtualCategories("GENRE_ALBUM")
-                    }
-                    "GENRE" -> {
-                        currentBrowserMode = BrowserMode.GenreArtists(categoryGenreFilter)
-                        virtualQueryValue = ALL_SONGS_SENTINEL
-                        buildVirtualCategories("GENRE_ARTIST")
-                    }
-                    "ALL" -> {
-                        currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                        lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("All Songs")
-                        buildFileBrowserUI()
-                    }
-                    "RECENT" -> {
-                        currentBrowserMode = BrowserMode.Root
-                        lastBrowserFocusText = localize("Recently Added")
-                        buildFileBrowserUI()
-                    }
-                    "ARTIST_ALL_ALBUMS" -> {
-                        val exitedArtist = categoryArtistFilter
-                        currentBrowserMode = BrowserMode.Albums(exitedArtist, categoryArtistFilterIsTrackArtist)
-                        virtualQueryValue = ALL_SONGS_SENTINEL
-                        buildVirtualCategories("ALBUM")
-                    }
-                    "ALBUM" -> {
-                        val exitedAlbum = virtualQueryValue
-                        currentBrowserMode = BrowserMode.Albums(categoryArtistFilter, categoryArtistFilterIsTrackArtist)
-                        virtualQueryValue = exitedAlbum
-                        buildVirtualCategories("ALBUM")
-                    }
-                    "COMPILATION_ALBUM" -> {
-                        val exitedAlbum = virtualQueryValue
-                        currentBrowserMode = BrowserMode.Compilations
-                        virtualQueryValue = exitedAlbum
-                        buildVirtualCategories("ALBUM")
-                    }
-                    "ARTIST" -> {
-                        val exitedArtist = virtualQueryValue
-                        currentBrowserMode = if (categoryArtistFilterIsTrackArtist) BrowserMode.TrackArtists else BrowserMode.Artists
-                        virtualQueryValue = exitedArtist
-                        buildVirtualCategories(if (categoryArtistFilterIsTrackArtist) "TRACK_ARTIST" else "ARTIST")
-                    }
-                    "YEAR" -> {
-                        val exitedYear = virtualQueryValue
-                        currentBrowserMode = BrowserMode.Years
-                        virtualQueryValue = exitedYear
-                        buildVirtualCategories("YEAR")
-                    }
-                    "COMPOSER" -> {
-                        val exitedComposer = virtualQueryValue
-                        currentBrowserMode = BrowserMode.Composers
-                        virtualQueryValue = exitedComposer
-                        buildVirtualCategories("COMPOSER")
-                    }
-                    else -> {
-                        currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                        buildFileBrowserUI()
-                    }
-                }
-                return true
-            }
-            is BrowserMode.Artists -> {
-                currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                lastBrowserFocusText = if (isAudiobookLibraryMode) localize("Authors") else localize("Album Artists")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.TrackArtists -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("Artists")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.Favorites -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("My Favorites")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.Albums -> {
-                if (categoryArtistFilter.isNotEmpty()) {
-                    val exitedArtist = categoryArtistFilter
-                    val wasTrack = categoryArtistFilterIsTrackArtist
-                    categoryArtistFilter = ""
-                    currentBrowserMode = if (wasTrack) BrowserMode.TrackArtists else BrowserMode.Artists
-                    virtualQueryValue = exitedArtist
-                    buildVirtualCategories(if (wasTrack) "TRACK_ARTIST" else "ARTIST")
-                } else {
-                    currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                    lastBrowserFocusText = if (isAudiobookLibraryMode) localize("Books") else localize("Albums")
-                    buildFileBrowserUI()
-                }
-                return true
-            }
-            is BrowserMode.Compilations -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("Compilations")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.GenreAlbums -> {
-                currentBrowserMode = BrowserMode.GenreArtists(categoryGenreFilter)
-                val exitedArtist = categoryArtistFilter
-                categoryArtistFilter = ""
-                virtualQueryValue = exitedArtist
-                buildVirtualCategories("GENRE_ARTIST")
-                return true
-            }
-            is BrowserMode.GenreArtists -> {
-                currentBrowserMode = BrowserMode.Genres
-                val exitedGenre = categoryGenreFilter
-                categoryGenreFilter = ""
-                virtualQueryValue = exitedGenre
-                buildVirtualCategories("GENRE")
-                return true
-            }
-            is BrowserMode.Years -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("Years")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.Genres -> {
-                currentBrowserMode = BrowserMode.Root
-                categoryGenreFilter = ""
-                categoryArtistFilter = ""
-                lastBrowserFocusText = localize("Genres")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.Composers -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("Composers")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.RecentlyAdded -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("Recently Added")
-                buildFileBrowserUI()
-                return true
-            }
-            else -> {
-                onNavigateBackToMenu()
-                return true
-            }
-        }
+        onNavigateBackToMenu()
+        return true
     }
 
     /**

@@ -3,15 +3,24 @@ package com.themoon.y1.navigation
 import android.view.View
 import android.view.ViewGroup
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.views.ListRows
 import java.util.ArrayDeque
 
 /**
  * Coordinates transitions between screen states, manages backstack history,
  * and notifies active ScreenController instances.
+ *
+ * The back stack is the one record of the way back, as on the iPod: each list that opens going down (a screen,
+ * a Music level, a Settings group or row screen) is a [ScreenState]. The list that it leaves is kept as an entry
+ * with its selected row; Back takes the top entry, the controller builds that list again from the state, and the
+ * row is selected again at the same height. The main menu is the bottom entry.
  */
 class NavigationManager private constructor() {
 
-    private val backStack = ArrayDeque<ScreenState>()
+    /** A list to come back to (its route key), and its selected row when the deeper list opened. */
+    data class BackEntry(val state: ScreenState, val row: RowKey?)
+
+    private val backStack = ArrayDeque<BackEntry>()
     private val controllerMap = HashMap<Class<out ScreenState>, ScreenController>()
 
     var currentState: ScreenState? = null
@@ -34,16 +43,28 @@ class NavigationManager private constructor() {
     }
 
     fun navigateTo(newState: ScreenState, addToBackStack: Boolean = true) {
+        navigate(newState, addToBackStack, null)
+    }
+
+    /**
+     * Back rule (as on the iPod): a list that opens going down selects its first row; Back selects again the
+     * row that opened the deeper list. [returnRow] is that row when Back comes to [newState].
+     */
+    private fun navigate(newState: ScreenState, addToBackStack: Boolean, returnRow: RowKey?) {
         if (newState == currentState && activeController != null) {
             activeController?.onRefreshUI()
             return
         }
 
+        ListRows.cancelPending()
         val previous = currentState
+        var back = returnRow
         if (newState is ScreenState.MainMenu) {
+            // The bottom entry: going to the main menu (with Back or directly) takes all entries off
+            if (back == null) back = backStack.lastOrNull { it.state is ScreenState.MainMenu }?.row
             backStack.clear()
         } else if (previous != null && addToBackStack) {
-            backStack.push(previous)
+            backStack.push(BackEntry(previous, activeController?.selectedRow()))
         }
 
         com.themoon.y1.eventlog.EventLog.screen(previous, newState, backStack.size)
@@ -67,6 +88,7 @@ class NavigationManager private constructor() {
         }
 
         controller?.onEnter(newState)
+        if (back != null) controller?.selectRow(back)
         if (previous != null) {
             transitionListener?.onScreenTransition(previous, newState)
         }
@@ -81,9 +103,18 @@ class NavigationManager private constructor() {
             return false
         }
 
-        val previousState = backStack.pop()
-        navigateTo(previousState, addToBackStack = false)
+        val entry = backStack.pop()
+        navigate(entry.state, addToBackStack = false, returnRow = entry.row)
         return true
+    }
+
+    /** The state of the top back-stack entry (where Back goes), or null. */
+    fun previousState(): ScreenState? = backStack.peek()?.state
+
+    /** Back to the nearest entry that [where] accepts; the entries above it go. Without one: to the main menu. */
+    fun popBackStackTo(where: (ScreenState) -> Boolean): Boolean {
+        while (backStack.isNotEmpty() && !where(backStack.peek().state)) backStack.pop()
+        return popBackStack()
     }
 
     fun navigateBack(): Boolean {
