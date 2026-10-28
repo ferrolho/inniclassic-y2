@@ -11,7 +11,13 @@ import java.util.ArrayDeque
  */
 class NavigationManager private constructor() {
 
-    private val backStack = ArrayDeque<ScreenState>()
+    /** A screen to come back to, and its selected row when the deeper screen opened. */
+    data class BackEntry(val state: ScreenState, val row: RowKey?)
+
+    private val backStack = ArrayDeque<BackEntry>()
+
+    /** The selected main menu row when the main menu last opened a screen (the main menu clears the back stack). */
+    private var mainMenuRow: RowKey? = null
     private val controllerMap = HashMap<Class<out ScreenState>, ScreenController>()
 
     var currentState: ScreenState? = null
@@ -34,16 +40,27 @@ class NavigationManager private constructor() {
     }
 
     fun navigateTo(newState: ScreenState, addToBackStack: Boolean = true) {
+        navigate(newState, addToBackStack, null)
+    }
+
+    /**
+     * Back rule (as on the iPod): a screen that opens going down selects its first row; Back selects again the
+     * row that opened the deeper screen. [returnRow] is that row when Back comes to [newState].
+     */
+    private fun navigate(newState: ScreenState, addToBackStack: Boolean, returnRow: RowKey?) {
         if (newState == currentState && activeController != null) {
             activeController?.onRefreshUI()
             return
         }
 
         val previous = currentState
+        val leaving = activeController
+        val row = if (previous != null && addToBackStack) leaving?.selectedRow() else null
+        if (previous is ScreenState.MainMenu && addToBackStack) mainMenuRow = row
         if (newState is ScreenState.MainMenu) {
             backStack.clear()
         } else if (previous != null && addToBackStack) {
-            backStack.push(previous)
+            backStack.push(BackEntry(leaving?.backState(previous) ?: previous, row))
         }
 
         activeController?.onExit()
@@ -66,6 +83,8 @@ class NavigationManager private constructor() {
         }
 
         controller?.onEnter(newState)
+        val back = if (newState is ScreenState.MainMenu) mainMenuRow else returnRow
+        if (back != null) controller?.selectRow(back)
         if (previous != null) {
             transitionListener?.onScreenTransition(previous, newState)
         }
@@ -80,8 +99,8 @@ class NavigationManager private constructor() {
             return false
         }
 
-        val previousState = backStack.pop()
-        navigateTo(previousState, addToBackStack = false)
+        val entry = backStack.pop()
+        navigate(entry.state, addToBackStack = false, returnRow = entry.row)
         return true
     }
 
@@ -99,6 +118,7 @@ class NavigationManager private constructor() {
 
     fun reset() {
         backStack.clear()
+        mainMenuRow = null
         currentState = null
         activeController = null
         controllerMap.clear()
