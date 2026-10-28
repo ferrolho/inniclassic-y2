@@ -99,6 +99,9 @@ internal fun MainActivity.initViewBindings() {
     ivStatusWifi = findViewById(R.id.iv_status_wifi)
     ivStatusBluetooth = findViewById(R.id.iv_status_bluetooth)
     ivStatusHeadphone = findViewById(R.id.iv_status_headphone)
+    tvStatusTime = findViewById(R.id.tv_status_time)
+    tvStatusTime?.setShadowLayer(0f, 0f, 0f, 0)
+    tvStatusTime?.typeface = ThemeManager.getCustomFontBold()
     tvStatusBattery = findViewById(R.id.tv_status_battery)
     tvStatusBattery?.setShadowLayer(0f, 0f, 0f, 0)
 
@@ -124,7 +127,6 @@ internal fun MainActivity.applyRootSystemSettings() {
     try {
         val pkg = packageName
         val combinedCmd = "setprop persist.bluetooth.avrcpversion 1.6 && " +
-                "setprop persist.sys.timezone GMT && " +
                 "settings put global wifi_sleep_policy 2 && " +
                 "pm grant $pkg android.permission.DUMP && " +
                 "pm grant $pkg android.permission.BATTERY_STATS && " +
@@ -143,8 +145,8 @@ internal fun MainActivity.loadPreferences() {
     isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
     isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
     isAutoFetchEnabled = prefs.getBoolean("auto_fetch", true)
-    is24HourFormat = prefs.getBoolean("is_24_hour_format", false)
-    isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false)
+    is24HourFormat = prefs.getBoolean(ClockSettings.KEY_24_HOUR_FORMAT, ClockSettings.DEFAULT_24_HOUR_FORMAT)
+    isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
     isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
     isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
     isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
