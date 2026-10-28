@@ -28,9 +28,6 @@ interface ScreenController {
     /** Back came back to this screen (after [onEnter]): select [row], the row that opened the deeper screen. */
     fun selectRow(row: RowKey) = ListRows.select(rootView, row)
 
-    /** The state that Back must come back to while this screen shows [state] (a screen can change its list in place). */
-    fun backState(state: ScreenState): ScreenState = state
-
     fun dispatchKeyEvent(event: KeyEvent): Boolean = false
     fun onWheel(delta: Int, event: KeyEvent): Boolean = false
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = false

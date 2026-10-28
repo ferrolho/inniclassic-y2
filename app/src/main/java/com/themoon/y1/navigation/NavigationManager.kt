@@ -64,7 +64,7 @@ class NavigationManager private constructor() {
             if (back == null) back = backStack.lastOrNull { it.state is ScreenState.MainMenu }?.row
             backStack.clear()
         } else if (previous != null && addToBackStack) {
-            backStack.push(BackEntry(activeController?.backState(previous) ?: previous, activeController?.selectedRow()))
+            backStack.push(BackEntry(previous, activeController?.selectedRow()))
         }
 
         activeController?.onExit()

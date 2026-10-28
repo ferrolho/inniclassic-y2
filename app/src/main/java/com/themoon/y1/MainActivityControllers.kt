@@ -191,10 +191,7 @@ internal fun MainActivity.initControllers() {
         uniqueAlbumList = uniqueAlbumList,
         clickFeedback = { clickFeedback() },
         onAlbumSelected = { album ->
-            browserController.virtualQueryType = "COVER_FLOW_ALBUM"
-            browserController.virtualQueryValue = album.album
-            browserController.virtualQueryAlbumArtist = AlbumKey.artistOf(album)
-            changeScreen(ScreenState.Browser(BrowserMode.VirtualSongs))
+            changeScreen(ScreenState.Browser(BrowserMode.Songs("COVER_FLOW_ALBUM", album.album, AlbumKey.artistOf(album))))
         },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onRebuildUniqueAlbumList = { rebuildUniqueAlbumListInternal() },
@@ -211,20 +208,14 @@ internal fun MainActivity.initControllers() {
         onPreviousTrack = { AudioPlayerManager.getInstance().prevTrack() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onBrowseAlbum = { album ->
-            changeScreen(MainActivity.STATE_BROWSER)
-            browserController.virtualQueryType = "ALBUM"
-            browserController.virtualQueryValue = album
             // The menu gives only the title; take the album artist from the song that plays.
             val playingPath = currentPlaylist.getOrNull(currentIndex)?.absolutePath
             val playingSong = MainActivity.customLibrary.firstOrNull { it.file.absolutePath == playingPath }
-            browserController.virtualQueryAlbumArtist = playingSong?.let { AlbumKey.artistOf(it) } ?: ""
-            browserController.buildVirtualSongs()
+            val albumArtist = playingSong?.let { AlbumKey.artistOf(it) } ?: ""
+            changeScreen(ScreenState.Browser(BrowserMode.Songs("ALBUM", album, albumArtist)))
         },
         onBrowseArtist = { artist ->
-            changeScreen(MainActivity.STATE_BROWSER)
-            browserController.virtualQueryType = "ARTIST"
-            browserController.virtualQueryValue = artist
-            browserController.buildVirtualSongs()
+            changeScreen(ScreenState.Browser(BrowserMode.Songs("ARTIST", artist)))
         },
         onToggleFavorite = { toggleFavorite() },
         onAddToOnTheGo = { showAddToPlaylistDialog(it) },
@@ -396,10 +387,8 @@ internal fun MainActivity.initControllers() {
             podcastController.searchApplePodcasts(keyword)
         },
         onSubmitSearchLibrary = { keyword ->
-            NavigationManager.getInstance().popBackStack()
-            browserController.virtualQueryType = "SEARCH"
-            browserController.virtualQueryValue = keyword
-            browserController.buildVirtualSongs()
+            // The result list takes the place of the keyboard: Back goes to the Music menu, on Search
+            NavigationManager.getInstance().navigateTo(ScreenState.Browser(BrowserMode.Songs("SEARCH", keyword)), addToBackStack = false)
         },
         onSubmitLastFmUsername = { username ->
             prefs.edit().putString("lastfm_username", username).apply()
@@ -562,9 +551,7 @@ internal fun MainActivity.initControllers() {
             updateMainMenuBackground()
         },
         onPickBackgroundFromStorage = {
-            changeScreen(MainActivity.STATE_BROWSER)
-            browserController.isPickingBackground = true
-            browserController.buildFolderBrowserUI()
+            changeScreen(ScreenState.Browser(BrowserMode.Folder(StoragePaths.getPrimaryRoot(), pickImage = true)))
         },
         resetBacklightTimer = { powerBacklightManager?.applyBacklightSetting() },
         applySoundSetting = {
@@ -657,11 +644,8 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
     backTargetForUtility = MainActivity.STATE_MENU
     when (action) {
         "OPEN_BROWSER", "MUSIC" -> {
-            browserController.isAudiobookLibraryMode = false
             this.isAudiobookLibraryMode = false
-            browserController.currentBrowserMode = BrowserMode.Root
-            changeScreen(MainActivity.STATE_BROWSER)
-            browserController.buildFileBrowserUI()
+            changeScreen(ScreenState.Browser(BrowserMode.Root))
         }
         "OPEN_VIDEOS", "VIDEOS" -> {
             changeScreen(ScreenState.Videos(VideoMode.Root))
@@ -695,11 +679,8 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
             changeScreen(MainActivity.STATE_WIFI)
         }
         "OPEN_AUDIOBOOKS" -> {
-            browserController.isAudiobookLibraryMode = true
             this.isAudiobookLibraryMode = true
-            browserController.currentBrowserMode = BrowserMode.Audiobooks
-            changeScreen(ScreenState.Browser(BrowserMode.Audiobooks))
-            browserController.buildFileBrowserUI()
+            changeScreen(ScreenState.Browser(BrowserMode.Audiobooks, audiobooks = true))
         }
         "OPEN_THEME_SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)
