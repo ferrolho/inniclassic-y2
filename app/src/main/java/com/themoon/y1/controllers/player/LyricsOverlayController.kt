@@ -95,6 +95,12 @@ class LyricsOverlayController(
         scheduleFrame()
     }
 
+    // Settings → Lyrics Keep Screen On: held while the lyrics show and music plays (renewed at each progress tick)
+    private val screenHold = LyricsScreenHold(context)
+
+    private fun keepScreenOnSetting(): Boolean = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        .getBoolean(LyricsKeepScreenOn.PREF, LyricsKeepScreenOn.DEFAULT)
+
     val hasLyrics: Boolean
         get() = currentLyrics.isNotEmpty() || plainLyrics != null
 
@@ -206,6 +212,7 @@ class LyricsOverlayController(
 
     fun hide() {
         lyricScrollView.visibility = View.GONE
+        screenHold.update(false)
         lyricScrollView.removeCallbacks(followPlayback)
         lyricScrollView.removeCallbacks(frameTask)
         frameScheduled = false
@@ -326,7 +333,7 @@ class LyricsOverlayController(
                             if (msStr.length == 2) ms *= 10
                             val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
                             val text = m.group(4)?.trim() ?: ""
-                            if (text.isNotEmpty()) {
+                            if (LyricsText.isVisible(text)) {
                                 currentLyrics[totalMs] = text
                             }
                         }
@@ -354,6 +361,9 @@ class LyricsOverlayController(
             plainLyrics = extractEmbeddedLyrics(audioFile)
         }
 
+        // A tag with no visible text (an empty ID3 USLT frame has only a NUL) is no lyrics: no blank lyrics view
+        plainLyrics = LyricsText.plain(plainLyrics)
+
         // 4. Test if plain lyrics string contains embedded LRC timestamps
         val candidate = plainLyrics
         if (!candidate.isNullOrEmpty()) {
@@ -372,7 +382,7 @@ class LyricsOverlayController(
                     if (msStr.length == 2) ms *= 10
                     val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
                     val text = m.group(4)?.trim() ?: ""
-                    if (text.isNotEmpty()) {
+                    if (LyricsText.isVisible(text)) {
                         currentLyrics[totalMs] = text
                     }
                 }
@@ -471,6 +481,7 @@ class LyricsOverlayController(
         progressTime = SystemClock.uptimeMillis()
         progressPlaying = playing
         if (isShowing()) scheduleFrame()
+        screenHold.update(LyricsKeepScreenOn.shouldHold(keepScreenOnSetting(), isShowing(), playing))
     }
 
     /** All synced lines in one text, so the view can glide between them. */

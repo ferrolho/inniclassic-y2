@@ -101,6 +101,7 @@ polish_dict = {
   "Hide Spectrum": "Ukryj widmo",
   "Show Total Time": "Pokaż całkowity czas",
   "Show Remaining Time": "Pokaż pozostały czas",
+  "Lyrics Keep Screen On": "Ekran włączony przy tekście",
   "Spectrum": "Widmo",
   "Total Time": "Całkowity czas",
   "Lyrics": "Tekst",
