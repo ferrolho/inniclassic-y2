@@ -1,5 +1,6 @@
 package com.themoon.y1.navigation
 
+import com.themoon.y1.managers.PlayHistoryManager
 import java.io.File
 
 /**
@@ -22,6 +23,8 @@ sealed interface ScreenState {
     data object CoverFlow : ScreenState
     data object Playlists : ScreenState
     data class M3uPlaylistSongs(val m3uFile: File) : ScreenState
+    /** iPod smart playlist in Music -> Playlists: Recently Played or Top 25 Most Played. */
+    data class SmartPlaylistSongs(val kind: PlayHistoryManager.Kind) : ScreenState
     data object Podcasts : ScreenState
     data class PodcastEpisodes(val channelTitle: String, val rssUrl: String) : ScreenState
     data object PodcastManage : ScreenState
@@ -39,6 +42,7 @@ sealed interface BrowserMode {
     data object Artists : BrowserMode
     data object TrackArtists : BrowserMode
     data class Albums(val artistFilter: String? = null, val byTrackArtist: Boolean = false) : BrowserMode
+    data object Compilations : BrowserMode
     data object Genres : BrowserMode
     data class GenreArtists(val genre: String) : BrowserMode
     data class GenreAlbums(val genre: String, val artist: String? = null) : BrowserMode
@@ -47,7 +51,6 @@ sealed interface BrowserMode {
     data object VirtualSongs : BrowserMode
     data object Favorites : BrowserMode
     data object RecentlyAdded : BrowserMode
-    data object RecentlyPlayed : BrowserMode
     data object Audiobooks : BrowserMode
     data object Playlists : BrowserMode
     data class M3uSongs(val m3uFile: File) : BrowserMode
