@@ -105,6 +105,21 @@ class MenuSlideMotionTest {
     }
 
     @Test
+    fun coverFlowArtLayerShowsTheArtLeftOfThePane() {
+        val l = IntArray(3)
+        MenuSlideMotion.coverFlowArtLayer(480, 240, l)
+        // The art pane in the layer is at the pane edge on the screen and has the pane width (same crop and zoom)
+        assertEquals(240, l[0] + l[2])
+        assertEquals(240, l[1] - l[2])
+        // At each art offset of the slide, the layer covers the full width: the art left of the pane edge shows
+        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o)
+        for (art in floatArrayOf(0f, 60f, 120f, o[2])) {
+            assertTrue(l[0] + art <= 0f)
+            assertTrue(l[0] + l[1] + art >= 480f)
+        }
+    }
+
+    @Test
     fun kinds() {
         assertEquals(Kind.PANE, MenuSlideMotion.kindOf(240, 241, false, false))
         assertEquals(Kind.SPLIT_TO_FULL, MenuSlideMotion.kindOf(240, null, false, false))

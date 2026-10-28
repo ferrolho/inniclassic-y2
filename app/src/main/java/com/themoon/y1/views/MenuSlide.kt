@@ -26,7 +26,9 @@ import com.themoon.y1.views.MenuSlideMotion.Kind
  * selects its row, draws the new screen once into a second bitmap, and then moves the two bitmaps. The frames
  * change only offsets: no allocation, no view layout, no copy. The bitmaps are kept for the next slide.
  * The Cover Flow slide also has a live art layer ([CoverArtView] with [CoverArtView.slideLayer]) that continues
- * the Menu Cover Motion and reaches under the list pane, so the art shows from under the list as it goes.
+ * the Menu Cover Motion with the same zoom and offset, and also draws the art that the list pane hid (left of the
+ * pane edge, up to the art's own left edge): the art shows from under the list as the list goes, and as the art
+ * pane goes right ([MenuSlideMotion.coverFlowArtLayer]).
  *
  * The screens change at once (the controllers have the new state at the key press), so keys always act on the new
  * screen: a key during a slide ends the slide at once ([finishNow]), and the key then acts as normal (not lost,
@@ -65,6 +67,7 @@ class MenuSlide private constructor(
     private val depth = FloatArray(2)
     private val off = FloatArray(3)
     private val loc = IntArray(2)
+    private val artLayer = IntArray(3)
 
     // Measurements of each slide (logcat tag MenuSlide)
     private var holdStartMs = 0L
@@ -164,14 +167,14 @@ class MenuSlide private constructor(
             // The art of the split screen: the old screen's for the entry, the new screen's for Back.
             val bitmap = if (push) artOld else (CoverPane.shownPane()?.drawable as? BitmapDrawable)?.bitmap
             if (bitmap != null && !bitmap.isRecycled) {
-                val under = (MenuSlideMotion.COVER_FLOW_ART_UNDER_DP * resources.displayMetrics.density).toInt()
+                MenuSlideMotion.coverFlowArtLayer(root.width, pane, artLayer)
                 val lp = art.layoutParams as LayoutParams
-                lp.width = root.width - pane + under
+                lp.width = artLayer[1]
                 lp.height = root.height - top
-                lp.leftMargin = pane - under
+                lp.leftMargin = artLayer[0]
                 lp.topMargin = top
                 art.layoutParams = lp
-                art.artLeft = under
+                art.artLeft = artLayer[2]
                 art.setImageDrawable(BitmapDrawable(resources, bitmap))
                 art.visibility = View.VISIBLE
                 // The art layer needs a layout pass: the slide starts at the next frame.

@@ -45,12 +45,6 @@ object MenuSlideMotion {
     /** Cover Flow → Music (Back): the entry played in reverse, a little slower. iPod: ~8 frames. */
     const val COVER_FLOW_OUT_MS = 270L
 
-    /**
-     * The art layer of the Cover Flow slide reaches this far under the list pane (dp): the art shows from under
-     * the list as the list goes, before the art pane moves. iPod: at least 12 px of 320.
-     */
-    const val COVER_FLOW_ART_UNDER_DP = 24f
-
     fun decelerate(t: Float): Float {
         val c = t.coerceIn(0f, 1f)
         return 1f - (1f - c) * (1f - c)
@@ -138,6 +132,19 @@ object MenuSlideMotion {
      * not from the right edge of the screen.
      */
     fun paneColumns(offset: Float, pane: Float): Float = (pane - offset).coerceIn(0f, pane)
+
+    /**
+     * The Cover Flow slide's art layer for a slide area [width] wide whose art pane starts at [pane]: [out] gets
+     * 0 = the x of the layer, 1 = its width, 2 = the x of the art pane in the layer. The art pane stays [width] − [pane]
+     * wide (the same CENTER_CROP, zoom and motion as the pane), but the layer also draws the art left of the pane
+     * (the part that the list pane hides). The layer covers the full slide area at each art offset from 0 to
+     * [width] − [pane], so the art shows up to its own left edge as the list goes out and as the art goes right.
+     */
+    fun coverFlowArtLayer(width: Int, pane: Int, out: IntArray) {
+        out[0] = pane - width
+        out[1] = 2 * width - pane
+        out[2] = width
+    }
 
     /**
      * The kind of slide between A and B. [paneA], [paneB]: the x of the art pane of each screen (its list pane
