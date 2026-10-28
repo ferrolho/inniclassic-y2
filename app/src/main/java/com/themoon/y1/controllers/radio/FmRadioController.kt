@@ -20,6 +20,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.navigation.ScreenState
@@ -378,7 +379,7 @@ class FmRadioController(
                     text = "● " + localize("PLAYING")
                     setTextColor(themeHighlightColor)
                 } else {
-                    text = localize("OFF") + " (" + localize("Press Center or Play to Turn ON") + ")"
+                    text = localize("Off (press Center or Play to turn on)")
                     setTextColor(0xFF888888.toInt())
                 }
                 textSize = 14f
@@ -498,7 +499,7 @@ class FmRadioController(
 
             val btnPower = createSettingRow(
                 "Radio Power",
-                if (fmManager.isPowerUp) localize("ON") else localize("OFF")
+                onOff(fmManager.isPowerUp, localize)
             ).apply {
                 setOnClickListener { toggleRadioPower() }
             }
@@ -578,7 +579,7 @@ class FmRadioController(
                 tvStatus.text = "● " + localize("PLAYING")
                 tvStatus.setTextColor(themeHighlightColor)
             } else {
-                tvStatus.text = localize("OFF") + " (" + localize("Press Center or Play to Turn ON") + ")"
+                tvStatus.text = localize("Off (press Center or Play to turn on)")
                 tvStatus.setTextColor(0xFF888888.toInt())
             }
         }
