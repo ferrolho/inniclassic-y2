@@ -43,6 +43,7 @@ import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
 import com.themoon.y1.managers.PowerMenu
 import com.themoon.y1.models.AlbumKey
+import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
@@ -96,9 +97,8 @@ class SettingsController(
             val old = field
             field = value
             // Title: the group name on a group list, the row name on a row's sub-screen (SettingsGroups.kt)
-            groupPages.onDepthChanged(old, value, containerSettingsItems, lastSettingsFocusIndex, mainActivity?.tvStatusBarTitle, localize)
+            groupPages.onDepthChanged(old, value, containerSettingsItems, mainActivity?.tvStatusBarTitle, localize)
         }
-    var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
     /** The Power screen (Restart, Power Off) is open: Back goes to the screen before it. */
@@ -117,6 +117,9 @@ class SettingsController(
     private var materialIconFont: Typeface? = null
 
     companion object {
+        /** The values of each Date & Time row's screen (Settings → Date & Time → Year...). */
+        val DATE_TIME_RANGES = mapOf("Year" to 2020..2035, "Month" to 1..12, "Day" to 1..31, "Hour" to 0..23, "Minute" to 0..59)
+
         /** Backlight Timer is the one screen timer: it also sets Android's SCREEN_OFF_TIMEOUT (see BacklightTimer). */
         val BACKLIGHT_TIMER_LABELS = com.themoon.y1.managers.BacklightTimer.LABELS
         val VIBE_STRENGTH_NAMES = com.themoon.y1.managers.ButtonVibration.LABELS
@@ -168,44 +171,68 @@ class SettingsController(
         )
     }
 
-    init {
-        containerSettingsItems.viewTreeObserver?.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (isUiActive && currentSettingsDepth == 0 && newFocus != null) {
-                var v: View? = newFocus
-                while (v != null && v.parent != containerSettingsItems) {
-                    v = v.parent as? View
-                }
-                if (v != null) {
-                    val idx = containerSettingsItems.indexOfChild(v)
-                    if (idx >= 0) {
-                        lastSettingsFocusIndex = idx
-                    }
-                }
-            }
-        }
-    }
-
     // Groups on the top level (SettingsGroups.kt). The rows stay in buildSettingsUI; the groups only move them.
     private val groupPages = SettingsGroupPages()
 
+    /** The list that shows, as its route key: the top level, a group, or the screen of a row (a back-stack entry). */
+    private var page: SettingsSubMode = SettingsSubMode.Root
+    /** currentSettingsDepth of [page]; a deeper depth is a sub-screen that a row opened in place. */
+    private var pageDepth = 0
+
+    /** Builds the list of [state]: when it opens going down, and when Back comes back to it (NavigationManager). */
     override fun onEnter(state: ScreenState) {
-        if ((state as? ScreenState.Settings)?.subMode == SettingsSubMode.Power) {
-            buildPowerUI()
-            return
+        page = (state as? ScreenState.Settings)?.subMode ?: SettingsSubMode.Root
+        when (val shown = page) {
+            is SettingsSubMode.Page -> buildPage(shown)
+            is SettingsSubMode.Power -> buildPowerUI()
+            else -> {
+                val title = (shown as? SettingsSubMode.Group)?.title
+                groupPages.show(SettingsGroups.GROUPS.indexOfFirst { it.title == title })
+                buildSettingsUI()
+            }
         }
-        // From the main menu: start at the top level. From a row's screen (Bluetooth, Equalizer...): stay in its group.
-        if (mainActivity?.backTargetForUtility == MainActivity.STATE_MENU) groupPages.close()?.let { lastSettingsFocusIndex = it }
-        buildSettingsUI()
+        pageDepth = currentSettingsDepth
+    }
+
+    private fun buildPage(shown: SettingsSubMode.Page) {
+        when (shown.id) {
+            "Language" -> buildLanguageSelectorUI()
+            "Theme" -> buildThemeSelectorUI()
+            "Background" -> buildBackgroundSettingsUI()
+            "DateTime" -> {
+                val range = DATE_TIME_RANGES[shown.arg]
+                if (range == null) buildDateTimeUI() else buildDateTimeSelectorUI(shown.arg, range.first, range.last, dateTimeValue(shown.arg))
+            }
+            "VolumeLimit" -> buildVolumeLimitSettingsUI()
+            "Legal" -> buildLegalSettingsUI()
+            "Update" -> buildUpdateSettingsUI()
+            "MainMenuItems" -> buildMainMenuVisibilitySettingsUI()
+            "MusicMenuItems" -> buildMusicMenuVisibilitySettingsUI()
+        }
+    }
+
+    /**
+     * True when the row screen [id] is the list that shows: the caller builds it now. Else this opens it and
+     * returns false: Back to it when it is the list under this one (a value was chosen), or one level down.
+     */
+    private fun showsPage(id: String, arg: String = ""): Boolean {
+        val target = SettingsSubMode.Page(id, arg)
+        if (page == target) return true
+        val state = ScreenState.Settings(target)
+        val nav = NavigationManager.getInstance()
+        if (nav.previousState() == state) nav.popBackStack() else mainActivity?.changeScreen(state)
+        return false
+    }
+
+    private fun dateTimeValue(type: String): Int = when (type) {
+        "Year" -> dtYear
+        "Month" -> dtMonth
+        "Day" -> dtDay
+        "Hour" -> dtHour
+        else -> dtMinute
     }
 
     override fun onExit() {
-        if (currentSettingsDepth == 0) {
-            val curFocus = containerSettingsItems.findFocus()
-            val idx = if (curFocus != null) containerSettingsItems.indexOfChild(curFocus) else -1
-            if (idx >= 0) {
-                lastSettingsFocusIndex = idx
-            }
-        }
         isUiActive = false
     }
 
@@ -224,11 +251,12 @@ class SettingsController(
         when {
             currentSettingsDepth == 0 -> buildSettingsUI()
             themeListFirstRow != null && containerSettingsItems.getChildAt(0) === themeListFirstRow -> buildThemeSelectorUI()
-            // Other sub-screens: one level up, as Back does
-            else -> buildSettingsUI()
+            // Other sub-screens: build the list of the back-stack entry again (its route key)
+            else -> onEnter(ScreenState.Settings(page))
         }
     }
 
+    /** Back: the list of the top back-stack entry (NavigationManager builds it again and selects its row). */
     override fun onBackPressed(): Boolean {
         if (isPowerScreen) {
             onNavigateBack()
@@ -238,26 +266,9 @@ class SettingsController(
             toggleMenuReorderMode()
             return true
         }
-        if (currentSettingsDepth == 0 && groupPages.isOpen) {
-            lastSettingsFocusIndex = groupPages.close() ?: 0
-            buildSettingsUI()
-            clickFeedback()
-            return true
-        }
-        if (currentSettingsDepth == 0) {
-            onNavigateBack()
-            return true
-        } else if (currentSettingsDepth == 1) {
-            buildSettingsUI()
-            clickFeedback()
-            return true
-        } else if (currentSettingsDepth == 2) {
-            buildDateTimeUI()
-            clickFeedback()
-            return true
-        }
-        buildSettingsUI()
         clickFeedback()
+        // A sub-screen that a row opened in place (not a back-stack entry): back to the list of this entry
+        if (currentSettingsDepth > pageDepth) onEnter(ScreenState.Settings(page)) else onNavigateBack()
         return true
     }
 
@@ -290,8 +301,7 @@ class SettingsController(
             return true
         }
 
-        val i = RowFocus.step(containerSettingsItems, delta) ?: return false
-        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+        RowFocus.step(containerSettingsItems, delta) ?: return false
         clickFeedback()
         return true
     }
@@ -327,10 +337,17 @@ class SettingsController(
 
     fun buildSettingsUI() {
         isPowerScreen = false
+        // A row's screen asks for its list (a value was chosen): Back to that list
+        if (page is SettingsSubMode.Page) {
+            onNavigateBack()
+            return
+        }
+        // A new build of the list that shows (a row changed a value) keeps the focused row; a list that opens starts at its first row
+        var focused: View? = if (isUiActive && currentSettingsDepth == 0) containerSettingsItems.findFocus() else null
+        while (focused != null && focused.parent !== containerSettingsItems) focused = focused.parent as? View
+        val targetFocusIndex = if (focused != null) containerSettingsItems.indexOfChild(focused) else -1
         currentSettingsDepth = 0
         settingsSubMode = 0
-
-        val targetFocusIndex = lastSettingsFocusIndex
         containerSettingsItems.removeAllViews()
 
         val isShuffleMode = prefs.getBoolean("shuffle", false)
@@ -930,11 +947,8 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnResetAll)
 
-        groupPages.arrange(containerSettingsItems, createSettingRow, clickFeedback, localize, mainActivity?.tvStatusBarTitle) {
-            // A row's screen (Bluetooth, Equalizer...) comes back into this group (see onEnter)
-            mainActivity?.backTargetForUtility = MainActivity.STATE_SETTINGS
-            lastSettingsFocusIndex = 0
-            buildSettingsUI()
+        groupPages.arrange(containerSettingsItems, createSettingRow, clickFeedback, localize, mainActivity?.tvStatusBarTitle) { group ->
+            mainActivity?.changeScreen(ScreenState.Settings(SettingsSubMode.Group(SettingsGroups.GROUPS[group].title)))
         }
 
         val sv = containerSettingsItems.parent as? ScrollView
@@ -947,12 +961,10 @@ class SettingsController(
                     sv.scrollTo(0, targetY)
                 }
                 target?.requestFocus()
-                lastSettingsFocusIndex = targetFocusIndex
             } else if (containerSettingsItems.childCount > 0) {
                 val first = containerSettingsItems.getChildAt(0)
                 first?.requestFocus()
                 sv?.scrollTo(0, 0)
-                lastSettingsFocusIndex = 0
             }
             isUiActive = true
         }
@@ -984,6 +996,7 @@ class SettingsController(
     }
 
     private fun buildLanguageSelectorUI() {
+        if (!showsPage("Language")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1028,6 +1041,7 @@ class SettingsController(
     }
 
     fun buildThemeSelectorUI() {
+        if (!showsPage("Theme")) return
         currentSettingsDepth = 1
         val themeFolder = File(activity.filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeFolder)
@@ -1062,6 +1076,7 @@ class SettingsController(
     }
 
     fun buildBackgroundSettingsUI() {
+        if (!showsPage("Background")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1092,6 +1107,7 @@ class SettingsController(
     }
 
     fun buildDateTimeUI() {
+        if (!showsPage("DateTime")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1346,6 +1362,7 @@ class SettingsController(
     }
 
     private fun buildDateTimeSelectorUI(type: String, min: Int, max: Int, currentValue: Int) {
+        if (!showsPage("DateTime", type)) return
         currentSettingsDepth = 2
         containerSettingsItems.removeAllViews()
 
@@ -1381,6 +1398,7 @@ class SettingsController(
 
     /** Volume Limit: the loudest volume step (1..30, see VolumeSteps), or Off. */
     private fun buildVolumeLimitSettingsUI() {
+        if (!showsPage("VolumeLimit")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1419,6 +1437,7 @@ class SettingsController(
     }
 
     private fun buildLegalSettingsUI() {
+        if (!showsPage("Legal")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1443,6 +1462,7 @@ class SettingsController(
     }
 
     private fun buildUpdateSettingsUI() {
+        if (!showsPage("Update")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1476,6 +1496,7 @@ class SettingsController(
     }
 
     private fun buildMainMenuVisibilitySettingsUI() {
+        if (!showsPage("MainMenuItems")) return
         currentSettingsDepth = 1
         settingsSubMode = 4
         containerSettingsItems.removeAllViews()
@@ -1554,6 +1575,7 @@ class SettingsController(
     }
 
     private fun buildMusicMenuVisibilitySettingsUI() {
+        if (!showsPage("MusicMenuItems")) return
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
