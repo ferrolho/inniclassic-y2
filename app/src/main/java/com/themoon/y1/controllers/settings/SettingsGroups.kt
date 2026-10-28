@@ -37,7 +37,7 @@ object SettingsGroups {
             "Time in Title", "Battery", "Battery Percentage"
         )),
         Group("Appearance", listOf(
-            "Theme", "Background", "Toggle Style", "List Edges", "Menu Cover Motion",
+            "Theme", "Toggle Style", "List Edges", "Menu Cover Motion",
             "Fill Video Screen"
         )),
         Group("Menus", listOf(
@@ -185,7 +185,7 @@ class SettingsGroupPages {
     }
 
     /**
-     * Call when SettingsController.currentSettingsDepth changes. A row's sub-screen (Background, Date & Time → Year...)
+     * Call when SettingsController.currentSettingsDepth changes. A row's sub-screen (Theme, Date & Time → Year...)
      * shows the label of the row that opened it; the group list shows the group name ([arrange]).
      * Each sub-screen sets the depth before it removes the rows, so the row that opened it still has the focus here.
      */
