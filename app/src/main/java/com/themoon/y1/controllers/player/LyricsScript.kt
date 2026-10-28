@@ -32,10 +32,11 @@ object LyricsScript {
     /**
      * The text of one lyrics line, and where the romanised part starts in it (-1 = no romanised part).
      * [BOTH] puts the romanised line under the original line; a line that is the same in both (an English line)
-     * shows once.
+     * shows once. A romanised line with no visible text (spaces, a NUL, a zero-width space) is no romanised line:
+     * the original line shows, so [ROMANISED] never gives a blank lyrics view.
      */
     fun line(original: String, romanised: String?, mode: Int): Pair<String, Int> {
-        val r = romanised?.trim()?.takeIf { it.isNotEmpty() }
+        val r = romanised?.trim()?.takeIf { LyricsText.isVisible(it) }
         return when {
             r == null || r == original.trim() -> Pair(original, -1)
             mode == ROMANISED -> Pair(r, -1)

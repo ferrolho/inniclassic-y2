@@ -43,6 +43,14 @@ class LyricsScriptTest {
     }
 
     @Test
+    fun invisibleRomanisedLineShowsTheOriginal() {
+        // No blank lyrics view in Romanised: a NUL or a zero-width space is no romanised text
+        assertEquals(Pair("七里香", -1), LyricsScript.line("七里香", "\u0000", LyricsScript.ROMANISED))
+        assertEquals(Pair("七里香", -1), LyricsScript.line("七里香", "\u200B", LyricsScript.ROMANISED))
+        assertEquals(listOf("一", "二"), LyricsScript.plainLines("一\n二", "\u0000\n\uFEFF", LyricsScript.ROMANISED)!!.map { it.first })
+    }
+
+    @Test
     fun plainLyricsPairInOrder() {
         val lines = LyricsScript.plainLines("一\n\n二", "yī\n\nèr", LyricsScript.BOTH)!!
         assertEquals(listOf("一\nyī", "", "二\nèr"), lines.map { it.first })
