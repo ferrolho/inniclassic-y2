@@ -149,7 +149,7 @@ internal fun MainActivity.loadPreferences() {
     isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
     isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
     isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
-    isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
+    isAlbumTiltEnabled = com.themoon.y1.controllers.player.AlbumTiltSetting.isEnabled(prefs)
     com.themoon.y1.models.AlbumKey.byArtist = prefs.getBoolean(com.themoon.y1.models.AlbumKey.PREF_BY_ARTIST, false)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq_enabled", false)
