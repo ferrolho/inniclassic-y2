@@ -17,8 +17,10 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
+import com.themoon.y1.changeTheme
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -26,6 +28,7 @@ import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.AutoThemeManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
@@ -40,6 +43,7 @@ import com.themoon.y1.views.ToggleStyle
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Controller for Settings screens:
@@ -109,6 +113,34 @@ class SettingsController(
         /** Backlight Timer is the one screen timer: it also sets Android's SCREEN_OFF_TIMEOUT (see BacklightTimer). */
         val BACKLIGHT_TIMER_LABELS = com.themoon.y1.managers.BacklightTimer.LABELS
         val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
+
+        // Common IANA zones covering the main UTC offsets, short enough to scroll with the wheel
+        val TIME_ZONE_IDS = arrayOf(
+            "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles", "America/Denver",
+            "America/Chicago", "America/Mexico_City", "America/New_York", "America/Bogota",
+            "America/Halifax", "America/St_Johns", "America/Sao_Paulo", "America/Argentina/Buenos_Aires",
+            "Atlantic/South_Georgia", "Atlantic/Azores", "GMT", "Europe/London", "Europe/Lisbon",
+            "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "Europe/Warsaw",
+            "Africa/Lagos", "Europe/Athens", "Europe/Helsinki", "Africa/Cairo", "Africa/Johannesburg",
+            "Europe/Moscow", "Europe/Istanbul", "Asia/Riyadh", "Asia/Tehran", "Asia/Dubai",
+            "Asia/Karachi", "Asia/Kolkata", "Asia/Kathmandu", "Asia/Dhaka", "Asia/Bangkok",
+            "Asia/Jakarta", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore", "Australia/Perth",
+            "Asia/Tokyo", "Asia/Seoul", "Australia/Adelaide", "Australia/Brisbane", "Australia/Sydney",
+            "Pacific/Auckland"
+        )
+
+        fun timeZoneCityName(zoneId: String): String = zoneId.substringAfterLast('/').replace('_', ' ')
+
+        // e.g. "UTC+01:00 London" (offset at the given time, so it includes summer time)
+        fun timeZoneLabel(zoneId: String, nowMs: Long): String {
+            val offsetMin = TimeZone.getTimeZone(zoneId).getOffset(nowMs) / 60000
+            val sign = if (offsetMin < 0) "-" else "+"
+            val absMin = Math.abs(offsetMin)
+            return String.format(
+                Locale.US, "UTC%s%02d:%02d %s",
+                sign, absMin / 60, absMin % 60, timeZoneCityName(zoneId)
+            )
+        }
 
         val MUSIC_MENU_ITEMS = arrayOf(
             arrayOf("coverflow", "Cover Flow"),
@@ -199,6 +231,18 @@ class SettingsController(
             buildPowerUI()
         } else if (currentSettingsDepth == 0) {
             buildSettingsUI()
+        }
+    }
+
+    // First row of the theme list when it was made; the list still shows while this row is in the container
+    private var themeListFirstRow: View? = null
+
+    override fun onThemeChanged() {
+        when {
+            currentSettingsDepth == 0 -> buildSettingsUI()
+            themeListFirstRow != null && containerSettingsItems.getChildAt(0) === themeListFirstRow -> buildThemeSelectorUI()
+            // Other sub-screens: build the list of the back-stack entry again (its route key)
+            else -> onEnter(ScreenState.Settings(page))
         }
     }
 
@@ -605,7 +649,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBacklightTimer)
 
-        val btnTheme = createSettingRow(localize("Theme"), ThemeManager.getCurrentTheme().name)
+        val btnTheme = createSettingRow(localize("Theme"), AutoThemeManager.settingsRowValue(prefs, localize))
         btnTheme.setOnClickListener {
             clickFeedback()
             buildThemeSelectorUI()
@@ -943,11 +987,13 @@ class SettingsController(
         val themeFolder = File(activity.filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeFolder)
         containerSettingsItems.removeAllViews()
+        containerSettingsItems.addView(
+            AutoThemeManager.createSelectorRow(activity, prefs, createTablerListButton, clickFeedback, localize)
+        )
 
         for (i in 0 until ThemeManager.availableThemes.size) {
-            val index = i
             val theme = ThemeManager.availableThemes[i]
-            val isSelected = ThemeManager.getCurrentThemeIndex() == i
+            val isSelected = ThemeManager.getCurrentThemeIndex() == i && !AutoThemeManager.isEnabled(prefs)
             val icon = if (isSelected) TablerIcons.CHECK else null
             val btn = createTablerListButton(
                 icon,
@@ -957,52 +1003,9 @@ class SettingsController(
             )
             btn.setOnClickListener {
                 clickFeedback()
-                ThemeManager.setThemeIndex(index)
-                try {
-                    val editor = prefs.edit()
-                    editor.putInt("app_theme_index", index)
-                    editor.putString("app_theme_name", ThemeManager.availableThemes[index].name)
-                    editor.putString("current_theme_name", ThemeManager.availableThemes[index].name)
-                    editor.putBoolean("reboot_to_theme", true)
-
-                    val selectedTheme = ThemeManager.availableThemes[index]
-                    var hasThemeBg = false
-                    if (!selectedTheme.bgImage.isNullOrEmpty() && File(selectedTheme.folderPath, selectedTheme.bgImage).exists()) {
-                        hasThemeBg = true
-                    }
-                    if (!hasThemeBg && File(selectedTheme.folderPath, "background.png").exists()) hasThemeBg = true
-                    if (!hasThemeBg && File(selectedTheme.folderPath, "bg.png").exists()) hasThemeBg = true
-
-                    if (hasThemeBg) {
-                        editor.putString("bg_path", "THEME_DEFAULT")
-                    }
-
-                    var hasClock = false
-                    var hasAnalog = false
-                    var hasBattery = false
-                    var hasCircular = false
-                    var hasAlbum = false
-                    var hasFocusImage = false
-
-                    for (el in theme.menuElements) {
-                        if ("widget_clock" == el.type) hasClock = true
-                        if ("widget_analog_clock" == el.type) hasAnalog = true
-                        if ("widget_battery" == el.type) hasBattery = true
-                        if ("widget_circular_battery" == el.type) hasCircular = true
-                        if ("widget_album" == el.type) hasAlbum = true
-                        if ("widget_focus_image" == el.type) hasFocusImage = true
-                    }
-
-                    editor.putBoolean("widget_clock", hasClock)
-                    editor.putBoolean("widget_analog_clock", hasAnalog)
-                    editor.putBoolean("widget_battery", hasBattery)
-                    editor.putBoolean("widget_circular_battery", hasCircular)
-                    editor.putBoolean("widget_album", hasAlbum)
-                    editor.putBoolean("widget_focus_image", hasFocusImage)
-                    editor.commit()
-                } catch (_: Exception) {}
-
-                activity.recreate()
+                AutoThemeManager.turnOff(activity, prefs)
+                // Live: the theme list is made again in the new theme, with the focus on this row
+                mainActivity?.changeTheme(theme.name)
             }
             containerSettingsItems.addView(btn)
         }
@@ -1010,6 +1013,7 @@ class SettingsController(
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
+        themeListFirstRow = containerSettingsItems.getChildAt(0)
     }
 
     fun buildBackgroundSettingsUI() {
@@ -1048,14 +1052,15 @@ class SettingsController(
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
-        var is24HourFormat = prefs.getBoolean("is_24h_format", true)
+        var is24HourFormat = prefs.getBoolean(ClockSettings.KEY_24_HOUR_FORMAT, ClockSettings.DEFAULT_24_HOUR_FORMAT)
         val formatRightText = if (is24HourFormat) localize("24 Hour") else localize("12 Hour")
         val rowFormat = createSettingRow(localize("Time Format"), formatRightText)
         rowFormat.setOnClickListener {
             clickFeedback()
             is24HourFormat = !is24HourFormat
             mainActivity?.is24HourFormat = is24HourFormat
-            prefs.edit().putBoolean("is_24h_format", is24HourFormat).commit()
+            prefs.edit().putBoolean(ClockSettings.KEY_24_HOUR_FORMAT, is24HourFormat).commit()
+            mainActivity?.onClockSettingsChanged()
             buildDateTimeUI()
         }
         containerSettingsItems.addView(rowFormat)
@@ -1085,7 +1090,7 @@ class SettingsController(
      * Before the Settings groups, it was a row of Date & Time.
      */
     private fun addClockRow() {
-        var isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", true)
+        var isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
             onOff(isTimeInTitleBar, localize)
@@ -1094,7 +1099,8 @@ class SettingsController(
             clickFeedback()
             isTimeInTitleBar = !isTimeInTitleBar
             mainActivity?.isTimeInTitleBar = isTimeInTitleBar
-            prefs.edit().putBoolean("time_in_title_bar", isTimeInTitleBar).commit()
+            prefs.edit().putBoolean(ClockSettings.KEY_TIME_IN_TITLE, isTimeInTitleBar).commit()
+            mainActivity?.onClockSettingsChanged()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isTimeInTitleBar, localize)
         }
@@ -1103,6 +1109,13 @@ class SettingsController(
 
     /** The rows of Date & Time after Time Format. */
     private fun addDateTimeValueRows() {
+        val rowTimeZone = createSettingRow(localize("Time Zone"), timeZoneCityName(TimeZone.getDefault().id))
+        rowTimeZone.setOnClickListener {
+            clickFeedback()
+            buildTimeZoneSelectorUI()
+        }
+        containerSettingsItems.addView(rowTimeZone)
+
         val rowYear = createSettingRow(localize("Year"), dtYear.toString())
         rowYear.setOnClickListener {
             clickFeedback()
@@ -1138,56 +1151,155 @@ class SettingsController(
         }
         containerSettingsItems.addView(rowMinute)
 
-        createCategoryHeader("━━━━━━━━━━━━━━")
-
-        val btnApply = createListButton(localize("APPLY DATE & TIME"))
-        btnApply.setTextColor(0xFFFFFFFF.toInt())
-        btnApply.typeface = ThemeManager.getCustomFontBold()
-        btnApply.setOnClickListener {
-            clickFeedback()
-            applySystemDateTime()
-            buildSettingsUI()
-        }
-        containerSettingsItems.addView(btnApply)
+        // A new value applies at once (setClockField): no Apply button.
+        addSyncTimeRow()
 
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
     }
 
-    private fun applySystemDateTime() {
-        try {
-            val cmd = "settings put global auto_time 0; settings put system auto_time 0; "
-            val targetYMD = String.format(Locale.US, "%04d%02d%02d", dtYear, dtMonth, dtDay)
-            val dateToolbox = String.format(
-                Locale.US, "%04d%02d%02d.%02d%02d%02d",
-                dtYear, dtMonth, dtDay, dtHour, dtMinute, 0
-            )
-            val datePosix = String.format(
-                Locale.US, "%02d%02d%02d%02d%04d.00",
-                dtMonth, dtDay, dtHour, dtMinute, dtYear
-            )
-            val dateString = String.format(
-                Locale.US, "%04d-%02d-%02d %02d:%02d:%02d",
-                dtYear, dtMonth, dtDay, dtHour, dtMinute, 0
-            )
-            val executeCmd = cmd +
-                "date -s $dateToolbox; " +
-                "if [ \"$(date +%Y%m%d)\" != \"$targetYMD\" ]; then " +
-                "  date $datePosix; " +
-                "  if [ \"$(date +%Y%m%d)\" != \"$targetYMD\" ]; then " +
-                "    date -s \"$dateString\"; " +
-                "  fi; " +
-                "fi; " +
-                "hwclock -w; sync"
+    // Date & Time → Sync Time Now: the last result (shown as the row value for SYNC_RESULT_MS), and the row itself
+    private var syncResult: String? = null
+    private var syncResultAt = 0L
+    private var syncRunning = false
+    private var syncRow: View? = null
+    private val SYNC_RESULT_MS = 120000L
 
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", executeCmd))
+    /** Date & Time → Sync Time Now: sets the clock from the internet now (DateTimeSync). Only with Wi-Fi, else grey. */
+    private fun addSyncTimeRow() {
+        val online = DateTimeSync.isWifiConnected(activity)
+        val recent = syncResult?.takeIf { android.os.SystemClock.elapsedRealtime() - syncResultAt < SYNC_RESULT_MS }
+        val value = when {
+            !online -> localize("Requires Wi-Fi")
+            syncRunning -> localize("Syncing…")
+            else -> recent ?: ""
+        }
+        val row = createSettingRow(localize("Sync Time Now"), value)
+        if (!online) {
+            // Grey, and the wheel does not stop on it (onWheel skips rows that are not focusable)
+            row.isFocusable = false
+            for (i in 0 until row.childCount) row.getChildAt(i).alpha = 0.4f
+        }
+        row.setOnClickListener {
+            if (syncRunning) return@setOnClickListener
+            clickFeedback()
+            syncRunning = true
+            (row.getChildAt(1) as? TextView)?.text = localize("Syncing…")
+            Thread {
+                var error: String? = "No answer from the time server."
+                for (host in DateTimeSync.servers(activity)) {
+                    val time = DateTimeSync.query(host) ?: continue
+                    error = DateTimeSync.setSystemTime(time.now(), manual = false)
+                    break
+                }
+                activity.runOnUiThread { onSyncDone(error) }
+            }.start()
+        }
+        containerSettingsItems.addView(row)
+        syncRow = row
+    }
+
+    private fun onSyncDone(error: String?) {
+        syncRunning = false
+        val is24Hour = prefs.getBoolean("is_24h_format", true)
+        val time = java.text.SimpleDateFormat(if (is24Hour) "HH:mm:ss" else "h:mm:ss a", Locale.US).format(java.util.Date())
+        syncResult = if (error == null) localize("Set to") + " " + time else localize("Failed")
+        syncResultAt = android.os.SystemClock.elapsedRealtime()
+        val message = if (error == null) localize("Time set from the internet:") + " " + time else localize(error)
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        refreshDateTimeScreen()
+    }
+
+    /** A value from the Year...Minute list: the clock changes at once, the other values stay (DateTimeSync.withField). */
+    private fun setClockField(field: String, value: Int) {
+        val target = DateTimeSync.withField(System.currentTimeMillis(), TimeZone.getDefault(), field, value)
+        Thread {
+            val error = DateTimeSync.setSystemTime(target, manual = true)
+            activity.runOnUiThread {
+                if (error != null) Toast.makeText(activity, localize(error), Toast.LENGTH_SHORT).show()
+                refreshDateTimeScreen()
+            }
+        }.start()
+    }
+
+    /** Back from a value list: the focus on the row of that value (Year...Minute), not on the first row. */
+    private fun focusDateTimeRow(label: String) {
+        val title = localize(label)
+        for (i in 0 until containerSettingsItems.childCount) {
+            val row = containerSettingsItems.getChildAt(i) as? ViewGroup ?: continue
+            if ((row.getChildAt(0) as? TextView)?.text?.toString() == title) {
+                row.requestFocus()
+                return
+            }
+        }
+    }
+
+    /** Takes Year...Minute from the clock again, and shows them if the Date & Time list shows (the focus stays). */
+    private fun refreshDateTimeScreen() {
+        val c = Calendar.getInstance()
+        dtYear = c.get(Calendar.YEAR)
+        dtMonth = c.get(Calendar.MONTH) + 1
+        dtDay = c.get(Calendar.DAY_OF_MONTH)
+        dtHour = c.get(Calendar.HOUR_OF_DAY)
+        dtMinute = c.get(Calendar.MINUTE)
+        val row = syncRow ?: return
+        if (currentSettingsDepth != 1 || containerSettingsItems.indexOfChild(row) < 0) return
+        val focus = containerSettingsItems.findFocus()
+        val index = if (focus != null) containerSettingsItems.indexOfChild(focus) else -1
+        buildDateTimeUI()
+        if (index >= 0) containerSettingsItems.getChildAt(index)?.requestFocus()
+    }
+
+    private fun applySystemTimeZone(zoneId: String) {
+        try {
+            // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
+            // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
+            // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
+            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
             proc.waitFor()
-            activity.sendBroadcast(Intent(Intent.ACTION_TIME_CHANGED))
-            Toast.makeText(activity, localize("Time applied successfully!"), Toast.LENGTH_SHORT).show()
+            TimeZone.setDefault(null)
+            if (TimeZone.getDefault().id != zoneId) {
+                Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+            }
         } catch (_: Exception) {
             Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun buildTimeZoneSelectorUI() {
+        currentSettingsDepth = 2
+        containerSettingsItems.removeAllViews()
+
+        val currentId = TimeZone.getDefault().id
+        val now = System.currentTimeMillis()
+        val ids = if (currentId in TIME_ZONE_IDS) TIME_ZONE_IDS else arrayOf(currentId) + TIME_ZONE_IDS
+        var focusBtn: View? = null
+        for (id in ids.sortedBy { TimeZone.getTimeZone(it).getOffset(now) }) {
+            val isSelected = id == currentId
+            val btn = createTablerListButton(
+                if (isSelected) TablerIcons.CHECK else null,
+                timeZoneLabel(id, now),
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
+            )
+            btn.setOnClickListener {
+                clickFeedback()
+                applySystemTimeZone(id)
+                // The clock itself is unchanged, but its local time moved, so reload the picker values
+                val c = Calendar.getInstance()
+                dtYear = c.get(Calendar.YEAR)
+                dtMonth = c.get(Calendar.MONTH) + 1
+                dtDay = c.get(Calendar.DAY_OF_MONTH)
+                dtHour = c.get(Calendar.HOUR_OF_DAY)
+                dtMinute = c.get(Calendar.MINUTE)
+                buildDateTimeUI()
+            }
+            containerSettingsItems.addView(btn)
+            if (isSelected) focusBtn = btn
+        }
+
+        focusBtn?.requestFocus() ?: containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun buildDateTimeSelectorUI(type: String, min: Int, max: Int, currentValue: Int) {
@@ -1214,7 +1326,9 @@ class SettingsController(
                     "Hour" -> dtHour = valNum
                     "Minute" -> dtMinute = valNum
                 }
+                setClockField(type, valNum)
                 buildDateTimeUI()
+                focusDateTimeRow(if (type == "Hour") "Hour (24H)" else type)
             }
             containerSettingsItems.addView(btn)
             if (valNum == currentValue) focusBtn = btn
@@ -1532,10 +1646,11 @@ class SettingsController(
     }
 
     private fun resetAllAppSettings() {
+        AutoThemeManager.reset(activity, prefs)
         try {
             prefs.edit()
-                .remove("is_24h_format")
-                .remove("time_in_title_bar")
+                .remove(ClockSettings.KEY_24_HOUR_FORMAT)
+                .remove(ClockSettings.KEY_TIME_IN_TITLE)
                 .remove("show_battery_percentage")
                 .remove(StatusBarSettings.KEY_SHOW_BATTERY)
                 .remove("volume_limit_max")
@@ -1564,8 +1679,9 @@ class SettingsController(
 
         mainActivity?.isScreenOffControlEnabled = false
         mainActivity?.isShowBatteryPercentage = false
-        mainActivity?.isTimeInTitleBar = false
-        mainActivity?.is24HourFormat = false
+        mainActivity?.isTimeInTitleBar = ClockSettings.DEFAULT_TIME_IN_TITLE
+        mainActivity?.is24HourFormat = ClockSettings.DEFAULT_24_HOUR_FORMAT
+        mainActivity?.onClockSettingsChanged()
         mainActivity?.batteryIconView?.setShowPercentage(false)
         mainActivity?.let { StatusBarSettings.applyBattery(it) }
 

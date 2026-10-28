@@ -27,6 +27,10 @@ interface ScreenController {
 
     /** Back came back to this screen (after [onEnter]): select [row], the row that opened the deeper screen. */
     fun selectRow(row: RowKey) = ListRows.select(rootView, row)
+    /** The theme changed while this screen shows: make it again in the new theme, with the same focus. */
+    fun onThemeChanged() {
+        onRefreshUI()
+    }
 
     fun dispatchKeyEvent(event: KeyEvent): Boolean = false
     fun onWheel(delta: Int, event: KeyEvent): Boolean = false
