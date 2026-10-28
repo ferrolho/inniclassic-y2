@@ -1,7 +1,6 @@
 package com.themoon.y1.controllers.radio
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.drawable.GradientDrawable
@@ -16,6 +15,8 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.controllers.settings.confirmScreen
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
@@ -68,11 +69,21 @@ class FmRadioController(
         loadSavedRadioStations()
     }
 
+    /** Back from an action screen that the saved-channel list opened: show that list again. */
+    private var returnToSavedChannels = false
+
     override fun onEnter(state: ScreenState) {
         isRadioUIShowing = true
+        if (returnToSavedChannels) {
+            returnToSavedChannels = false
+            isRadioSettingsMode = true
+            buildRadioSavedChannelsUI()
+            return
+        }
         buildRadioUI()
         if (savedRadioStations.isEmpty() && !hasPromptedRadioScan) {
-            promptInitialRadioScan()
+            // After this screen change: the prompt is a screen of its own
+            containerSettingsItems.post { promptInitialRadioScan() }
         }
     }
 
@@ -230,14 +241,12 @@ class FmRadioController(
         if (savedRadioStations.isNotEmpty() || hasPromptedRadioScan) return
         hasPromptedRadioScan = true
 
-        AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle(localize("FM Radio"))
-            .setMessage(localize("No saved stations found.\nWould you like to scan for FM channels now?"))
-            .setPositiveButton(localize("Scan")) { _, _ ->
-                startRadioAutoScan()
-            }
-            .setNegativeButton(localize("Cancel"), null)
-            .show()
+        if (!isRadioUIShowing) return
+        ActionScreens.open(confirmScreen(
+            localize("FM Radio"),
+            localize("No saved stations found.\nWould you like to scan for FM channels now?"),
+            localize("Scan")
+        ) { startRadioAutoScan() })
     }
 
     fun startRadioAutoScan() {
@@ -660,17 +669,16 @@ class FmRadioController(
 
                 btnFreq.setOnLongClickListener {
                     clickFeedback()
-                    AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                        .setTitle(localize("Delete Channel"))
-                        .setMessage(String.format(Locale.US, localize("Remove %.1f MHz from saved channels?"), freq))
-                        .setPositiveButton(localize("Delete")) { _, _ ->
-                            clickFeedback()
-                            savedRadioStations.remove(freq)
-                            saveRadioStationsToPrefs()
-                            buildRadioSavedChannelsUI()
-                        }
-                        .setNegativeButton(localize("Cancel"), null)
-                        .show()
+                    returnToSavedChannels = true
+                    ActionScreens.open(confirmScreen(
+                        localize("Delete Channel"),
+                        String.format(Locale.US, localize("Remove %.1f MHz from saved channels?"), freq),
+                        localize("Delete")
+                    ) {
+                        savedRadioStations.remove(freq)
+                        saveRadioStationsToPrefs()
+                        buildRadioSavedChannelsUI()
+                    })
                     true
                 }
 
