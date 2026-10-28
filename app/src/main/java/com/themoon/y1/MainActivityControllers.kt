@@ -41,6 +41,7 @@ import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.navigation.SettingsSubMode
 import com.themoon.y1.navigation.VideoMode
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
@@ -530,10 +531,7 @@ internal fun MainActivity.initControllers() {
         },
         clickFeedback = { clickFeedback() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
-        onNavigateToScreen = { screenId ->
-            backTargetForUtility = MainActivity.STATE_SETTINGS
-            changeScreen(screenId)
-        },
+        onNavigateToScreen = { screenId -> changeScreen(screenId) },
         onOpenEqualizer = { changeScreen(ScreenState.Equalizer) },
         onOpenJellyfin = { changeScreen(ScreenState.Jellyfin) },
         onOpenUpdateCheck = { otaUpdateManager?.checkForUpdates() },
@@ -641,7 +639,6 @@ internal fun MainActivity.shuffleAllSongs() {
 }
 
 internal fun MainActivity.handleMainMenuAction(action: String) {
-    backTargetForUtility = MainActivity.STATE_MENU
     when (action) {
         "OPEN_BROWSER", "MUSIC" -> {
             this.isAudiobookLibraryMode = false
@@ -662,9 +659,6 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_SETTINGS", "SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)
-            // Opened going down: the first row (Back from a row's screen selects that row, NavigationManager)
-            settingsController.lastSettingsFocusIndex = 0
-            settingsController.buildSettingsUI()
         }
         "OPEN_RADIO", "RADIO" -> {
             changeScreen(ScreenState.FmRadio)
@@ -683,8 +677,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
             changeScreen(ScreenState.Browser(BrowserMode.Audiobooks, audiobooks = true))
         }
         "OPEN_THEME_SETTINGS" -> {
-            changeScreen(MainActivity.STATE_SETTINGS)
-            settingsController.buildThemeSelectorUI()
+            changeScreen(ScreenState.Settings(SettingsSubMode.Page("Theme")))
         }
         "OPEN_PLAYER" -> {
             if (currentPlaylist.isEmpty()) {
