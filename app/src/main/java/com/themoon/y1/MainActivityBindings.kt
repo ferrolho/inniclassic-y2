@@ -50,7 +50,6 @@ internal fun MainActivity.initViewBindings() {
         clickFeedback()
     }
 
-    ivMainBg = findViewById(R.id.iv_main_bg)
     ivAlbumArt = findViewById(R.id.iv_album_art)
     ivAlbumReflection = findViewById(R.id.iv_album_reflection)
     ivPlayerBgBlur = findViewById(R.id.iv_player_bg_blur)
