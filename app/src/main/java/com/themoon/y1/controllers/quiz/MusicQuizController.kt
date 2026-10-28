@@ -22,6 +22,8 @@ import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.controllers.settings.confirmScreen
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
@@ -78,9 +80,14 @@ class MusicQuizController(
     private var totalQuestionTimeMs = 15000L
     private var currentTimerMillisRemaining = 0L
 
+    /** Back from the Clear Scores screen: the leaderboard again (its fromGameOver), else null. */
+    private var returnToLeaderboard: Boolean? = null
+
     override fun onEnter(state: ScreenState) {
         layoutQuiz.visibility = View.VISIBLE
-        showStartHub()
+        val leaderboard = returnToLeaderboard
+        returnToLeaderboard = null
+        if (leaderboard != null) showLeaderboardView(leaderboard) else showStartHub()
     }
 
     override fun onExit() {
@@ -507,9 +514,12 @@ class MusicQuizController(
             val btnClear = createAnswerPill(localize("Clear Scores"))
             btnClear.setOnClickListener {
                 clickFeedback()
-                leaderboardManager.clearLeaderboard()
-                Toast.makeText(activity, localize("Scores Cleared"), Toast.LENGTH_SHORT).show()
-                showLeaderboardView(fromGameOver)
+                returnToLeaderboard = fromGameOver
+                ActionScreens.open(confirmScreen(localize("Leaderboard"), "", localize("Clear Scores")) {
+                    leaderboardManager.clearLeaderboard()
+                    Toast.makeText(activity, localize("Scores Cleared"), Toast.LENGTH_SHORT).show()
+                    showLeaderboardView(fromGameOver)
+                })
             }
             scrollContent.addView(btnClear)
         }
