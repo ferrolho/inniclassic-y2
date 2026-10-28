@@ -635,10 +635,6 @@ class PlayerController(
                 }
                 return true
             }
-            KeyEvent.KEYCODE_BACK, 4 -> {
-                onBackPressed()
-                return true
-            }
         }
         return false
     }
