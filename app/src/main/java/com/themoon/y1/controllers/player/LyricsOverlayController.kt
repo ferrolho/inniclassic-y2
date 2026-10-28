@@ -258,7 +258,7 @@ class LyricsOverlayController(
                             if (msStr.length == 2) ms *= 10
                             val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
                             val text = m.group(4)?.trim() ?: ""
-                            if (text.isNotEmpty()) {
+                            if (LyricsText.isVisible(text)) {
                                 currentLyrics[totalMs] = text
                             }
                         }
@@ -286,6 +286,9 @@ class LyricsOverlayController(
             plainLyrics = extractEmbeddedLyrics(audioFile)
         }
 
+        // A tag with no visible text (an empty ID3 USLT frame has only a NUL) is no lyrics: no blank lyrics view
+        plainLyrics = LyricsText.plain(plainLyrics)
+
         // 4. Test if plain lyrics string contains embedded LRC timestamps
         val candidate = plainLyrics
         if (!candidate.isNullOrEmpty()) {
@@ -304,7 +307,7 @@ class LyricsOverlayController(
                     if (msStr.length == 2) ms *= 10
                     val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
                     val text = m.group(4)?.trim() ?: ""
-                    if (text.isNotEmpty()) {
+                    if (LyricsText.isVisible(text)) {
                         currentLyrics[totalMs] = text
                     }
                 }
