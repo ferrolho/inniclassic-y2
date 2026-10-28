@@ -52,7 +52,6 @@ internal fun MainActivity.initViewBindings() {
 
     ivAlbumArt = findViewById(R.id.iv_album_art)
     ivAlbumReflection = findViewById(R.id.iv_album_reflection)
-    ivPlayerBgBlur = findViewById(R.id.iv_player_bg_blur)
     ivPauseOverlay = findViewById(R.id.iv_pause_overlay)
     tvPlayerTitle = findViewById(R.id.tv_player_title)
     tvPlayerArtist = findViewById(R.id.tv_player_artist)

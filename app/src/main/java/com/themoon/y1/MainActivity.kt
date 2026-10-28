@@ -89,7 +89,6 @@ import com.themoon.y1.navigation.InputRouter
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
-import com.themoon.y1.views.ImageEffects
 import com.themoon.y1.views.ListItemViewFactory
 import java.io.File
 import java.util.ArrayList
@@ -255,7 +254,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     lateinit var ivAlbumArt: ImageView
     var ivAlbumReflection: ImageView? = null
-    lateinit var ivPlayerBgBlur: ImageView
     lateinit var ivPauseOverlay: ImageView
     lateinit var tvPlayerTitle: TextView
     lateinit var tvPlayerArtist: TextView
@@ -746,7 +744,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     fun findFolderCover(folder: File?): File? = MediaLibraryManager.getInstance().findFolderCover(folder)
 
-    fun applyGaussianBlur(original: Bitmap?): Bitmap? = ImageEffects.applyGaussianBlur(this, original)
 
     fun applyTheme() = applyThemeInternal()
     fun applyCachedCoverArt(imagePath: String) = applyCachedCoverArtInternal(imagePath)
