@@ -507,7 +507,6 @@ class AudioPlayerManager private constructor() {
                                 val blurredBg = main.applyGaussianBlur(bmp)
                                 main.ivPlayerBgBlur.setImageBitmap(blurredBg)
                                 main.currentAlbumColor = (bmp.getPixel(bmp.width / 2, (bmp.height * 0.8).toInt()) or 0xFF000000.toInt())
-                                main.updateMainMenuBackground()
                             }
                         }
                     } catch (ignored: Exception) {}
@@ -881,7 +880,6 @@ class AudioPlayerManager private constructor() {
                     val bmpCenter = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsCenter)
                     if (bmpCenter != null) {
                         main.ivAlbumArt.setImageBitmap(bmpCenter)
-                        main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
 
                         val optsBg = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
@@ -930,7 +928,6 @@ class AudioPlayerManager private constructor() {
                                 main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
                             }
 
-                            main.updateMainMenuBackground()
                             main.refreshNowPlayingPreview()
                             artApplied = true
                         }
@@ -950,7 +947,6 @@ class AudioPlayerManager private constructor() {
                         main.ivAlbumArt.setImageResource(R.drawable.default_album)
                         main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
                         main.ivPlayerBgBlur.setImageResource(0)
-                        main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
                     }
                 }
@@ -1832,7 +1828,6 @@ class AudioPlayerManager private constructor() {
             prepareMusicTrack(main.currentIndex, initialSeekMs = savedPos, initialDurationMs = savedDur)
             main.updatePlayerUI()
             main.refreshNowPlayingPreview()
-            main.updateMainMenuBackground()
             return true
         } finally {
             isRestoringPlaybackState = false

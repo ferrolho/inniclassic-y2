@@ -39,7 +39,6 @@ import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.LetterJump
-import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.ClassicMenuStyle
@@ -52,7 +51,7 @@ import java.util.HashSet
 /**
  * Controller for library browser navigation:
  * - Root music / audiobook library menus
- * - Folder browsing with recursive audio playback and background picking
+ * - Folder browsing with recursive audio playback
  * - Category lists (Artists, Track Artists, Albums, Genres, Composers, Years)
  * - Virtual song lists (All, Recent, Favorites, Album tracks, Search results)
  * - Breadcrumb navigation and Alphabet index bar integration
@@ -97,7 +96,6 @@ class BrowserController(
 
     var currentBrowserMode: BrowserMode = BrowserMode.Root
     var isAudiobookLibraryMode: Boolean = false
-    var isPickingBackground: Boolean = false
 
     var currentFolder: File = StoragePaths.getPrimaryRoot()
     var virtualQueryType: String = "ALL"
@@ -134,7 +132,6 @@ class BrowserController(
         if (state is ScreenState.Browser) {
             currentBrowserMode = state.mode
             isAudiobookLibraryMode = state.audiobooks || state.mode is BrowserMode.Audiobooks
-            isPickingBackground = (state.mode as? BrowserMode.Folder)?.pickImage == true
             when (val mode = state.mode) {
                 is BrowserMode.Root -> buildFileBrowserUI()
                 is BrowserMode.Folder -> {
@@ -271,7 +268,7 @@ class BrowserController(
         listVirtualSongs?.visibility = View.GONE
         containerBrowserItems.removeAllViews()
 
-        if (isPickingBackground || currentBrowserMode is BrowserMode.Folder) {
+        if (currentBrowserMode is BrowserMode.Folder) {
             buildFolderBrowserUI()
             return
         }
@@ -836,14 +833,12 @@ class BrowserController(
         val folders = ArrayList<File>()
         val audioFiles = ArrayList<File>()
         val apkFiles = ArrayList<File>()
-        val imageFiles = ArrayList<File>()
 
         for (f in files) {
             when {
                 f.isDirectory -> folders.add(f)
-                isPickingBackground && isImageFile(f) -> imageFiles.add(f)
-                !isPickingBackground && isAudioFile(f) -> audioFiles.add(f)
-                !isPickingBackground && isApkFile(f) -> apkFiles.add(f)
+                isAudioFile(f) -> audioFiles.add(f)
+                isApkFile(f) -> apkFiles.add(f)
             }
         }
 
@@ -851,9 +846,8 @@ class BrowserController(
         Collections.sort(folders, fileSorter)
         Collections.sort(audioFiles, fileSorter)
         Collections.sort(apkFiles, fileSorter)
-        Collections.sort(imageFiles, fileSorter)
 
-        if (!isPickingBackground && (audioFiles.isNotEmpty() || folders.isNotEmpty())) {
+        if (audioFiles.isNotEmpty() || folders.isNotEmpty()) {
             val btnPlayAll = Button(activity).apply {
                 text = "▶ ${localize("Play All")}"
                 setTextColor(0xFFFFFFFF.toInt())
@@ -885,44 +879,24 @@ class BrowserController(
             val b = createListButtonWithIcon("\uE2C7", folder.name, null)
             b.setOnClickListener {
                 clickFeedback()
-                openList(BrowserMode.Folder(folder, isPickingBackground))
+                openList(BrowserMode.Folder(folder))
             }
             containerBrowserItems.addView(b)
         }
 
-        if (isPickingBackground) {
-            for (img in imageFiles) {
-                val b = createListButtonWithIcon("\uE410", img.name, null)
-                b.setOnClickListener {
+        for (apk in apkFiles) {
+            val b = Button(activity).apply {
+                text = "📦 [${localize("INSTALL")}] ${apk.name}"
+                setTextColor(0xFF00FFFF.toInt())
+                background = createButtonBackground(ThemeManager.getListButtonNormalBg())
+                setOnClickListener {
                     clickFeedback()
-                    try {
-                        AppPrefs.get(activity).edit().putString("bg_path", img.absolutePath).commit()
-                        MainActivity.instance?.updateMainMenuBackground()
-                    } catch (e: Exception) {
-                    }
-                    Toast.makeText(activity, localize("Background Applied!"), Toast.LENGTH_SHORT).show()
-                    isPickingBackground = false
-                    // Back to the Settings screen that opened the picker, over all its folder levels
-                    NavigationManager.getInstance().popBackStackTo { it !is ScreenState.Browser }
+                    installApk(apk)
                 }
-                containerBrowserItems.addView(b)
             }
-            finishFolderBrowserUIRender()
-        } else {
-            for (apk in apkFiles) {
-                val b = Button(activity).apply {
-                    text = "📦 [${localize("INSTALL")}] ${apk.name}"
-                    setTextColor(0xFF00FFFF.toInt())
-                    background = createButtonBackground(ThemeManager.getListButtonNormalBg())
-                    setOnClickListener {
-                        clickFeedback()
-                        installApk(apk)
-                    }
-                }
-                containerBrowserItems.addView(b)
-            }
-            renderAudioFileRowsIncrementally(audioFiles, 0)
+            containerBrowserItems.addView(b)
         }
+        renderAudioFileRowsIncrementally(audioFiles, 0)
     }
 
     private fun renderAudioFileRowsIncrementally(audioFiles: List<File>, startIndex: Int) {
@@ -1206,11 +1180,6 @@ class BrowserController(
     }
 
     private fun isApkFile(f: File?): Boolean = f != null && f.isFile && f.name.lowercase().endsWith(".apk")
-    private fun isImageFile(f: File?): Boolean {
-        if (f == null || !f.isFile) return false
-        val name = f.name.lowercase()
-        return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")
-    }
 
     private fun createButtonBackground(color: Int): GradientDrawable {
         return GradientDrawable().apply {
