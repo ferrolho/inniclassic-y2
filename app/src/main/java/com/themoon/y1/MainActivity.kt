@@ -267,7 +267,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var ivMainBg: ImageView? = null
     lateinit var ivAlbumArt: ImageView
     var ivAlbumReflection: ImageView? = null
-    lateinit var ivPlayerBgBlur: ImageView
     lateinit var ivPauseOverlay: ImageView
     lateinit var tvPlayerTitle: TextView
     lateinit var tvPlayerArtist: TextView
@@ -1342,8 +1341,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
             if (!isScreenOn) {
                 val isScreenOffCtrl = instance?.isScreenOffControlEnabled
-                    ?: context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
-                        .getBoolean("screen_off_control", false)
+                    ?: AppPrefs.get(context).getBoolean("screen_off_control", false)
                 if (!isScreenOffCtrl) {
                     return
                 }
