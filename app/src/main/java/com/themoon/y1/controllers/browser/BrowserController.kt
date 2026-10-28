@@ -193,6 +193,19 @@ class BrowserController(
         }
     }
 
+    /**
+     * The Music lists change in this screen without a new [ScreenState]: Back from Now Playing must come back
+     * to the list that shows now (an album, a genre...), not to the Music menu. The audiobook lists stay as before.
+     */
+    override fun backState(state: ScreenState): ScreenState {
+        if (state !is ScreenState.Browser || isAudiobookLibraryMode) return state
+        return when (val mode = currentBrowserMode) {
+            is BrowserMode.Folder -> ScreenState.Browser(BrowserMode.Folder(currentFolder))
+            is BrowserMode.Audiobooks, is BrowserMode.CoverFlow -> state
+            else -> ScreenState.Browser(mode)
+        }
+    }
+
     override fun onExit() {
         hideBrowserCoverPane()
         hzIndexScroll?.visibility = View.GONE
