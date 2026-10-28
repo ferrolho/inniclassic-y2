@@ -24,6 +24,7 @@ import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.player.NowPlayingTime
 import com.themoon.y1.core.extensions.onOff
+import com.themoon.y1.controllers.player.LyricsScript
 import com.themoon.y1.R
 import com.themoon.y1.changeTheme
 import com.themoon.y1.StoragePaths
@@ -514,6 +515,16 @@ class SettingsController(
             (btnMenuCoverMotion.getChildAt(1) as? TextView)?.text = com.themoon.y1.core.extensions.onOff(on, localize)
         }
         containerSettingsItems.addView(btnMenuCoverMotion)
+
+        // Lyrics: Original (native script), Romanised (pinyin, romaji) or Original + Romanised (both lines), for songs with a .romanised.lrc file
+        val btnLyricsScript = createSettingRow(localize("Lyrics"), localize(LyricsScript.label(prefs.getInt(LyricsScript.PREF, LyricsScript.ORIGINAL))))
+        btnLyricsScript.setOnClickListener {
+            clickFeedback()
+            val next = (LyricsScript.normalize(prefs.getInt(LyricsScript.PREF, LyricsScript.ORIGINAL)) + 1) % 3
+            prefs.edit().putInt(LyricsScript.PREF, next).commit()
+            (btnLyricsScript.getChildAt(1) as? TextView)?.text = localize(LyricsScript.label(next))
+        }
+        containerSettingsItems.addView(btnLyricsScript)
 
         val speedLabels = arrayOf("1.0x (Normal)", "1.2x (Fast)", "1.5x (Faster)", "2.0x (Very Fast)")
         val speedValues = floatArrayOf(1.0f, 1.2f, 1.5f, 2.0f)
@@ -1751,6 +1762,7 @@ class SettingsController(
                 .remove("album_tilt_enabled")
                 .remove("show_total_time")
                 .remove(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF)
+                .remove("lyrics_script")
                 .remove("backlight_timer_index")
                 .remove(com.themoon.y1.managers.ClickVolume.PREF)
                 .remove("screen_off_control")
