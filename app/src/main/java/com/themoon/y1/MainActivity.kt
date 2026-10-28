@@ -1342,8 +1342,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
             if (!isScreenOn) {
                 val isScreenOffCtrl = instance?.isScreenOffControlEnabled
-                    ?: context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
-                        .getBoolean("screen_off_control", false)
+                    ?: AppPrefs.get(context).getBoolean("screen_off_control", false)
                 if (!isScreenOffCtrl) {
                     return
                 }
