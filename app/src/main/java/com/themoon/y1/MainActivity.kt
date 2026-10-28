@@ -253,7 +253,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var ivMainBg: ImageView? = null
     lateinit var ivAlbumArt: ImageView
     var ivAlbumReflection: ImageView? = null
-    lateinit var ivPlayerBgBlur: ImageView
     lateinit var ivPauseOverlay: ImageView
     lateinit var tvPlayerTitle: TextView
     lateinit var tvPlayerArtist: TextView
