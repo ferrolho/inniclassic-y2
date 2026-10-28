@@ -23,6 +23,7 @@ import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.AppPrefs
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
@@ -411,9 +412,7 @@ class BrowserController(
                 clickFeedback()
                 val main = MainActivity.instance ?: return@setOnClickListener
                 main.isAudiobookLibraryMode = true
-                val bookPrefs = activity.getSharedPreferences("Y1_AUDIOBOOK_BOOKMARKS", Context.MODE_PRIVATE)
                 val savedPath = main.prefs.getString("last_played_audiobook_path", null)
-                    ?: bookPrefs.getString("LAST_AUDIOBOOK_PATH", null)
                     ?: if (main.prefs.getBoolean("last_played_is_audiobook", false)) {
                         main.prefs.getString("last_played_song_path", null)
                     } else null
@@ -463,7 +462,6 @@ class BrowserController(
                     var targetIdx = bookChapters.indexOfFirst { it.absolutePath == targetFile.absolutePath }
                     if (targetIdx == -1) targetIdx = 0
                     val savedPos = main.prefs.getInt("book_pos_" + targetFile.absolutePath, 0)
-                        .takeIf { it > 0 } ?: AudiobookManager.getInstance(main).getSavedPosition(targetFile.absolutePath)
                     AudioPlayerManager.getInstance().playTrackListWithOffset(bookChapters, targetIdx, savedPos)
                     onNavigateToScreen(ScreenState.Player)
                 } else {
@@ -887,10 +885,8 @@ class BrowserController(
                 b.setOnClickListener {
                     clickFeedback()
                     try {
-                        activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
-                            .edit()
-                            .putString("bg_path", img.absolutePath)
-                            .commit()
+                        AppPrefs.get(activity).edit().putString("bg_path", img.absolutePath).commit()
+                        MainActivity.instance?.updateMainMenuBackground()
                     } catch (e: Exception) {
                     }
                     Toast.makeText(activity, localize("Background Applied!"), Toast.LENGTH_SHORT).show()
@@ -937,7 +933,7 @@ class BrowserController(
         val b = createListButtonWithIcon(iconCode, audio.name, null)
 
         if (isAudiobookLibraryMode || currentBrowserMode is BrowserMode.Audiobooks) {
-            val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+            val prefs = AppPrefs.get(activity)
             val pos = prefs.getInt("book_pos_" + audio.absolutePath, 0)
             val dur = prefs.getInt("book_dur_" + audio.absolutePath, 0)
             if (pos > 0 && dur > 0) {
