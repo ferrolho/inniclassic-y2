@@ -96,7 +96,6 @@ internal fun MainActivity.initControllers() {
         onButtonFocusChanged = { el ->
             homeWidgetsController?.updateFocusPreview(el)
         },
-        startCoverPanAnimation = { _, _, _ -> },
         onLongPressScreenOff = View.OnLongClickListener {
             turnOffScreen()
             true
