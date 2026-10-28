@@ -76,6 +76,7 @@ class MenuSlide private constructor(
     private var maxGapNanos = 0L
     private var lateFrames = 0
 
+    private val waitStep1 = Runnable { root.post(waitStep2) }
     private val waitStep2 = Runnable { root.post(waitStep3) }
     private val waitStep3 = Runnable {
         if (phase != Phase.WAIT) return@Runnable
@@ -127,7 +128,7 @@ class MenuSlide private constructor(
         phase = Phase.WAIT
         // Runs after the layout of the new screen (posted messages wait for the traversal), then twice more:
         // ListRows.select selects the row in its layout listener and in two posted steps.
-        root.post { root.post(waitStep2) }
+        root.post(waitStep1)
     }
 
     override fun onPreDraw(): Boolean {
@@ -225,6 +226,7 @@ class MenuSlide private constructor(
         val wasRunning = phase == Phase.RUN
         Choreographer.getInstance().removeFrameCallback(this)
         removeCallbacks(holdTimeout)
+        root.removeCallbacks(waitStep1)
         root.removeCallbacks(waitStep2)
         root.removeCallbacks(waitStep3)
         val observer = root.viewTreeObserver
