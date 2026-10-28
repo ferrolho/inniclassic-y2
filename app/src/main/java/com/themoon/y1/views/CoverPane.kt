@@ -128,6 +128,14 @@ object CoverPane {
         canvas.drawRect(0f, 0f, w, height.toFloat(), paint)
     }
 
+    /** The art pane that shows now (not a slide layer), or null when no split screen shows. */
+    fun shownPane(): CoverArtView? {
+        for (v in views.keys) {
+            if (!v.slideLayer && v.isShown && v.width > 0 && v.height > 0) return v
+        }
+        return null
+    }
+
     internal fun register(view: CoverArtView) {
         init(view.context)
         views[view] = true
