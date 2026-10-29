@@ -131,11 +131,10 @@ object TestHookLogic {
     }
 
     private val SETTING_KEYS = listOf(
-        "sound", "sound_effect", "vibrate", "vibration", "vibrate_strength", "vibration_level",
-        "double_click_favorite", "time_in_title_bar", "is_24h_format", "is_24_hour_format",
-        "screen_off_control", "loop_scroll_on", "app_theme_name", "current_theme_name",
-        "album_tilt_effect", "shuffle", "repeat_mode", "backlight_timer_index", "volume_limit_max",
-        "app_language", "language", "auto_theme_enabled"
+        "sound", "vibrate", "vibrate_strength", "double_click_favorite", "time_in_title_bar", "is_24h_format",
+        "screen_off_control", "loop_scroll_on", "list_edges_fade", "app_theme_name", "current_theme_name",
+        "album_tilt_enabled", "shuffle", "repeat_mode", "backlight_timer_index", "volume_limit_max",
+        "app_language", "auto_theme_enabled"
     )
 
     private val SECRET_PARTS = listOf("password", "token", "secret", "apikey", "api_key", "session")
