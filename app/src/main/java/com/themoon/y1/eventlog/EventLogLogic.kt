@@ -261,6 +261,117 @@ object EventLogLogic {
         }
     }
 
+    // --- noise and repeats ---
+
+    private val DALVIK_NOISE = Regex("^(VFY: |Unable to resolve |Could not find class |Link of class |Refusing to reopen boot DEX)")
+
+    /**
+     * Warnings of the app that do not help to find a fault: the class checks of Android 4.4 for newer APIs
+     * (about 30 at each start), layout warnings of the framework, MP3 files with no embedded picture or a wrong
+     * XING size. The log keeps only their count (see [Repeats]). Returns the name of the count, or null.
+     */
+    fun noiseKey(tag: String, message: String): String? = when {
+        tag == "dalvikvm" && DALVIK_NOISE.containsMatchIn(message) -> "dalvikvm: class check"
+        tag == "View" && message.startsWith("requestLayout() improperly called") -> "View: requestLayout during layout"
+        tag == "MediaMetadataRetrieverJNI" && message.contains("getEmbeddedPicture failed") -> "no embedded picture"
+        tag == "FfmpegLibrary" && message.contains("decoder available") -> "FfmpegLibrary: no decoder"
+        tag == "XingSeeker" -> "XingSeeker: data size mismatch"
+        tag == "MemoryDealer" && message.contains("MADV_REMOVE") -> "MemoryDealer: madvise"
+        else -> null
+    }
+
+    private val NUMBERS = Regex("0x[0-9a-fA-F]+|\\d+")
+
+    /** The same warning with other numbers (ids, sizes, times) gives the same key. */
+    fun repeatKey(tag: String, message: String): String =
+        tag + ": " + cut(NUMBERS.replace(message.substringBefore('\n'), "#"), 100)
+
+    /**
+     * Counts repeated warnings in windows of [windowMs]: in a window, the first line of each key is logged and the
+     * next ones are only counted. [drain] gives the counts of a window that ended (then a new window starts).
+     * Not thread-safe: one thread uses it.
+     */
+    class Repeats(private val windowMs: Long) {
+        private val seen = HashSet<String>()
+        private val counts = LinkedHashMap<String, Int>()
+        private var start = -1L
+
+        /** True when the line with [key] must be logged: the first of its key in this window. */
+        fun first(key: String, now: Long): Boolean {
+            if (start < 0) start = now
+            if (seen.add(key)) return true
+            count(key, now)
+            return false
+        }
+
+        /** Counts a line that is not logged. */
+        fun count(key: String, now: Long) {
+            if (start < 0) start = now
+            counts[key] = (counts[key] ?: 0) + 1
+        }
+
+        /** The counts of the window when it ended at [now] (or at once with [force]); null when nothing was counted. */
+        fun drain(now: Long, force: Boolean = false): Map<String, Int>? {
+            if (start < 0 || (!force && now - start < windowMs)) return null
+            val out = if (counts.isEmpty()) null else LinkedHashMap(counts)
+            seen.clear()
+            counts.clear()
+            start = -1L
+            return out
+        }
+    }
+
+    // --- garbage collection (Dalvik) ---
+
+    data class Gc(val kind: String, val pausedMs: Int, val usedKb: Int, val heapKb: Int)
+
+    private val GC_LINE = Regex("^(GC_[A-Z_]+) .*?(\\d+)K/(\\d+)K, paused ([\\d+ms]+)")
+
+    /**
+     * A Dalvik GC line, for example "GC_FOR_ALLOC freed 3697K (50950), 38% free 16790K/26900K, paused 72ms,
+     * total 72ms". A concurrent GC has two pauses ("paused 2ms+3ms"): their sum. Null for other lines.
+     */
+    fun parseGc(message: String): Gc? {
+        val m = GC_LINE.find(message) ?: return null
+        val paused = m.groupValues[4].split('+').sumOf { it.removeSuffix("ms").toIntOrNull() ?: 0 }
+        return Gc(m.groupValues[1], paused, m.groupValues[2].toInt(), m.groupValues[3].toInt())
+    }
+
+    /** GC pauses in windows of [windowMs]. [drain] gives a summary when the pauses of the ended window were [minPausedMs] or more. */
+    class GcWindow(private val windowMs: Long, private val minPausedMs: Int) {
+        private var start = -1L
+        private var n = 0
+        private var forAlloc = 0
+        private var paused = 0
+        private var max = 0
+        private var last: Gc? = null
+
+        fun add(gc: Gc, now: Long) {
+            if (start < 0) start = now
+            n++
+            if (gc.kind == "GC_FOR_ALLOC") forAlloc++
+            paused += gc.pausedMs
+            if (gc.pausedMs > max) max = gc.pausedMs
+            last = gc
+        }
+
+        /** {"n", "forAlloc", "pausedMs", "maxMs", "usedKb", "heapKb"} of the ended window, or null. */
+        fun drain(now: Long): JSONObject? {
+            if (start < 0 || now - start < windowMs) return null
+            val g = last
+            val out = if (paused >= minPausedMs && g != null) JSONObject()
+                .put("n", n).put("forAlloc", forAlloc).put("pausedMs", paused).put("maxMs", max)
+                .put("usedKb", g.usedKb).put("heapKb", g.heapKb) else null
+            start = -1L
+            n = 0
+            forAlloc = 0
+            paused = 0
+            max = 0
+            last = null
+            return out
+        }
+    }
+
     // --- reading ---
 
     private val UP_FIELD = Regex("\"up\":(\\d+)")

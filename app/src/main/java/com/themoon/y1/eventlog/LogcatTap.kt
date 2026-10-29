@@ -19,6 +19,10 @@ import java.io.InputStreamReader
  * The pids of the Bluetooth processes come from /proc: at the start, after each Bluetooth state change
  * ([refreshBluetoothPids]), and once for each new pid that writes a line.
  * Lines of one Log call (a stack trace) become one event. Own lines and Bluetooth lines have separate rate limits.
+ * Own warnings that do not help ([EventLogLogic.noiseKey]) and repeats of the same warning in 10 minutes are
+ * only counted: one `repeats` line gives the counts. The Dalvik GC lines of the app (debug level) are not logged:
+ * one `gc` line each minute gives the sum of the pauses, when they stopped the app for [GC_MIN_PAUSED_MS] or more
+ * (each GC_FOR_ALLOC stops all threads, also the UI thread).
  * If the app process dies, the child stays until its next write fails; at the next start, the tap stops the
  * child of the previous process (its pid is in `logcat.pid`).
  */
@@ -42,6 +46,10 @@ internal class LogcatTap(private val dir: File) {
     private val ownRate = EventLogLogic.RateWindow(WINDOW_MS, MAX_PER_WINDOW)
     private val btRate = EventLogLogic.RateWindow(WINDOW_MS, BT_MAX_PER_WINDOW)
     private val btLongRate = EventLogLogic.RateWindow(BT_LONG_WINDOW_MS, BT_MAX_PER_LONG_WINDOW)
+
+    // Guarded by themselves: the tap thread adds, [drain] (power log thread) can also write the summaries
+    private val repeats = EventLogLogic.Repeats(REPEAT_WINDOW_MS)
+    private val gc = EventLogLogic.GcWindow(GC_WINDOW_MS, GC_MIN_PAUSED_MS)
 
     /** Bluetooth processes found in /proc: pid → short name. Written by [refreshBluetoothPids]. */
     @Volatile
@@ -101,7 +109,7 @@ internal class LogcatTap(private val dir: File) {
 
     private fun startLogcat(useRoot: Boolean): Pair<java.lang.Process, BufferedReader>? {
         // `echo $$` gives the pid; exec keeps it for logcat
-        val script = "echo \$\$; exec logcat -v threadtime '*:W'"
+        val script = "echo \$\$; exec logcat -v threadtime '*:W' 'dalvikvm:D'"
         val cmd = if (useRoot) listOf("su", "-c", script) else listOf("sh", "-c", script)
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val reader = BufferedReader(InputStreamReader(proc.inputStream), 8192)
@@ -131,7 +139,10 @@ internal class LogcatTap(private val dir: File) {
             while (true) {
                 val raw = reader.readLine() ?: break
                 val line = EventLogLogic.parseLogcat(raw)
-                if (line != null && !(line.pid == myPid && line.tag == TAG_SELF)) {
+                if (line != null && line.level in "VDI") {
+                    // Debug lines come only for the GC summary
+                    if (line.pid == myPid) EventLogLogic.parseGc(line.message)?.let { addGc(it) }
+                } else if (line != null && !(line.pid == myPid && line.tag == TAG_SELF)) {
                     val keep: Boolean
                     var proc: String? = null
                     if (line.pid == myPid) {
@@ -177,9 +188,37 @@ internal class LogcatTap(private val dir: File) {
             }
         }
         if (!ok) return
+        if (e.proc == null && !keepOwn(e.line.tag, e.text.toString(), now)) return
         var text = e.text.toString()
         if (e.lines > MAX_LINES) text += "\n… ${e.lines - MAX_LINES} more lines"
         EventLog.logcat(e.line.level, e.line.tag, e.line.tid, e.line.time, text, e.proc, e.line.pid)
+    }
+
+    /** False for noise and for a repeat in the window: those are only counted. */
+    private fun keepOwn(tag: String, message: String, now: Long): Boolean = synchronized(repeats) {
+        val noise = EventLogLogic.noiseKey(tag, message)
+        if (noise != null) {
+            repeats.count(noise, now)
+            false
+        } else {
+            repeats.first(EventLogLogic.repeatKey(tag, message), now)
+        }
+    }.also { drain(now) }
+
+    private fun addGc(g: EventLogLogic.Gc) {
+        val now = SystemClock.uptimeMillis()
+        synchronized(gc) { gc.add(g, now) }
+        drain(now)
+    }
+
+    /** Writes the `repeats` and `gc` lines of the windows that ended. Also called each minute by the power log. */
+    fun drain(now: Long = SystemClock.uptimeMillis(), force: Boolean = false) {
+        synchronized(repeats) { repeats.drain(now, force) }?.let { counts ->
+            val o = org.json.JSONObject()
+            for ((k, n) in counts) o.put(k, n)
+            EventLog.emit("repeats", org.json.JSONObject().put("min", REPEAT_WINDOW_MS / 60_000).put("n", o))
+        }
+        synchronized(gc) { gc.drain(now) }?.let { EventLog.emit("gc", it) }
     }
 
     private fun report(dropped: Int, what: String, max: Int, windowMs: Long) {
@@ -209,6 +248,9 @@ internal class LogcatTap(private val dir: File) {
         private const val BT_MAX_PER_WINDOW = 20
         private const val BT_LONG_WINDOW_MS = 600_000L
         private const val BT_MAX_PER_LONG_WINDOW = 300
+        private const val REPEAT_WINDOW_MS = 600_000L
+        private const val GC_WINDOW_MS = 60_000L
+        private const val GC_MIN_PAUSED_MS = 200
 
         @Volatile
         var instance: LogcatTap? = null

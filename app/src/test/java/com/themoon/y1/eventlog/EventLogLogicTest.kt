@@ -240,4 +240,61 @@ class EventLogLogicTest {
         assertEquals(emptyList<String>(), f.readAll())
         assertEquals(0L, f.bytes())
     }
+
+    @Test
+    fun knownNoiseIsCountedNotLogged() {
+        assertEquals("dalvikvm: class check", EventLogLogic.noiseKey("dalvikvm", "VFY: unable to resolve new-instance 450 (Ljavax/net/ssl/SNIHostName;)"))
+        assertEquals("dalvikvm: class check", EventLogLogic.noiseKey("dalvikvm", "Could not find class 'android.media.AudioTrack\$Builder', referenced from method x"))
+        assertEquals("View: requestLayout during layout", EventLogLogic.noiseKey("View", "requestLayout() improperly called by android.widget.TextView{42be8d50}"))
+        assertEquals("no embedded picture", EventLogLogic.noiseKey("MediaMetadataRetrieverJNI", "getEmbeddedPicture: Call to getEmbeddedPicture failed."))
+        assertNull(EventLogLogic.noiseKey("dalvikvm", "threadid=1: thread exiting with uncaught exception"))
+        assertNull(EventLogLogic.noiseKey("BtAvrcp", "AVRCP track data sent"))
+    }
+
+    @Test
+    fun repeatsWithOtherNumbersHaveOneKey() {
+        assertEquals(
+            EventLogLogic.repeatKey("Tag", "size 12 at 0x42be8d50"),
+            EventLogLogic.repeatKey("Tag", "size 345 at 0x42c40868")
+        )
+        assertEquals("Tag: first line", EventLogLogic.repeatKey("Tag", "first line\n\tat x.y(Z.kt:1)"))
+    }
+
+    @Test
+    fun repeatsAreLoggedOnceForEachWindow() {
+        val r = EventLogLogic.Repeats(1000)
+        assertTrue(r.first("a", 0))
+        assertFalse(r.first("a", 10))
+        assertFalse(r.first("a", 20))
+        r.count("noise", 30)
+        assertNull(r.drain(500))
+        assertEquals(mapOf("a" to 2, "noise" to 1), r.drain(1000))
+        assertTrue(r.first("a", 1100))
+        assertNull(r.drain(2200))
+    }
+
+    @Test
+    fun gcLinesAreParsed() {
+        val g = EventLogLogic.parseGc("GC_FOR_ALLOC freed 3697K (50950), 38% free 16790K/26900K, paused 72ms, total 72ms")!!
+        assertEquals("GC_FOR_ALLOC", g.kind)
+        assertEquals(72, g.pausedMs)
+        assertEquals(16790, g.usedKb)
+        assertEquals(26900, g.heapKb)
+        assertEquals(5, EventLogLogic.parseGc("GC_CONCURRENT freed 2048K, 40% free 12000K/20000K, paused 2ms+3ms, total 40ms")!!.pausedMs)
+        assertNull(EventLogLogic.parseGc("create new thread"))
+    }
+
+    @Test
+    fun gcSummaryOnlyForLongPauses() {
+        val w = EventLogLogic.GcWindow(60_000, 200)
+        w.add(EventLogLogic.Gc("GC_CONCURRENT", 5, 100, 200), 0)
+        assertNull(w.drain(60_000))
+        repeat(4) { w.add(EventLogLogic.Gc("GC_FOR_ALLOC", 57, 17000, 27000), 70_000L + it) }
+        assertNull(w.drain(100_000))
+        val o = w.drain(130_000)!!
+        assertEquals(4, o.getInt("n"))
+        assertEquals(4, o.getInt("forAlloc"))
+        assertEquals(228, o.getInt("pausedMs"))
+        assertEquals(57, o.getInt("maxMs"))
+    }
 }
