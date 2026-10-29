@@ -312,6 +312,7 @@ object EventLog {
             .put("depth", backStack)
         EventLogLogic.screenDetail(to)?.let { f.put("detail", it) }
         emit("screen", f)
+        FrameWatch.screenChanged(EventLogLogic.screenName(to))
     }
 
     // --- settings (AppPrefs listener) ---
@@ -557,6 +558,13 @@ object EventLog {
         f.put("stack", EventLogLogic.frames(stack, 15))
         emit("stall", f)
         if (ongoing) flush(sync = true) // the system can kill the app soon (ANR)
+    }
+
+    /** Lag after a screen change: the longest time with no frame ([ms], from [at] ms after the change). */
+    internal fun frames(screen: String, ms: Long, at: Long, n: Int, heapMb: Long, stack: Array<StackTraceElement>?) {
+        val f = JSONObject().put("s", screen).put("ms", ms).put("at", at).put("n", n).put("heapMb", heapMb)
+        if (stack != null) f.put("stack", EventLogLogic.frames(stack, 15))
+        emit("frames", f)
     }
 
     // Read from a background thread: only the NavigationManager state, no views
