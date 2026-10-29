@@ -577,11 +577,4 @@ class BluetoothController(
         clickFeedback()
         return true
     }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            return onWheel(if (keyCode == 22) 1 else -1, event)
-        }
-        return false
-    }
 }

@@ -258,54 +258,8 @@ class WifiKeyboardController(
         return false
     }
 
+    // Back, Up, Down, the media keys and the wheel never come here: dispatchKeyEvent and onWheel take them
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
-            if (event.repeatCount == 0) {
-                isBackLongPressConsumed = false
-                handler.removeCallbacks(longPressBackRunnable)
-                handler.postDelayed(longPressBackRunnable, 450L)
-            } else if (!isBackLongPressConsumed && (event.eventTime - event.downTime) >= 450L) {
-                handler.removeCallbacks(longPressBackRunnable)
-                isBackLongPressConsumed = true
-                InputRouter.getInstance().suppressBackUntilRelease(350L)
-                clickFeedback()
-                exitKeyboard()
-            }
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19) {
-            keyboardQwertyView?.moveFocus(0, -1, false)
-            clickFeedback()
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
-            || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
-            || keyCode == 126 || keyCode == 127
-            || keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20) {
-            keyboardQwertyView?.moveFocus(0, 1, false)
-            clickFeedback()
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-            keyboardQwertyView?.moveFocus(-1, 0, false)
-            clickFeedback()
-            return true
-        }
-        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-            keyboardQwertyView?.moveFocus(1, 0, false)
-            clickFeedback()
-            return true
-        }
-        if (keyCode == 21) { // Wheel CCW
-            keyboardQwertyView?.moveFocus(-1, 0, true)
-            clickFeedback()
-            return true
-        }
-        if (keyCode == 22) { // Wheel CW
-            keyboardQwertyView?.moveFocus(1, 0, true)
-            clickFeedback()
-            return true
-        }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (event.repeatCount == 0) {
                 event.startTracking()
@@ -316,17 +270,6 @@ class WifiKeyboardController(
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
-            handler.removeCallbacks(longPressBackRunnable)
-            if (isBackLongPressConsumed) {
-                isBackLongPressConsumed = false
-                return true
-            }
-            keyboardQwertyView?.moveFocus(0, -1, false)
-            clickFeedback()
-            return true
-        }
-
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (isLongPressConsumed) {
                 isLongPressConsumed = false
@@ -342,15 +285,6 @@ class WifiKeyboardController(
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
-            handler.removeCallbacks(longPressBackRunnable)
-            isBackLongPressConsumed = true
-            InputRouter.getInstance().suppressBackUntilRelease(350L)
-            clickFeedback()
-            exitKeyboard()
-            return true
-        }
-
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             isLongPressConsumed = true
             keyboardQwertyView?.performCenterLongPress(typedText)

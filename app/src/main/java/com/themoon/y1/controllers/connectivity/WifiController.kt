@@ -245,14 +245,6 @@ class WifiController(
         return true
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            val delta = if (keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1
-            return onWheel(delta, event)
-        }
-        return false
-    }
-
     companion object {
         private const val WIFI_POWER_ROW_ID = 999992
     }

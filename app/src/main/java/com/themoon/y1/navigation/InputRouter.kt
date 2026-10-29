@@ -116,14 +116,8 @@ class InputRouter private constructor() {
             if (!RemoteMediaKeys.actsWithScreenOff(event, isScreenOffControlEnabled)) {
                 return true
             }
-            val isMediaKey = keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
-                    keyCode == 85 ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ||
-                    keyCode == 87 ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS ||
-                    keyCode == 88
+            // The same media keys as RemoteMediaKeys, also the wired headset button (HEADSETHOOK: play/pause)
+            val isMediaKey = RemoteMediaKeys.isMediaKey(keyCode)
 
             if (isMediaKey) {
                 if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {

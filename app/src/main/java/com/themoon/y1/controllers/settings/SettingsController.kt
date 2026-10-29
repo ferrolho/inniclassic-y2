@@ -208,13 +208,6 @@ class SettingsController(
         return true
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            return onWheel(if (keyCode == 22) 1 else -1, event)
-        }
-        return false
-    }
-
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) &&
             (event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0
