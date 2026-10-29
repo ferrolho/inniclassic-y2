@@ -111,6 +111,9 @@ internal fun MainActivity.rebuildUniqueAlbumListInternal() {
             uniqueAlbumList.add(song)
         }
     }
+    com.themoon.y1.controllers.coverflow.CoverFlowOrder.sort(uniqueAlbumList)
+    // The first Cover Flow entry after a load is then as fast as the next ones.
+    if (isCoverFlowControllerInitialized()) coverFlowController.prepareSoon()
 }
 
 internal fun MainActivity.scanVideosInternal() {
