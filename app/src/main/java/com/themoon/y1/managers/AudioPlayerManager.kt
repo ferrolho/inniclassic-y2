@@ -33,7 +33,6 @@ import com.google.android.exoplayer2.util.Util
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
-import com.themoon.y1.ThemeManager
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -267,7 +266,6 @@ class AudioPlayerManager private constructor() {
                     if (newIndex < 0 || newIndex >= main.currentPlaylist.size) return
 
                     main.currentIndex = newIndex
-                    main.lastTrackChangeTime = System.currentTimeMillis()
                     main.runOnUiThread {
                         prepareMusicTrack(newIndex)
                         main.updatePlayerUI()
@@ -501,7 +499,6 @@ class AudioPlayerManager private constructor() {
                         if (bmp != null) {
                             main.runOnUiThread {
                                 main.ivAlbumArt.setImageBitmap(bmp)
-                                main.currentAlbumColor = (bmp.getPixel(bmp.width / 2, (bmp.height * 0.8).toInt()) or 0xFF000000.toInt())
                             }
                         }
                     } catch (ignored: Exception) {}
@@ -598,7 +595,6 @@ class AudioPlayerManager private constructor() {
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
-        main.lastTrackChangeTime = System.currentTimeMillis()
 
         if (isGaplessQueueActive && exoPlayer != null) {
             val exo = exoPlayer ?: return
@@ -619,7 +615,6 @@ class AudioPlayerManager private constructor() {
         saveAudiobookBookmarkIfNeeded()
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
-        main.lastTrackChangeTime = System.currentTimeMillis()
 
         if (isGaplessQueueActive && exoPlayer != null) {
             val exo = exoPlayer ?: return
@@ -659,7 +654,6 @@ class AudioPlayerManager private constructor() {
         val track = main.currentPlaylist[index]
         currentlyPlayingFilePath = track.absolutePath
         main.lastAlbumArtBytes = null
-        main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
 
         if (!track.exists() || track.length() < 1024) {
             val size = if (track.exists()) track.length() else -1L
@@ -837,14 +831,6 @@ class AudioPlayerManager private constructor() {
                     if (bmpCenter != null) {
                         main.ivAlbumArt.setImageBitmap(bmpCenter)
                         main.refreshNowPlayingPreview()
-
-                        try {
-                            val centerX = bmpCenter.width / 2
-                            val centerY = (bmpCenter.height * 0.8).toInt()
-                            main.currentAlbumColor = (bmpCenter.getPixel(centerX, centerY) or 0xFF000000.toInt())
-                        } catch (e: Exception) {
-                            main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-                        }
                         artApplied = true
                     }
                 } catch (ignored: Throwable) {}
@@ -866,15 +852,6 @@ class AudioPlayerManager private constructor() {
                         val bmp = android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
                         if (bmp != null) {
                             main.ivAlbumArt.setImageBitmap(bmp)
-
-                            try {
-                                val centerX = bmp.width / 2
-                                val centerY = (bmp.height * 0.8).toInt()
-                                main.currentAlbumColor = (bmp.getPixel(centerX, centerY) or 0xFF000000.toInt())
-                            } catch (e: Exception) {
-                                main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-                            }
-
                             main.refreshNowPlayingPreview()
                             artApplied = true
                         }
@@ -892,7 +869,6 @@ class AudioPlayerManager private constructor() {
                         artApplied = true
                     } else {
                         main.ivAlbumArt.setImageResource(R.drawable.default_album)
-                        main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
                         main.refreshNowPlayingPreview()
                     }
                 }

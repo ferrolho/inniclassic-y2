@@ -151,7 +151,6 @@ internal fun MainActivity.loadPreferences() {
     com.themoon.y1.models.AlbumKey.byArtist = prefs.getBoolean(com.themoon.y1.models.AlbumKey.PREF_BY_ARTIST, false)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq", false)
-    currentSystemBrightness = prefs.getInt("brightness_level", 255)
 
     eqPresetNames.clear()
     eqPresetNames.addAll(listOf("Off", "Acoustic", "Bass Booster", "Bass Reducer", "Classical", "Electronic", "Hip Hop", "Jazz", "Latin", "Loudness", "Pop", "R&B", "Rock", "Vocal Booster"))
