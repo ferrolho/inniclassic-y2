@@ -158,6 +158,19 @@ class NavigationManager private constructor() {
         backStack.clear()
     }
 
+    /**
+     * Makes [state] the entry under the current screen, where Back goes: the entries above the newest entry of
+     * [state] go; without one, [state] is added with no row. For a screen that opens directly but has its menu
+     * under it (the FM tuner and its Radio menu, as on the iPod nano).
+     */
+    fun setBackTarget(state: ScreenState) {
+        if (backStack.any { it.state == state }) {
+            while (backStack.peek().state != state) backStack.pop()
+        } else {
+            backStack.push(BackEntry(state, null))
+        }
+    }
+
     fun reset() {
         backStack.clear()
         currentState = null
