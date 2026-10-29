@@ -321,7 +321,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         UsbStorageUiManager(
             activity = this,
             getExternalSdMountMonitor = { externalSdMountMonitor },
-            isFmRadioActive = { activePlayer == 1 },
+            isFmRadioActive = { FmRadioManager.getInstance(this).isPowerUp },
             stopFmRadio = { FmRadioManager.getInstance(this).powerDown() },
             localize = { t(it) },
             clickFeedback = { clickFeedback() },
@@ -1465,13 +1465,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             val am = AudioPlayerManager.getInstance()
             when (event.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {
-                    am.playOrPauseMusic()
+                    com.themoon.y1.managers.AudioSources.app.playPauseKey()
                 }
                 KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> {
-                    am.nextTrack()
+                    com.themoon.y1.managers.AudioSources.app.skipKey(true)
                 }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> {
-                    am.prevTrack()
+                    com.themoon.y1.managers.AudioSources.app.skipKey(false)
                 }
             }
         }
