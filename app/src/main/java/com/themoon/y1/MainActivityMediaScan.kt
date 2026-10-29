@@ -5,6 +5,8 @@ import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.TvSeason
 import com.themoon.y1.models.TvSeries
 import com.themoon.y1.models.VideoItem
+import com.themoon.y1.navigation.NavigationManager
+import com.themoon.y1.navigation.ScreenState
 import java.io.File
 import java.util.HashSet
 import java.util.Locale
@@ -92,7 +94,7 @@ internal fun MainActivity.startMediaLibraryScanInternal() {
                 isCustomScanning = false
                 dismissLoadingOverlay()
                 refreshNowPlayingPreview()
-                if (isBrowserControllerInitialized()) {
+                if (isBrowserControllerInitialized() && NavigationManager.getInstance().currentState is ScreenState.Browser) {
                     browserController.buildFileBrowserUI()
                 }
             }
@@ -310,7 +312,11 @@ internal fun MainActivity.scanVideosInternal() {
     if (isVideosControllerInitialized()) {
         runOnUiThread {
             videoBrowserController.clearThumbCache()
-            videoBrowserController.buildCurrentModeUI()
+            // The rebuild sets the status-bar title and width, so only do it while Videos shows.
+            // Videos rebuilds its list in onEnter.
+            if (NavigationManager.getInstance().currentState is ScreenState.Videos) {
+                videoBrowserController.buildCurrentModeUI()
+            }
         }
     }
 }
