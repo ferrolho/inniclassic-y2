@@ -7,8 +7,11 @@
 #
 # Type a|b — Y1 stock bases from rockbox-y1.
 # Type y2  — base ROM from y2-test release (Solar Y2 pack), strip Solar
-#            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk, and
-#            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT).
+#            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk,
+#            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT), add the stock
+#            Bluetooth.apk + Bluetooth.odex from tools/rom_assets (the base has none) with
+#            the phone profiles (HFP, PBAP, MAP) turned off in the installed Bluetooth.apk,
+#            and turn off the SystemUI low-battery dialog (the launcher shows its own).
 #
 # Optional override:
 #   Y2_BASE_URL=https://.../rom_y2.zip ./scripts/build-rom.sh y2 out.zip
@@ -29,6 +32,13 @@ LAUNCHER_REPO="${LAUNCHER_REPO:-JonaszPotoniec/inniclassic-y2}"
 
 # Published Y2 base (Solar-built pack for stripping + InniClassic install).
 Y2_BASE_URL="${Y2_BASE_URL:-https://github.com/ryan-specter/jj_auto/releases/download/y2-test/rom_y2.zip}"
+
+# Original /system/app/Bluetooth.apk + Bluetooth.odex of the Innioasis build the Y2 base uses
+# (see tools/rom_assets/README.md). The y2-test base has none, so Bluetooth cannot turn on.
+Y2_BT_APK_SHA256="064855fd299e54d30e114b4d441e1f14657e62b4325cfed5e5c7b9a652e81b37"
+Y2_BT_ODEX_SHA256="f543c2842589e70f6d4582e8992e2ccf1f2e0e1fa19b454fabf039b5f8e08fc2"
+# The installed Bluetooth.apk after tools/patch_bluetooth_profiles.py (only resources.arsc bools change).
+Y2_BT_APK_PATCHED_SHA256="99d8d244e6dd083266985ef473bbe86fe51026d11ab724f9a78ca677cc388013"
 
 usage() {
     cat >&2 <<EOF
@@ -128,6 +138,7 @@ require_cmd unzip
 require_cmd zip
 require_cmd cmp
 require_cmd sudo
+require_cmd sha256sum
 
 resolve_latest_launcher_tag() {
     local release_url tag
@@ -172,6 +183,20 @@ download_launcher_apk() {
     apk_url="https://github.com${apk_url}"
     echo "Downloading $(basename "$apk_url") from release ${tag}"
     curl -fsSL -o "$dest" "$apk_url"
+}
+
+sha256_of() {
+    sha256sum "$1" | awk '{ print $1 }'
+}
+
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+    local actual
+
+    [ -f "$file" ] || die "missing $file"
+    actual="$(sha256_of "$file")"
+    [ "$actual" = "$expected" ] || die "SHA-256 mismatch for $file: got $actual, expected $expected"
 }
 
 # Remove Solar packages / helpers / config (used when base is a Solar Y2 pack).
@@ -320,8 +345,22 @@ audit_rom_contents() {
             errors=$((errors + 1))
         fi
 
-        if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ] && [ ! -f "$sys_mount/priv-app/Bluetooth.apk" ]; then
-            echo "audit fail: /system/priv-app/Bluetooth.apk missing (asset was provided but not installed)" >&2
+        if [ ! -f "$sys_mount/app/Bluetooth.apk" ] || [ ! -f "$sys_mount/app/Bluetooth.odex" ]; then
+            echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex missing (Bluetooth cannot turn on)" >&2
+            errors=$((errors + 1))
+        elif [ "$(sha256_of "$sys_mount/app/Bluetooth.apk")" != "$Y2_BT_APK_PATCHED_SHA256" ] \
+            || [ "$(sha256_of "$sys_mount/app/Bluetooth.odex")" != "$Y2_BT_ODEX_SHA256" ]; then
+            echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex is not the stock pair (APK with the profile patch)" >&2
+            errors=$((errors + 1))
+        fi
+        if [ -f "$sys_mount/app/Bluetooth.apk" ] \
+            && ! python3 -B "$REPO_ROOT/tools/patch_bluetooth_profiles.py" --check "$sys_mount/app/Bluetooth.apk" >/dev/null 2>&1; then
+            echo "audit fail: Bluetooth.apk still has the hands-free, phone book or message profile on" >&2
+            errors=$((errors + 1))
+        fi
+
+        if ! python3 "$REPO_ROOT/tools/patch_low_battery_warning.py" --check "$sys_mount/framework/framework-res.apk" >/dev/null 2>&1; then
+            echo "audit fail: framework-res.apk still has the low-battery dialog levels" >&2
             errors=$((errors + 1))
         fi
 
@@ -495,6 +534,11 @@ fi
 # BT operations (power-on, connect, unpair) fail with "No such file or directory".
 setprop ctl.start mtkbt
 
+# USB device name: init never sets it, so computers show the kernel default "MediaTek MT65xx Android Phone".
+# Use the maker and the model instead (as AOSP init.usb.rc does). It shows at the next USB connection.
+echo -n Innioasis > /sys/class/android_usb/android0/iManufacturer
+echo -n "$(getprop ro.product.model)" > /sys/class/android_usb/android0/iProduct
+
 # Prevent Bluetooth from auto-enabling on every boot / com.android.bluetooth restart.
 # The MTK firmware persists BT state in persist.bluetooth.on; clearing it means the user's
 # explicit OFF choice is respected after reboot rather than being overridden by the stack.
@@ -531,14 +575,34 @@ if [ "$TYPE" = "y2" ]; then
     sudo chmod 644 "$MOUNT_SYS/lib/libaudiocustparam.so"
     sudo chown root:root "$MOUNT_SYS/lib/libaudiocustparam.so"
 
-    if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ]; then
-        echo "==> Installing Bluetooth framework service (tools/rom_assets/Bluetooth.apk)"
-        sudo mkdir -p "$MOUNT_SYS/priv-app"
-        sudo cp -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" "$MOUNT_SYS/priv-app/Bluetooth.apk"
-        sudo chmod 644 "$MOUNT_SYS/priv-app/Bluetooth.apk"
-        sudo chown root:root "$MOUNT_SYS/priv-app/Bluetooth.apk"
-    fi
+    echo "==> Turning off the SystemUI low-battery dialog and sound in framework-res.apk"
+    sudo python3 "$REPO_ROOT/tools/patch_low_battery_warning.py" "$MOUNT_SYS/framework/framework-res.apk"
+    sudo chmod 644 "$MOUNT_SYS/framework/framework-res.apk"
+    sudo chown root:root "$MOUNT_SYS/framework/framework-res.apk"
 
+    echo "==> Installing stock Bluetooth.apk + Bluetooth.odex (tools/rom_assets) in /system/app"
+    verify_sha256 "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" "$Y2_BT_APK_SHA256"
+    verify_sha256 "$REPO_ROOT/tools/rom_assets/Bluetooth.odex" "$Y2_BT_ODEX_SHA256"
+    sudo mkdir -p "$MOUNT_SYS/app"
+    for bt_file in Bluetooth.apk Bluetooth.odex; do
+        sudo cp -f "$REPO_ROOT/tools/rom_assets/$bt_file" "$MOUNT_SYS/app/$bt_file"
+        sudo chmod 644 "$MOUNT_SYS/app/$bt_file"
+        sudo chown root:root "$MOUNT_SYS/app/$bt_file"
+    done
+
+    # The Y2 has no phone: without HFP, PBAP and MAP a car asks for no phone book or messages,
+    # so Settings shows no access dialog (the click wheel cannot answer it). A2DP and AVRCP stay on.
+    # The manifest sets android:enabled of these profile components to the patched bools, so Android
+    # disables them (also the PBAP receiver, which AdapterService does not control). Only an explicit
+    # `pm enable` in /data overrides this.
+    echo "==> Turning off the hands-free, phone book and message profiles in Bluetooth.apk"
+    sudo python3 -B "$REPO_ROOT/tools/patch_bluetooth_profiles.py" "$MOUNT_SYS/app/Bluetooth.apk"
+    sudo chmod 644 "$MOUNT_SYS/app/Bluetooth.apk"
+    sudo chown root:root "$MOUNT_SYS/app/Bluetooth.apk"
+
+    # Only for a re-signed MtkBt.apk (not in the repo). Bluetooth.apk and MtkBt.apk share
+    # android.uid.bluetooth, so they need the same signature: the stock pair above needs
+    # the stock MtkBt.apk of the base.
     if [ -f "$REPO_ROOT/tools/rom_assets/MtkBt.apk" ]; then
         echo "==> Installing signature-aligned MtkBt.apk (tools/rom_assets/MtkBt.apk)"
         sudo mkdir -p "$MOUNT_SYS/app"
