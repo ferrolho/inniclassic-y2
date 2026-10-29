@@ -41,6 +41,7 @@ import com.themoon.y1.managers.LastFmScrobbler
 import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
+import com.themoon.y1.views.ListEdges
 import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.Calendar
@@ -668,6 +669,20 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnLoopScrollToggle)
 
+        var isListEdgeFade = ListEdges.isFade(activity)
+        val btnListEdges = createSettingRow(
+            localize("List Edges"),
+            if (isListEdgeFade) localize("Fade") else localize("Cut")
+        )
+        btnListEdges.setOnClickListener {
+            clickFeedback()
+            isListEdgeFade = !isListEdgeFade
+            ListEdges.setFade(activity, isListEdgeFade)
+            val tvStatus = btnListEdges.getChildAt(1) as? TextView
+            tvStatus?.text = if (isListEdgeFade) localize("Fade") else localize("Cut")
+        }
+        containerSettingsItems.addView(btnListEdges)
+
         var currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
         if (currentTimeoutIndex >= TIMEOUT_VALUES.size) currentTimeoutIndex = 0
         val btnTimeout = createSettingRow(
@@ -986,8 +1001,8 @@ class SettingsController(
         val btnEng = createTablerListButton(
             if (isEngSelected) TablerIcons.CHECK else null,
             "English (Default)",
-            if (isEngSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-            if (isEngSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+            ThemeManager.getTextColorPrimary(),
+            ThemeManager.getListButtonFocusedTextColor()
         )
         btnEng.setOnClickListener {
             clickFeedback()
@@ -1002,8 +1017,8 @@ class SettingsController(
             val btnLang = createTablerListButton(
                 if (isSelected) TablerIcons.CHECK else null,
                 f.name.replace(".json", ""),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
             )
             btnLang.setOnClickListener {
                 clickFeedback()
@@ -1033,8 +1048,8 @@ class SettingsController(
             val btn = createTablerListButton(
                 icon,
                 localize(theme.name),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
             )
             btn.setOnClickListener {
                 clickFeedback()
@@ -1741,6 +1756,7 @@ class SettingsController(
                 .remove("repeat_mode")
                 .remove("repeat")
                 .remove("loop_scroll_on")
+                .remove(ListEdges.PREF_KEY)
                 .remove("eq_preset")
                 .remove("eq_profile_id")
                 .remove(AlbumKey.PREF_BY_ARTIST)
@@ -1753,6 +1769,7 @@ class SettingsController(
         AudioEffectManager.getInstance().applySoundCheck()
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
+        ListEdges.reload(activity)
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
         applyAlbumGrouping()
