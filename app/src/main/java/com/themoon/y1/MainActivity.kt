@@ -554,7 +554,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             is ScreenState.Playlists, is ScreenState.M3uPlaylistSongs, is ScreenState.SmartPlaylistSongs -> STATE_BROWSER
             is ScreenState.Podcasts, is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> STATE_BROWSER
             is ScreenState.Equalizer -> STATE_EQUALIZER
-            is ScreenState.FmRadio -> STATE_FM_RADIO
+            is ScreenState.FmRadio, is ScreenState.FmRadioMenu, is ScreenState.FmRadioSaved -> STATE_FM_RADIO
             is ScreenState.Jellyfin -> STATE_JELLYFIN
             is ScreenState.Player -> STATE_PLAYER
             is ScreenState.Settings -> {
@@ -970,7 +970,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 }
             }
             STATE_EQUALIZER -> t("Equalizer")
-            STATE_FM_RADIO -> t("Radio")
+            STATE_FM_RADIO -> if (::fmRadioController.isInitialized) fmRadioController.title() else t("Radio")
             STATE_JELLYFIN -> t("Jellyfin")
             else -> t("iPod")
         }

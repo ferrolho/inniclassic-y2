@@ -613,6 +613,8 @@ internal fun MainActivity.initControllers() {
         registerController(ScreenState.Settings::class.java, settingsController)
         registerController(ScreenState.Equalizer::class.java, equalizerController)
         registerController(ScreenState.FmRadio::class.java, fmRadioController)
+        registerController(ScreenState.FmRadioMenu::class.java, fmRadioController)
+        registerController(ScreenState.FmRadioSaved::class.java, fmRadioController)
         registerController(ScreenState.Jellyfin::class.java, jellyfinUiController)
         registerController(ScreenState.Bluetooth::class.java, bluetoothController)
         registerController(ScreenState.Wifi::class.java, wifiController)
