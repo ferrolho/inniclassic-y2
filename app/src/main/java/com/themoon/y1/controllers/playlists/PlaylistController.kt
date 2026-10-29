@@ -2,7 +2,6 @@ package com.themoon.y1.controllers.playlists
 
 import android.app.Activity
 import android.os.Build
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -52,7 +51,6 @@ class PlaylistController(
     private val createListButtonWithIcon: (icon: String, text: String, color: Int?) -> View,
     private val clickFeedback: () -> Unit,
     private val onPlaylistSelected: (m3uFile: File) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -484,11 +482,6 @@ class PlaylistController(
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {

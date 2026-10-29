@@ -8,6 +8,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
+import android.widget.AbsListView
 import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
@@ -150,14 +151,8 @@ class InputRouter private constructor() {
             if (!RemoteMediaKeys.actsWithScreenOff(event, isScreenOffControlEnabled)) {
                 return true
             }
-            val isMediaKey = keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
-                    keyCode == 85 ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ||
-                    keyCode == 87 ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS ||
-                    keyCode == 88
+            // The same media keys as RemoteMediaKeys, also the wired headset button (HEADSETHOOK: play/pause)
+            val isMediaKey = RemoteMediaKeys.isMediaKey(keyCode)
 
             if (isMediaKey) {
                 if (isPlayPauseKey(keyCode)) {
@@ -244,8 +239,15 @@ class InputRouter private constructor() {
             }
 
             // A screen with no own wheel code: one step in the list of the selected row
-            val rows = activeController?.rootView?.findFocus()?.parent as? LinearLayout
-            if (rows != null && RowFocus.step(rows, delta) != null) {
+            val focus = activeController?.rootView?.findFocus()
+            val rows = focus?.parent
+            val moved = when {
+                focus is AbsListView -> RowFocus.step(focus, delta) // the list has the focus, not a row
+                rows is AbsListView -> RowFocus.step(rows, delta)
+                rows is LinearLayout -> RowFocus.step(rows, delta)
+                else -> null
+            }
+            if (moved != null) {
                 (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
                 return true
             }
@@ -285,10 +287,10 @@ class InputRouter private constructor() {
     private fun isBackKey(keyCode: Int): Boolean =
         keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4
 
-    private fun goBack(activeController: ScreenController?) {
-        if (activeController?.onBackPressed() == true) return
-        if (NavigationManager.getInstance().navigateBack()) return
+    /** The one Back path: one click, then the screen's own Back (a level up in its lists), else the previous screen. */
+    fun goBack(activeController: ScreenController?) {
         (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+        if (activeController?.onBackPressed() != true) NavigationManager.getInstance().popBackStack()
     }
 
     fun onKeyUp(

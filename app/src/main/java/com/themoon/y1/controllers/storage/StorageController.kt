@@ -30,7 +30,6 @@ class StorageController(
     private val videosProvider: () -> List<File>,
     private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -155,11 +154,6 @@ class StorageController(
                 containerStorageItems.getChildAt(0).requestFocus()
             }
         }
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 
     private fun formatSize(bytes: Long): String {

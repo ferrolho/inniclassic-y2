@@ -45,7 +45,6 @@ class BluetoothController(
     private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val createTablerListButton: (iconPaths: Array<String>?, text: String, rightIconPaths: Array<String>?, iconColor: Int, textColor: Int) -> View,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -694,18 +693,6 @@ class BluetoothController(
             btnScanBt.requestFocus()
         }
         clickFeedback()
-        return true
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            return onWheel(if (keyCode == 22) 1 else -1, event)
-        }
-        return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
         return true
     }
 }

@@ -1088,7 +1088,6 @@ class BrowserController(
 
     /** Back: the list of the top back-stack entry (NavigationManager builds it again and selects its row). */
     override fun onBackPressed(): Boolean {
-        clickFeedback()
         onNavigateBackToMenu()
         return true
     }

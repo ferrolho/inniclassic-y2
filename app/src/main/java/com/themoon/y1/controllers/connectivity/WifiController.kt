@@ -34,7 +34,6 @@ class WifiController(
     private val clickFeedback: () -> Unit,
     private val onConnectToSavedNetwork: (ssid: String, netId: Int) -> Unit,
     private val onOpenWifiKeyboard: (ssid: String, isOpen: Boolean) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -246,19 +245,6 @@ class WifiController(
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
         RowFocus.step(containerWifiItems, delta) ?: return false
         clickFeedback()
-        return true
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            val delta = if (keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1
-            return onWheel(delta, event)
-        }
-        return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
         return true
     }
 

@@ -737,7 +737,6 @@ class PlayerController(
     }
 
     override fun onBackPressed(): Boolean {
-        clickFeedback()
         // Back from Lyrics, Scrub, Shuffle/Repeat or Rating returns to Progress; a pending seek is discarded
         if (nowPlayingBottomState != 0) {
             if (nowPlayingBottomState == LYRICS_STATE) setLyricsShowing(false)

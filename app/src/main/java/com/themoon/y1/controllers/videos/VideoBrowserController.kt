@@ -46,7 +46,6 @@ class VideoBrowserController(
     private val allVideosProvider: () -> List<File>,
     private val onVideoSelected: (file: File) -> Unit,
     private val onNavigateToMode: (VideoMode) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val clickFeedback: () -> Unit,
     private val localize: (String) -> String,
     private val updateHeaderTitle: (String) -> Unit
@@ -1020,14 +1019,5 @@ class VideoBrowserController(
                 }
             }
         }.start()
-    }
-
-    // ------------------------------------------------------------------------
-    // Navigation / Key Handling
-    // ------------------------------------------------------------------------
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 }

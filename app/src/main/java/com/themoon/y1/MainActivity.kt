@@ -676,15 +676,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        val active = getActiveScreenController()
-        if (active?.onBackPressed() == true) {
-            return
-        }
-        if (NavigationManager.getInstance().navigateBack()) {
-            return
-        }
-        clickFeedback()
-        // Never call super.onBackPressed() because MainActivity is the HOME launcher.
+        // The router acts on Back; never call super.onBackPressed() because MainActivity is the HOME launcher.
+        InputRouter.getInstance().goBack(getActiveScreenController())
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

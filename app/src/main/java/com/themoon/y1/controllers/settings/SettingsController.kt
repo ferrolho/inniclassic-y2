@@ -245,7 +245,6 @@ class SettingsController(
     /** Back: the list of the top back-stack entry (NavigationManager builds it again and selects its row). */
     override fun onBackPressed(): Boolean {
         if (isActionScreen) {
-            clickFeedback()
             ActionScreens.cancel((actionPage as? SettingsSubMode.Action)?.let { ActionScreens.spec(it.key) }) { onNavigateBack() }
             return true
         }
@@ -253,7 +252,6 @@ class SettingsController(
             toggleMenuReorderMode()
             return true
         }
-        clickFeedback()
         // A sub-screen that a row opened in place (not a back-stack entry): back to the list of this entry
         if (currentSettingsDepth > pageDepth) onEnter(ScreenState.Settings(page)) else onNavigateBack()
         return true
@@ -291,13 +289,6 @@ class SettingsController(
         RowFocus.step(containerSettingsItems, delta) ?: return false
         clickFeedback()
         return true
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            return onWheel(if (keyCode == 22) 1 else -1, event)
-        }
-        return false
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {

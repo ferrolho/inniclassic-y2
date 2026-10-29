@@ -65,12 +65,10 @@ class PodcastController(
     override fun onBackPressed(): Boolean {
         return when (currentMode) {
             is BrowserMode.PodcastEpisodes, is BrowserMode.PodcastManage -> {
-                clickFeedback()
                 buildChannelsUI()
                 true
             }
             is BrowserMode.PodcastChannels -> {
-                clickFeedback()
                 onExitPodcasts()
                 true
             }
