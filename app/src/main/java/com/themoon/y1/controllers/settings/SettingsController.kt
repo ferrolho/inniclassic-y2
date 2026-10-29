@@ -1030,7 +1030,7 @@ class SettingsController(
         for (line in spec.info) containerSettingsItems.addView(ActionScreens.infoRow(activity, line))
         var firstAction: View? = null
         for (action in spec.actions) {
-            val row = if (action.checked == null) createSettingRow(action.label, "") else createTablerListButton(
+            val row = if (action.checked == null) createSettingRow(action.label, if (action.opensList) "〉" else "") else createTablerListButton(
                 if (action.checked) TablerIcons.CHECK else null,
                 action.label,
                 ThemeManager.getTextColorPrimary(),
