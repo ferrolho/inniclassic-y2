@@ -68,6 +68,15 @@ data class AudioEffectPlan(
 
         fun bandCount(softwareEq: Boolean): Int = if (softwareEq) SOFTWARE_EQ_BANDS else HARDWARE_EQ_BANDS
 
+        /** Highest band level in millibels (+15 dB). The lowest level is -[MAX_BAND_LEVEL]. */
+        const val MAX_BAND_LEVEL = 1500
+
+        /** The pref key of one band level of the stored levels [name] (see [levelsName]). */
+        fun bandLevelKey(name: String, band: Int): String = "eq_custom_" + name + "_band_" + band
+
+        /** [level] moved by [delta] millibels, in the band range. */
+        fun stepBandLevel(level: Int, delta: Int): Int = (level + delta).coerceIn(-MAX_BAND_LEVEL, MAX_BAND_LEVEL)
+
         /** Strength (0–1000) of the Bass Boost and Virtualizer steps Off, Weak, Normal, Strong. */
         fun strengthForStep(step: Int): Short = when {
             step <= 0 -> 0
