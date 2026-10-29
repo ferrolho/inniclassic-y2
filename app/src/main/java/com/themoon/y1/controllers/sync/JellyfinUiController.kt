@@ -121,7 +121,6 @@ class JellyfinUiController(
                 isLongPressActive = true
                 val main = activity as? com.themoon.y1.MainActivity
                 if (main != null) {
-                    main.lastJellyfinLongClickTime = lastLongClickTime
                     main.isLongPressConsumed = true
                 }
                 c.performLongClick()
@@ -1749,7 +1748,6 @@ class JellyfinUiController(
                 lastLongClickTime = System.currentTimeMillis()
                 isLongPressActive = true
                 val main = activity as? com.themoon.y1.MainActivity
-                main?.lastJellyfinLongClickTime = lastLongClickTime
                 main?.isLongPressConsumed = true
                 longClickListener.onLongClick(v)
             }
@@ -1868,7 +1866,6 @@ class JellyfinUiController(
                 lastLongClickTime = System.currentTimeMillis()
                 isLongPressActive = true
                 val main = activity as? com.themoon.y1.MainActivity
-                main?.lastJellyfinLongClickTime = lastLongClickTime
                 main?.isLongPressConsumed = true
                 clickListener.onClick(v)
                 true
