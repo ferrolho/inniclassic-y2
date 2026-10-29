@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.menu
 
+import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
@@ -683,20 +684,6 @@ class MainMenuController(
         currentButtons.addAll(createdButtons)
         IpodClassicLists.styleMainMenuButtons(createdButtons)
 
-        // 3. Chain Focus Navigation Loop
-        val totalBtns = createdButtons.size
-        val isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
-        for (i in 0 until totalBtns) {
-            val currentBtn = createdButtons[i]
-            val prevId = if (i == 0) (if (isLoopScrollOn) 10000 + totalBtns - 1 else View.NO_ID) else 10000 + i - 1
-            val nextId = if (i == totalBtns - 1) (if (isLoopScrollOn) 10000 else View.NO_ID) else 10000 + i + 1
-
-            currentBtn.nextFocusUpId = dynamicViewId(prevId)
-            currentBtn.nextFocusLeftId = dynamicViewId(prevId)
-            currentBtn.nextFocusDownId = dynamicViewId(nextId)
-            currentBtn.nextFocusRightId = dynamicViewId(nextId)
-        }
-
         // 4. Restore Focus & Scroll Position
         if (createdButtons.isNotEmpty()) {
             val targetIndex = safeMenuIndex.coerceIn(0, createdButtons.size - 1)
@@ -815,20 +802,15 @@ class MainMenuController(
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
         val c = activity.currentFocus
         if (c != null) {
-            val targetId = if (delta < 0) c.nextFocusUpId else c.nextFocusDownId
-            if (targetId != View.NO_ID) {
-                val target = activity.findViewById<View>(targetId)
-                if (target != null) {
-                    target.requestFocus()
-                    val idx = currentButtons.indexOf(target)
-                    if (idx >= 0) {
-                        lastMainMenuFocusIndex = idx
-                        isUiActive = true
-                    }
-                    clickFeedback()
-                    return true
-                }
-            }
+            // The buttons can be anywhere on the theme canvas, so step in their list order
+            val idx = RowFocus.next(currentButtons.size, currentButtons.indexOf(c), delta, RowFocus.isLoopOn(activity)) {
+                RowFocus.isSelectable(currentButtons[it])
+            } ?: return false
+            currentButtons[idx].requestFocus()
+            lastMainMenuFocusIndex = idx
+            isUiActive = true
+            clickFeedback()
+            return true
         } else {
             val targetIndex = lastMainMenuFocusIndex.coerceIn(0, (currentButtons.size - 1).coerceAtLeast(0))
             val targetBtn = currentButtons.getOrNull(targetIndex) ?: currentButtons.firstOrNull()
