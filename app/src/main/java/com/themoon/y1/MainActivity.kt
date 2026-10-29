@@ -34,6 +34,7 @@ import android.view.MotionEvent
 import com.themoon.y1.views.BatteryIconView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.Notice
+import com.themoon.y1.views.IpodClassicLayout
 import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
@@ -903,6 +904,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (::playerController.isInitialized) {
             playerController.updatePlayerUI()
         }
+        IpodClassicLayout.refreshPlayIcon(this)
         val am = AudioPlayerManager.getInstance()
         sendBluetoothMetaToCar()
         BluetoothAvrcpManager.getInstance(this).updatePlaybackState(am.isPlaying())
