@@ -30,7 +30,6 @@ class WebServerController(
     private val onServerStateChanged: (isRunning: Boolean) -> Unit,
     private val onScanMediaRequested: () -> Unit,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -149,11 +148,5 @@ class WebServerController(
             return true
         }
         return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        clickFeedback()
-        onNavigateBack()
-        return true
     }
 }

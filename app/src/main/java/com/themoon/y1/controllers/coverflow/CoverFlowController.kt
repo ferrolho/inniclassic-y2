@@ -33,7 +33,6 @@ class CoverFlowController(
     private val uniqueAlbumList: List<SongItem>,
     private val clickFeedback: () -> Unit,
     private val onAlbumSelected: (albumItem: SongItem) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val onRebuildUniqueAlbumList: (() -> Unit)? = null,
     private val localize: (String) -> String
 ) : ScreenController {
@@ -520,11 +519,6 @@ class CoverFlowController(
             return true
         }
         return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 
     companion object {

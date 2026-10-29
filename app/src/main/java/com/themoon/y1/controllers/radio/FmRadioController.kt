@@ -769,7 +769,6 @@ class FmRadioController(
         if (isRadioSettingsMode) {
             isRadioSettingsMode = false
             buildRadioUI()
-            clickFeedback()
             return true
         }
         onExitRadio()

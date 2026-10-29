@@ -176,7 +176,6 @@ internal fun MainActivity.initControllers() {
         onPlaylistSelected = { file ->
             changeScreen(ScreenState.M3uPlaylistSongs(file))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -191,7 +190,6 @@ internal fun MainActivity.initControllers() {
             browserController.virtualQueryValue = album.album
             changeScreen(ScreenState.Browser(BrowserMode.VirtualSongs))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onRebuildUniqueAlbumList = { rebuildUniqueAlbumListInternal() },
         localize = { t(it) }
     )
@@ -312,7 +310,6 @@ internal fun MainActivity.initControllers() {
         onNavigateToMode = { mode ->
             changeScreen(ScreenState.Videos(mode))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         clickFeedback = { clickFeedback() },
         localize = { t(it) },
         updateHeaderTitle = { title ->
@@ -344,7 +341,6 @@ internal fun MainActivity.initControllers() {
             )
         },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -367,7 +363,6 @@ internal fun MainActivity.initControllers() {
         onOpenWifiKeyboard = { ssid, isOpen ->
             changeScreen(ScreenState.WifiKeyboard(KeyboardTarget.WifiPassword(ssid, isOpen)))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -454,7 +449,6 @@ internal fun MainActivity.initControllers() {
         },
         onScanMediaRequested = { startMediaLibraryScan() },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -465,15 +459,13 @@ internal fun MainActivity.initControllers() {
         videosProvider = { videoFiles },
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
     brightnessController = BrightnessController(
         activity = this,
         rootView = layoutBrightnessMode as ViewGroup,
-        clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() }
+        clickFeedback = { clickFeedback() }
     )
 
     jellyfinUiController = JellyfinUiController(
@@ -598,7 +590,6 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -607,7 +598,6 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 

@@ -164,15 +164,12 @@ class SettingsController(
             return true
         } else if (currentSettingsDepth == 1) {
             buildSettingsUI()
-            clickFeedback()
             return true
         } else if (currentSettingsDepth == 2) {
             buildDateTimeUI()
-            clickFeedback()
             return true
         }
         buildSettingsUI()
-        clickFeedback()
         return true
     }
 

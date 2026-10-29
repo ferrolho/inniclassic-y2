@@ -363,7 +363,6 @@ class WifiKeyboardController(
         handler.removeCallbacks(longPressBackRunnable)
         isBackLongPressConsumed = false
         InputRouter.getInstance().suppressBackUntilRelease(300L)
-        clickFeedback()
         exitKeyboard()
         return true
     }

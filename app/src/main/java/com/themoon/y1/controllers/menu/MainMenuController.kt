@@ -865,8 +865,6 @@ class MainMenuController(
         return false
     }
 
-    override fun onBackPressed(): Boolean {
-        clickFeedback()
-        return true
-    }
+    // Back on the main menu stays here (the router gives the click)
+    override fun onBackPressed(): Boolean = true
 }

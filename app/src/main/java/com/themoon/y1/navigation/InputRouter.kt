@@ -230,10 +230,10 @@ class InputRouter private constructor() {
     private fun isBackKey(keyCode: Int): Boolean =
         keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4
 
-    private fun goBack(activeController: ScreenController?) {
-        if (activeController?.onBackPressed() == true) return
-        if (NavigationManager.getInstance().navigateBack()) return
+    /** The one Back path: one click, then the screen's own Back (a level up in its lists), else the previous screen. */
+    fun goBack(activeController: ScreenController?) {
         (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+        if (activeController?.onBackPressed() != true) NavigationManager.getInstance().popBackStack()
     }
 
     fun onKeyUp(

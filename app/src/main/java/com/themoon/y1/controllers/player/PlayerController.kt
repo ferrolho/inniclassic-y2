@@ -502,7 +502,6 @@ class PlayerController(
     }
 
     override fun onBackPressed(): Boolean {
-        clickFeedback()
         if (lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
             lyricsOverlayController.hide()
             return true
