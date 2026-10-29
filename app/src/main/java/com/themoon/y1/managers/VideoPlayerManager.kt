@@ -52,6 +52,7 @@ class VideoPlayerManager private constructor() {
     }
 
     fun playVideo(context: Context, videoFile: File, surfaceView: SurfaceView) {
+        AudioSources.app.videoStarts()
         ensurePlayer(context)
 
         val player = mediaPlayer ?: return

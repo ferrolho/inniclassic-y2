@@ -206,7 +206,7 @@ internal fun MainActivity.initControllers() {
         rootView = layoutPlayerMode as ViewGroup,
         clickFeedback = { clickFeedback() },
         onAdjustVolume = { adjustVolume(it) },
-        onTogglePlayback = { AudioPlayerManager.getInstance().playOrPauseMusic() },
+        onTogglePlayback = { com.themoon.y1.managers.AudioSources.app.playPauseKey() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onBrowseAlbum = { album ->
             // The menu gives only the title; take the album artist from the song that plays.

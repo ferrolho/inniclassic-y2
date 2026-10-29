@@ -306,6 +306,7 @@ class FmRadioManager private constructor(context: Context) {
             if (lastError.isEmpty()) lastError = "Driver class is null."
             return false
         }
+        AudioSources.app.radioStarts()
         try {
             if (CellRadioManager.airplaneModeSparesFm(context)) {
                 Log.i(TAG, "Airplane mode affects only the cell radio; FM keeps it")
