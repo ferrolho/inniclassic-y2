@@ -29,6 +29,8 @@ import com.themoon.y1.managers.SafeVolumeBypasser
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
+import com.themoon.y1.eventlog.EventLog
+import com.themoon.y1.eventlog.EventLogExport
 import com.themoon.y1.managers.WirelessAdbManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
@@ -643,6 +645,31 @@ class SettingsController(
             }
         }
         containerSettingsItems.addView(btnWirelessAdb)
+
+        // The event log as a zip on the memory card, for a tester without adb (only in builds with the event log).
+        if (EventLog.enabled) {
+            val btnSaveLog = createSettingRow(localize("Save Log"), "")
+            btnSaveLog.setOnClickListener {
+                clickFeedback()
+                val tvValue = btnSaveLog.getChildAt(btnSaveLog.childCount - 1) as? TextView
+                tvValue?.text = localize("Saving…")
+                Thread {
+                    val result = try {
+                        EventLogExport.save(activity)
+                    } catch (t: Throwable) {
+                        EventLog.note("save log failed: $t")
+                        null
+                    }
+                    activity.runOnUiThread {
+                        tvValue?.text = localize(if (result != null) "Saved" else "Failed")
+                        if (result != null) {
+                            Toast.makeText(activity, "${EventLogExport.FOLDER}/${result.name}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }.start()
+            }
+            containerSettingsItems.addView(btnSaveLog)
+        }
 
         val btnWifiMenu = createSettingRow(localize("Wi-Fi"), "〉 ")
         btnWifiMenu.setOnClickListener {
