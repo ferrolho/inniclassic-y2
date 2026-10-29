@@ -305,6 +305,7 @@ class FmRadioManager private constructor(context: Context) {
             if (lastError.isEmpty()) lastError = "Driver class is null."
             return false
         }
+        AudioSources.app.radioStarts()
         try {
             if (!ensureAirplaneModeOff()) {
                 Log.w(TAG, "Continuing FM powerUp despite airplane-mode clear uncertainty")
