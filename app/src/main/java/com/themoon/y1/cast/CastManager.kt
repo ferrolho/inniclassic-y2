@@ -9,12 +9,13 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
-import android.widget.Toast
 import com.themoon.y1.MainActivity
+import com.themoon.y1.R
 import com.themoon.y1.updateStatusBarPlayOn
 import com.themoon.y1.eventlog.EventLog
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
+import com.themoon.y1.views.Notice
 import org.json.JSONObject
 import java.io.File
 import java.net.DatagramSocket
@@ -86,7 +87,7 @@ object CastManager {
         AudioPlayerManager.getInstance().applyMasterVolume()
         MainActivity.instance?.updateStatusBarPlayOn()
         log("start", JSONObject().put("device", target.id).put("name", target.name))
-        toast("${localize("Playing on")} ${target.name}")
+        notice("${localize("Playing on")} ${target.name}")
         val r = CastRenderer.forDevice(target)
         renderer = r
         workerHandler().post {
@@ -115,7 +116,7 @@ object CastManager {
         MainActivity.instance?.updateStatusBarPlayOn()
         releaseLocks()
         log("stop", JSONObject().put("device", d.id).put("reason", reason ?: "user"))
-        if (reason != null) toast("${d.name}: ${localize(reason)}")
+        if (reason != null) notice("${d.name}: ${localize(reason)}", error = true)
         workerHandler().post {
             if (stopRemote) try { r?.stop() } catch (e: Exception) { Log.w(TAG, "stop: $e") }
             try { r?.close() } catch (_: Exception) {}
@@ -135,7 +136,7 @@ object CastManager {
         val target = (current + if (isUp) VOLUME_STEP else -VOLUME_STEP).coerceIn(0, 100)
         volumeTarget = target
         lastWheelAt = SystemClock.uptimeMillis()
-        MainActivity.instance?.showDynamicVolumeOverlay(target, 100)
+        MainActivity.instance?.showDynamicVolumeOverlay(target, 100, R.drawable.ic_play_on)
         val s = session
         val w = workerHandler()
         w.removeCallbacks(sendVolume)
@@ -310,8 +311,9 @@ object CastManager {
         wifiLock = null
     }
 
-    private fun toast(text: String) {
-        main.post { MainActivity.instance?.let { Toast.makeText(it, text, Toast.LENGTH_SHORT).show() } }
+    private fun notice(text: String, error: Boolean = false) {
+        val ctx = MainActivity.instance ?: return
+        if (error) Notice.error(ctx, text) else Notice.show(ctx, text)
     }
 
     private fun localize(text: String): String = MainActivity.instance?.t(text) ?: text
