@@ -39,6 +39,20 @@ class ActionScreenTest {
     }
 
     @Test
+    fun aRowThatOpensAListKeepsTheScreenUnderIt() {
+        val steps = mutableListOf<String>()
+        val playOn = ActionScreens.Action("Play On", opensList = true) { steps.add("open list") }
+        assertFalse(playOn.closes)
+        ActionScreens.choose(playOn) { steps.add("close") }
+        assertEquals(listOf("open list"), steps)
+        // A row that goes to another screen itself: no close first, and no chevron
+        val speaker = ActionScreens.Action("Sonos", checked = false, closes = false) { steps.add("play") }
+        assertFalse(speaker.opensList)
+        ActionScreens.choose(speaker) { steps.add("close") }
+        assertEquals(listOf("open list", "play"), steps)
+    }
+
+    @Test
     fun backClosesTheScreenAndCancelsWithoutTheAction() {
         val steps = mutableListOf<String>()
         val spec = ActionScreens.Spec(
