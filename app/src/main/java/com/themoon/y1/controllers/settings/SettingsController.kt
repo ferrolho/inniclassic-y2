@@ -138,24 +138,6 @@ class SettingsController(
                 sign, absMin / 60, absMin % 60, timeZoneCityName(zoneId)
             )
         }
-
-        val MUSIC_MENU_ITEMS = arrayOf(
-            arrayOf("coverflow", "Cover Flow"),
-            arrayOf("playlists", "Playlists"),
-            arrayOf("track_artists", "Artists"),
-            arrayOf("artists", "Album Artists"),
-            arrayOf("albums", "Albums"),
-            arrayOf("compilations", "Compilations"),
-            arrayOf("songs", "Songs"),
-            arrayOf("shuffle_songs", "Shuffle Songs"),
-            arrayOf("genres", "Genres"),
-            arrayOf("composers", "Composers"),
-            arrayOf("years", "Years"),
-            arrayOf("recently_added", "Recently Added"),
-            arrayOf("favorites", "My Favorites"),
-            arrayOf("folders", "Folders"),
-            arrayOf("search", "Search")
-        )
     }
 
     // Groups on the top level (SettingsGroups.kt). The rows stay in buildSettingsUI; the groups only move them.
@@ -1233,20 +1215,32 @@ class SettingsController(
         if (index >= 0) containerSettingsItems.getChildAt(index)?.requestFocus()
     }
 
-    private fun applySystemTimeZone(zoneId: String) {
-        try {
-            // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
-            // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
-            // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
-            proc.waitFor()
-            TimeZone.setDefault(null)
-            if (TimeZone.getDefault().id != zoneId) {
-                Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+    // Time Zone list: su runs, so a second click waits
+    private var timeZoneRunning = false
+
+    /** Sets the zone through su on a background thread, then calls [onDone] on the main thread. */
+    private fun applySystemTimeZone(zoneId: String, onDone: () -> Unit) {
+        timeZoneRunning = true
+        Thread {
+            val ok = try {
+                // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
+                // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
+                // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
+                val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
+                proc.waitFor()
+                true
+            } catch (_: Exception) {
+                false
             }
-        } catch (_: Exception) {
-            Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
-        }
+            activity.runOnUiThread {
+                timeZoneRunning = false
+                TimeZone.setDefault(null)
+                if (!ok || TimeZone.getDefault().id != zoneId) {
+                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                }
+                onDone()
+            }
+        }.start()
     }
 
     private fun buildTimeZoneSelectorUI() {
@@ -1266,16 +1260,14 @@ class SettingsController(
                 ThemeManager.getListButtonFocusedTextColor()
             )
             btn.setOnClickListener {
+                if (timeZoneRunning) return@setOnClickListener
                 clickFeedback()
-                applySystemTimeZone(id)
-                // The clock itself is unchanged, but its local time moved, so reload the picker values
-                val c = Calendar.getInstance()
-                dtYear = c.get(Calendar.YEAR)
-                dtMonth = c.get(Calendar.MONTH) + 1
-                dtDay = c.get(Calendar.DAY_OF_MONTH)
-                dtHour = c.get(Calendar.HOUR_OF_DAY)
-                dtMinute = c.get(Calendar.MINUTE)
-                buildDateTimeUI()
+                applySystemTimeZone(id) {
+                    // The clock itself is unchanged, but its local time moved, so reload the picker values
+                    refreshDateTimeScreen()
+                    // Back to Date & Time, if the user did not leave this list meanwhile
+                    if (containerSettingsItems.indexOfChild(btn) >= 0) buildDateTimeUI()
+                }
             }
             containerSettingsItems.addView(btn)
             if (isSelected) focusBtn = btn
@@ -1514,12 +1506,12 @@ class SettingsController(
             } catch (_: Exception) {}
         }
 
-        for (item in MUSIC_MENU_ITEMS) {
-            val id = item[0]
+        for (item in com.themoon.y1.controllers.browser.MusicMenuItems.ITEMS) {
+            val id = item.id
             val isHidden = com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
             val stateIcon = if (isHidden) "\uE5CD" else "\uE8F4"
 
-            val row = createSettingRow(localize(item[1]), stateIcon)
+            val row = createSettingRow(localize(item.label), stateIcon)
             val tvRight = row.getChildAt(1) as? TextView
             if (materialIconFont != null) {
                 tvRight?.typeface = materialIconFont
