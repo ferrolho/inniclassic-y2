@@ -54,6 +54,8 @@ class AudioPlayerManager private constructor() {
     val crossfeedProcessor: Y1CrossfeedAudioProcessor = Y1CrossfeedAudioProcessor()
     var legacyPlayer: MediaPlayer? = null
     var isUsingLegacyPlayer: Boolean = false
+    // The file that the legacy player has prepared, or null.
+    private var legacyPlayerPath: String? = null
 
     private val flacLegacyFailedPaths: MutableSet<String> = HashSet()
     private var isGaplessQueueActive: Boolean = false
@@ -955,6 +957,7 @@ class AudioPlayerManager private constructor() {
                     setAudioStreamType(AudioManager.STREAM_MUSIC)
                     legacyPlayer = this
                 }
+                legacyPlayerPath = null
                 player.reset()
 
                 player.setOnCompletionListener { handleTrackCompletion() }
@@ -973,6 +976,7 @@ class AudioPlayerManager private constructor() {
                 currentFileInputStream = FileInputStream(track)
                 player.setDataSource(currentFileInputStream!!.fd)
                 player.prepare()
+                legacyPlayerPath = track.absolutePath
 
                 if (effectiveSeekMs > 0) {
                     player.seekTo(effectiveSeekMs.toInt())
@@ -1115,6 +1119,19 @@ class AudioPlayerManager private constructor() {
             return if (duration < 0) 0 else duration.toInt()
         }
         return 0
+    }
+
+    /**
+     * The duration of the file at [path] in ms, or 0 when the player does not know it. During a track
+     * change the player can still hold the previous file; then it is 0, not the previous duration.
+     */
+    fun getDurationOf(path: String): Int {
+        if (isUsingLegacyPlayer) return if (legacyPlayerPath == path) getDuration() else 0
+        val uri = exoPlayer?.currentMediaItem?.playbackProperties?.uri ?: return 0
+        // A podcast stream has a web address, not the "/PODCAST_STREAM/..." name of the playlist.
+        val isStream = path.startsWith("/PODCAST_STREAM")
+        val same = if (isStream) uri.scheme != "file" else uri.path == path
+        return if (same) getDuration() else 0
     }
 
     fun isPlaying(): Boolean {

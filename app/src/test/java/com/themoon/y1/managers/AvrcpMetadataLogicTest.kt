@@ -3,7 +3,9 @@ package com.themoon.y1.managers
 import android.media.MediaMetadataRetriever
 import android.media.RemoteControlClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AvrcpMetadataLogicTest {
@@ -29,6 +31,42 @@ class AvrcpMetadataLogicTest {
         assertEquals(215_000L, AvrcpMetadataLogic.duration(track))
         assertNull(AvrcpMetadataLogic.duration(track.copy(durationMs = 0)))
         assertNull(AvrcpMetadataLogic.duration(track.copy(durationMs = -1)))
+    }
+
+    @Test
+    fun newTrackOnlyWhenTitleArtistOrAlbumChanges() {
+        assertTrue(AvrcpMetadataLogic.isNewTrack(null, track))
+        assertFalse(AvrcpMetadataLogic.isNewTrack(track, track.copy(durationMs = 0)))
+        assertTrue(AvrcpMetadataLogic.isNewTrack(track, track.copy(title = "Other")))
+        assertTrue(AvrcpMetadataLogic.isNewTrack(track, track.copy(artist = "Other")))
+        assertTrue(AvrcpMetadataLogic.isNewTrack(track, track.copy(album = "Other")))
+    }
+
+    @Test
+    fun newTrackWaitsForItsDuration() {
+        val next = track.copy(title = "Next", durationMs = 0)
+        assertEquals(AvrcpMetadataLogic.Action.WAIT, AvrcpMetadataLogic.action(track, next, artChanged = true, waitedMs = 0))
+        assertEquals(AvrcpMetadataLogic.Action.WAIT, AvrcpMetadataLogic.action(null, next, artChanged = false, waitedMs = 1_499))
+        // The duration is known: send now.
+        assertEquals(AvrcpMetadataLogic.Action.SEND, AvrcpMetadataLogic.action(track, next.copy(durationMs = 180_000), artChanged = false, waitedMs = 0))
+        // The duration does not come: send the title, artist and album after the wait.
+        assertEquals(AvrcpMetadataLogic.Action.SEND, AvrcpMetadataLogic.action(track, next, artChanged = false, waitedMs = AvrcpMetadataLogic.MAX_DURATION_WAIT_MS))
+    }
+
+    @Test
+    fun sameTrackSendsOnlyChanges() {
+        assertEquals(AvrcpMetadataLogic.Action.SKIP, AvrcpMetadataLogic.action(track, track, artChanged = false, waitedMs = 0))
+        assertEquals(AvrcpMetadataLogic.Action.SEND, AvrcpMetadataLogic.action(track, track, artChanged = true, waitedMs = 0))
+        // A later duration of a track that was sent without one: send it (no wait, it is not a new track).
+        val noDuration = track.copy(durationMs = 0)
+        assertEquals(AvrcpMetadataLogic.Action.SEND, AvrcpMetadataLogic.action(noDuration, track, artChanged = false, waitedMs = 0))
+        assertEquals(AvrcpMetadataLogic.Action.SEND, AvrcpMetadataLogic.action(track, noDuration, artChanged = false, waitedMs = 0))
+    }
+
+    @Test
+    fun logLineHasTheDuration() {
+        assertEquals("AVRCP track data sent: \"Title\" duration 215000 ms", AvrcpMetadataLogic.logLine(track))
+        assertEquals("AVRCP track data sent: \"Title\" duration -", AvrcpMetadataLogic.logLine(track.copy(durationMs = 0)))
     }
 
     @Test
