@@ -505,7 +505,6 @@ class AudioPlayerManager private constructor() {
                             main.runOnUiThread {
                                 main.ivAlbumArt.setImageBitmap(bmp)
                                 main.currentAlbumColor = (bmp.getPixel(bmp.width / 2, (bmp.height * 0.8).toInt()) or 0xFF000000.toInt())
-                                main.updateMainMenuBackground()
                             }
                         }
                     } catch (ignored: Exception) {}
@@ -873,7 +872,6 @@ class AudioPlayerManager private constructor() {
                     val bmpCenter = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsCenter)
                     if (bmpCenter != null) {
                         main.ivAlbumArt.setImageBitmap(bmpCenter)
-                        main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
 
                         try {
@@ -913,7 +911,6 @@ class AudioPlayerManager private constructor() {
                                 main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
                             }
 
-                            main.updateMainMenuBackground()
                             main.refreshNowPlayingPreview()
                             artApplied = true
                         }
@@ -932,7 +929,6 @@ class AudioPlayerManager private constructor() {
                     } else {
                         main.ivAlbumArt.setImageResource(R.drawable.default_album)
                         main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-                        main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
                     }
                 }
@@ -1815,7 +1811,6 @@ class AudioPlayerManager private constructor() {
             prepareMusicTrack(main.currentIndex, initialSeekMs = savedPos, initialDurationMs = savedDur)
             main.updatePlayerUI()
             main.refreshNowPlayingPreview()
-            main.updateMainMenuBackground()
             return true
         } finally {
             isRestoringPlaybackState = false
