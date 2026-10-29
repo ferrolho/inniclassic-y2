@@ -206,8 +206,6 @@ internal fun MainActivity.initControllers() {
         clickFeedback = { clickFeedback() },
         onAdjustVolume = { adjustVolume(it) },
         onTogglePlayback = { AudioPlayerManager.getInstance().playOrPauseMusic() },
-        onNextTrack = { AudioPlayerManager.getInstance().nextTrack() },
-        onPreviousTrack = { AudioPlayerManager.getInstance().prevTrack() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onBrowseAlbum = { album ->
             // The menu gives only the title; take the album artist from the song that plays.
@@ -220,7 +218,8 @@ internal fun MainActivity.initControllers() {
             changeScreen(ScreenState.Browser(BrowserMode.Songs("ARTIST", artist)))
         },
         onToggleFavorite = { toggleFavorite() },
-        onAddToOnTheGo = { showAddToPlaylistDialog(it) },
+        onAddToOnTheGo = { playlistController.addSongToOnTheGo(it) },
+        onAddToPlaylist = { showAddToPlaylistDialog(it) },
         onToggleVisualizer = { toggleVisualizer() },
         localize = { t(it) }
     )
