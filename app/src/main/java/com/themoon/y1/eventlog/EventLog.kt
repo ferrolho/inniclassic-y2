@@ -115,6 +115,15 @@ object EventLog {
             try { Inputs.start(app) } catch (t: Throwable) { note("input devices not logged: $t") }
             try { Bluetooth.start(app) } catch (t: Throwable) { note("Bluetooth events not logged: $t") }
             LogcatTap(File(app.filesDir, "event-log")).start()
+            app.registerReceiver(Network, IntentFilter().apply {
+                addAction(android.net.wifi.WifiManager.WIFI_STATE_CHANGED_ACTION)
+                addAction(android.net.wifi.WifiManager.NETWORK_STATE_CHANGED_ACTION)
+            })
+            app.registerReceiver(Storage, IntentFilter().apply {
+                for (a in Storage.ACTIONS) addAction(a)
+                addDataScheme("file")
+            })
+            PowerLog.start(app, File(app.filesDir, "event-log"))
         } catch (t: Throwable) {
             Log.w(TAG, "event log not started: $t")
         }
@@ -636,6 +645,46 @@ object EventLog {
         }
 
         override fun onConfigurationChanged(newConfig: Configuration) {}
+    }
+
+    /** Wi-Fi on and off, connected and disconnected: one line for each change (the system sends the same state again). */
+    private object Network : BroadcastReceiver() {
+        private var last: String? = null
+
+        override fun onReceive(context: Context, intent: Intent) {
+            val state = when (intent.action) {
+                android.net.wifi.WifiManager.WIFI_STATE_CHANGED_ACTION ->
+                    when (intent.getIntExtra(android.net.wifi.WifiManager.EXTRA_WIFI_STATE, -1)) {
+                        android.net.wifi.WifiManager.WIFI_STATE_ENABLED -> "on"
+                        android.net.wifi.WifiManager.WIFI_STATE_DISABLED -> "off"
+                        else -> return
+                    }
+                else -> {
+                    val info = intent.getParcelableExtra<android.net.NetworkInfo>(android.net.wifi.WifiManager.EXTRA_NETWORK_INFO) ?: return
+                    when (info.state) {
+                        android.net.NetworkInfo.State.CONNECTED -> "connected"
+                        android.net.NetworkInfo.State.DISCONNECTED -> "disconnected"
+                        else -> return
+                    }
+                }
+            }
+            if (state == last) return
+            last = state
+            emit("wifi", JSONObject().put("a", state))
+        }
+    }
+
+    /** The memory card and the internal storage: mounted, shared over USB, removed. */
+    private object Storage : BroadcastReceiver() {
+        val ACTIONS = arrayOf(
+            Intent.ACTION_MEDIA_MOUNTED, Intent.ACTION_MEDIA_UNMOUNTED, Intent.ACTION_MEDIA_SHARED,
+            Intent.ACTION_MEDIA_EJECT, Intent.ACTION_MEDIA_REMOVED, Intent.ACTION_MEDIA_BAD_REMOVAL
+        )
+
+        override fun onReceive(context: Context, intent: Intent) {
+            val a = intent.action?.removePrefix("android.intent.action.MEDIA_")?.lowercase(Locale.US) ?: return
+            emit("storage", JSONObject().put("a", a).put("path", intent.data?.path ?: ""))
+        }
     }
 
     private object Display : BroadcastReceiver() {

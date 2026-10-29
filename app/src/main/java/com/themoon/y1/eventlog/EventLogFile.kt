@@ -5,18 +5,20 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * The log files: `events.jsonl` (current) and `events.1.jsonl` … (older), one JSON object per line.
+ * The log files: `<name>.jsonl` (current) and `<name>.1.jsonl` … (older), one JSON object per line
+ * (`events`: the event log; `power`: the power log).
  * When the current file would grow past [maxBytes], the files move up by one and the oldest is deleted.
  * No fsync: the kernel writes the data to flash in its own time.
  */
 class EventLogFile(
     val dir: File,
     private val maxBytes: Long = EventLogLogic.MAX_FILE_BYTES,
-    private val files: Int = EventLogLogic.FILES
+    private val files: Int = EventLogLogic.FILES,
+    private val name: String = "events"
 ) {
-    val current: File get() = File(dir, "events.jsonl")
+    val current: File get() = File(dir, "$name.jsonl")
 
-    private fun older(i: Int) = File(dir, "events.$i.jsonl")
+    private fun older(i: Int) = File(dir, "$name.$i.jsonl")
 
     @Synchronized
     fun append(lines: List<String>) {
