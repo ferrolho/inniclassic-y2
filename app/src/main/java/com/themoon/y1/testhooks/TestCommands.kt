@@ -43,6 +43,8 @@ import java.io.File
  *   (builds with the live theme change only).
  * - `log [--ei lines <n>] [--es since <uptimeMs>] [--ez clear true]`: lines of the event log
  *   (see [com.themoon.y1.eventlog.EventLog]) in place of the state.
+ * - `cast --es do search|start|stop|status [--es name <part of the speaker name>]`: Play On (see
+ *   [com.themoon.y1.cast.CastManager]); `start` searches first when no search ran yet.
  */
 internal class TestCommands(private val main: MainActivity, private val handler: Handler) {
 
@@ -102,7 +104,8 @@ internal class TestCommands(private val main: MainActivity, private val handler:
             }
             "theme" -> done(theme(intent.getStringExtra("name")))
             "log" -> done(log(intent))
-            else -> done("unknown cmd '$cmd'; use state|open|browse|play|seek|bottom|key|theme|log")
+            "cast" -> cast(intent.getStringExtra("do") ?: "status", intent.getStringExtra("name"), done)
+            else -> done("unknown cmd '$cmd'; use state|open|browse|play|seek|bottom|key|theme|log|cast")
         }
     }
 
@@ -127,6 +130,7 @@ internal class TestCommands(private val main: MainActivity, private val handler:
             "Upload" -> main.handleMainMenuAction("WEBSERVER")
             "Bluetooth" -> main.handleMainMenuAction("BLUETOOTH")
             "Wifi" -> main.handleMainMenuAction("WIFI")
+            "PlayOn" -> main.handleMainMenuAction("OPEN_PLAY_ON")
             "Themes" -> main.handleMainMenuAction("OPEN_THEME_SETTINGS")
             "Playlists" -> {
                 // Music -> Playlists, as the browser row does
@@ -343,6 +347,36 @@ internal class TestCommands(private val main: MainActivity, private val handler:
      * lines go to `<external files>/event-log-tail.jsonl`; the reply has them in `events` only when it stays
      * short enough for the broadcast result.
      */
+    // --- cast ---
+
+    private fun cast(action: String, name: String?, done: (String?) -> Unit) {
+        val cm = com.themoon.y1.cast.CastManager
+        fun devices(list: List<com.themoon.y1.cast.CastDevice>) = JSONArray().also { a ->
+            for (d in list) a.put(JSONObject().put("name", d.name).put("kind", d.kind.name).put("host", d.host).put("port", d.port))
+        }
+        fun status() = JSONObject().put("active", cm.isActive).put("device", cm.device?.id ?: JSONObject.NULL)
+            .put("known", devices(cm.knownDevices))
+        when (action) {
+            "search" -> cm.search { found -> reply = status().put("found", devices(found)); done(null) }
+            "start" -> {
+                val start = { list: List<com.themoon.y1.cast.CastDevice> ->
+                    val d = list.firstOrNull { name == null || it.name.contains(name, true) || it.kind.name.equals(name, true) }
+                    if (d == null) {
+                        done("no speaker matches '${name.orEmpty()}'; found: ${list.joinToString { it.rowLabel }}")
+                    } else {
+                        cm.start(main, d)
+                        reply = status()
+                        done(null)
+                    }
+                }
+                if (cm.searchIsRecent()) start(cm.knownDevices) else cm.search { start(it) }
+            }
+            "stop" -> { cm.stop(); reply = status(); done(null) }
+            "status" -> { reply = status(); done(null) }
+            else -> done("cast needs --es do search|start|stop|status")
+        }
+    }
+
     private fun log(intent: Intent): String? {
         if (!EventLog.enabled) return "the event log is off in this build"
         if (intent.getBooleanExtra("clear", false)) {
