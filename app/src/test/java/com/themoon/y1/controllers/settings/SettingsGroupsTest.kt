@@ -173,10 +173,10 @@ class SettingsGroupsTest {
     @Test
     fun subScreenTitleIsTheRowThatOpenedIt() {
         val t = SettingsGroups::subScreenTitles
-        // Appearance → Background, then Back
-        val bg = t(emptyList(), 0, 1, "Background", "Settings")
-        assertEquals(listOf("Background"), bg)
-        assertEquals(emptyList<String>(), t(bg, 1, 0, null, "Settings"))
+        // Appearance → Theme, then Back
+        val theme = t(emptyList(), 0, 1, "Theme", "Settings")
+        assertEquals(listOf("Theme"), theme)
+        assertEquals(emptyList<String>(), t(theme, 1, 0, null, "Settings"))
         // General → Date & Time → Year, Back to Date & Time, Time Format rebuilds Date & Time at the same depth
         val dt = t(emptyList(), 0, 1, "Date & Time", "Settings")
         val year = t(dt, 1, 2, "Year", "Settings")
