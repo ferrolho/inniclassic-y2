@@ -645,8 +645,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // A key during a menu slide ends the slide at once, then acts on the new screen as normal
-        if (event.action == KeyEvent.ACTION_DOWN) menuSlide?.finishNow()
+        // A key during a menu slide ends the slide at once, then acts on the new screen as normal. Not the repeats of
+        // a held key: a held centre opens a screen (Now Playing menu, Add to Playlist), and its repeats must not stop
+        // the slide of that screen.
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) menuSlide?.finishNow()
         return InputRouter.getInstance().dispatchKeyEvent(
             event = event,
             context = this,
