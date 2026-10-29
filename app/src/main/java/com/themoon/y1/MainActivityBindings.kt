@@ -113,6 +113,7 @@ internal fun MainActivity.initViewBindings() {
             setColor(ThemeManager.getTextColorPrimary())
         }
         batteryIconView = biv
+        com.themoon.y1.controllers.settings.StatusBarSettings.applyBattery(this)
         val d = resources.displayMetrics.density
         val blp = LinearLayout.LayoutParams((30 * d).toInt(), (16 * d).toInt()).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -143,7 +144,6 @@ internal fun MainActivity.loadPreferences() {
     vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
     isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
     isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
-    isAutoFetchEnabled = prefs.getBoolean("auto_fetch", true)
     is24HourFormat = prefs.getBoolean(ClockSettings.KEY_24_HOUR_FORMAT, ClockSettings.DEFAULT_24_HOUR_FORMAT)
     isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
     isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
@@ -152,7 +152,6 @@ internal fun MainActivity.loadPreferences() {
     com.themoon.y1.models.AlbumKey.byArtist = prefs.getBoolean(com.themoon.y1.models.AlbumKey.PREF_BY_ARTIST, false)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq_enabled", false)
-    currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
     currentSystemBrightness = prefs.getInt("brightness_level", 255)
 
     eqPresetNames.clear()
