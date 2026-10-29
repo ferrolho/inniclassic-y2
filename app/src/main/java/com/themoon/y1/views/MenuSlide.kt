@@ -28,7 +28,7 @@ import com.themoon.y1.views.MenuSlideMotion.Kind
  * The Cover Flow slide also has a live art layer ([CoverArtView] with [CoverArtView.slideLayer]) that continues
  * the Menu Cover Motion with the same zoom and offset, and also draws the art that the list pane hid (left of the
  * pane edge, up to the art's own left edge): the art shows from under the list as the list goes, and as the art
- * pane goes right ([MenuSlideMotion.coverFlowArtLayer]).
+ * pane goes right ([MenuSlideMotion.coverFlowArtLayer]). The menu shadow moves with the list pane's right edge.
  *
  * The screens change at once (the controllers have the new state at the key press), so keys always act on the new
  * screen: a key during a slide ends the slide at once ([finishNow]), and the key then acts as normal (not lost,
@@ -299,6 +299,14 @@ class MenuSlide private constructor(
                 drawPart(canvas, b, 0f, 0, w.toFloat())
                 super.dispatchDraw(canvas)
                 drawPart(canvas, a, off[0], 0, pane.toFloat())
+                // The menu shadow is the list's drop shadow: it moves with the list's right edge, over the art and
+                // Cover Flow, and fades out in the last shadow width before the edge leaves the screen.
+                val edge = pane + off[0]
+                val density = resources.displayMetrics.density
+                val save = canvas.save()
+                canvas.translate(edge, top.toFloat())
+                CoverPane.drawShadow(canvas, density, a.height, edge / (CoverPane.SHADOW_WIDTH_DP * density))
+                canvas.restoreToCount(save)
             }
         }
     }
