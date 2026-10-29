@@ -87,6 +87,7 @@ internal class TestCommands(private val main: MainActivity, private val handler:
             "play" -> done(play(intent.getStringExtra("path"), intent.getStringExtra("query"), intent.getStringExtra("from")))
             "seek" -> done(if (intent.hasExtra("ms")) seek(intent.getIntExtra("ms", 0)) else "seek needs --ei ms <position>")
             "bottom" -> done(if (intent.hasExtra("state")) bottom(intent.getIntExtra("state", 0)) else "bottom needs --ei state <n>")
+            "loading" -> done(loading(intent.getStringExtra("do"), intent.getStringExtra("text"), intent.getIntExtra("percent", 0)))
             "key" -> {
                 if (!intent.hasExtra("code")) {
                     done("key needs --ei code <keycode>")
@@ -329,6 +330,31 @@ internal class TestCommands(private val main: MainActivity, private val handler:
     // --- theme ---
 
     /** MainActivity.changeTheme(name) (MainActivityTheme.kt): selects the theme and applies it after this event. */
+    // --- loading ---
+
+    /**
+     * The wait screen of the library scan, without a scan: do=show (the spinner, [text] or the default text),
+     * do=update ([percent] on the bar, builds with MainActivity.updateLoadingProgress), do=hide.
+     */
+    private fun loading(action: String?, text: String?, percent: Int): String? = when (action) {
+        "show" -> {
+            main.showLoadingPopup(text)
+            null
+        }
+        "update" -> try {
+            main.javaClass.getMethod("updateLoadingProgress", Int::class.javaPrimitiveType, String::class.java)
+                .invoke(main, percent, text ?: "")
+            null
+        } catch (_: Throwable) {
+            "this build has no progress bar update"
+        }
+        "hide" -> {
+            main.dismissLoadingOverlay()
+            null
+        }
+        else -> "loading needs --es do show|update|hide"
+    }
+
     private fun theme(name: String?): String? {
         if (name.isNullOrBlank()) return "theme needs --es name <theme>"
         val change = try {
