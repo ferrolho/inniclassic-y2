@@ -820,7 +820,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val split = volumeSplit()
         val setting = VolumeSteps.settingFor(target, curve, sysMaxVol, split)
         lastTargetVolume = setting.index
-        lastTargetVolumeTime = System.currentTimeMillis()
         val fromIndex = try { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) } catch (_: Exception) { 0 }
         val plan = VolumeSteps.indexSchedule(
             fromIndex, target, curve, sysMaxVol, android.os.SystemClock.uptimeMillis() - lastVolumeIndexWriteMs, split
