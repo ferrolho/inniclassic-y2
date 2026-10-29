@@ -258,7 +258,7 @@ internal fun MainActivity.initControllers() {
         onExitRadio = { NavigationManager.getInstance().popBackStack() },
         showLoadingPopup = { showLoadingPopup() },
         dismissLoadingOverlay = { dismissLoadingOverlay() },
-        updateLoadingProgress = { _, _ -> },
+        updateLoadingProgress = { progress, message -> updateLoadingProgress(progress, message) },
         localize = { t(it) }
     )
 

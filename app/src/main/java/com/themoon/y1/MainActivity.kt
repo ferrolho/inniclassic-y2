@@ -283,8 +283,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var tvStatusBattery: TextView? = null
     var batteryIconView: BatteryIconView? = null
     var layoutLoadingOverlay: LinearLayout? = null
-    var pbLoadingProgress: ProgressBar? = null
-    var tvLoadingProgress: TextView? = null
 
     val usbStorageOverlay: View?
         get() = usbStorageManager.usbStorageOverlay
@@ -843,22 +841,18 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         prefs.edit().putStringSet("favorite_songs_set", favoritePaths).apply()
     }
 
+    /** Shows work in progress under the status bar ([com.themoon.y1.views.ProgressLayer]), with the spinner. */
     fun showLoadingPopup(title: String? = null) {
-        pbLoadingProgress?.visibility = View.VISIBLE
-        if (title != null) {
-            tvLoadingProgress?.text = title
-        } else if (tvLoadingProgress?.text.isNullOrEmpty()) {
-            tvLoadingProgress?.text = t("Preparing to scan...\nPlease wait.")
-        }
-        layoutLoadingOverlay?.apply {
-            setBackgroundColor(0xDD000000.toInt())
-            alpha = 1.0f
-            visibility = View.VISIBLE
-        }
+        com.themoon.y1.views.ProgressLayer.show(this, title)
+    }
+
+    /** Shows [percent] (0–100) of the work on the iPod progress bar, with [message]. */
+    fun updateLoadingProgress(percent: Int, message: String) {
+        com.themoon.y1.views.ProgressLayer.update(this, percent, message)
     }
 
     fun dismissLoadingOverlay() {
-        layoutLoadingOverlay?.visibility = View.GONE
+        com.themoon.y1.views.ProgressLayer.hide()
     }
 
     fun showAddToPlaylistDialog(songFile: File) {
@@ -893,8 +887,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         // Only the web server holds the screen on (FLAG_KEEP_SCREEN_ON), so the screen is blanked for it.
         if (BacklightTimer.useFakeScreenOff(isServerRunning)) {
             isFakeScreenOff = true
-            pbLoadingProgress?.visibility = View.GONE
-            tvLoadingProgress?.text = ""
             powerBacklightManager?.enterFakeScreenOff(window, layoutLoadingOverlay) { sleep ->
                 autoManageWifiPower(sleep)
             }

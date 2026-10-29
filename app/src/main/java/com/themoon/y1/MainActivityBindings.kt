@@ -1,12 +1,10 @@
 package com.themoon.y1
 
-import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 
 internal fun MainActivity.initViewBindings() {
@@ -57,26 +55,6 @@ internal fun MainActivity.initViewBindings() {
         isClickable = true
         isFocusable = true
         visibility = View.GONE
-
-        val density = resources.displayMetrics.density
-        val pb = ProgressBar(this@initViewBindings, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
-        }
-        pbLoadingProgress = pb
-        val pbLp = LinearLayout.LayoutParams(
-            (250 * density).toInt(),
-            (20 * density).toInt()
-        )
-        addView(pb, pbLp)
-
-        val tv = TextView(this@initViewBindings).apply {
-            setTextColor(Color.WHITE)
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, (20 * density).toInt(), 0, 0)
-        }
-        tvLoadingProgress = tv
-        addView(tv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
     rootContent.addView(layoutLoadingOverlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
