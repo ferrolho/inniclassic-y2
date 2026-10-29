@@ -224,6 +224,7 @@
   "Folders": "Folders",
   "Artists": "Artists",
   "Albums": "Albums",
+  "Compilations": "Compilations",
   "All Songs": "All Songs",
   "Playlists": "Playlists",
   "Switch to Audiobooks": "Switch to Audiobooks",
@@ -287,6 +288,7 @@
   "HIDDEN": "HIDDEN",
   "SHOW": "SHOW",
   "Shuffle Mode": "Shuffle Mode",
+  "Shuffle Songs": "Shuffle Songs",
   "Repeat Mode": "Repeat Mode",
   "ONE": "ONE",
   "ALL": "ALL",
@@ -525,6 +527,9 @@
   "Keyboard Layout": "Keyboard Layout",
   "Original": "Original",
   "QWERTY": "QWERTY",
+  "Group Albums": "Group Albums",
+  "By Title": "By Title",
+  "By Title and Artist": "By Title and Artist",
   "Next": "Next",
   "Login": "Login",
   "Add to Favorites": "Add to Favorites",
@@ -641,8 +646,6 @@
   "Buy 1 Heart ($1,500)": "Buy 1 Heart ($1,500)",
   "Heart Purchased": "Heart Purchased",
   "Recently Played": "Recently Played",
-  "No recently played albums yet.": "No recently played albums yet.",
-  "Clear Recently Played": "Clear Recently Played",
-  "Are you sure you want to clear your recently played history?": "Are you sure you want to clear your recently played history?",
-  "Recently played cleared.": "Recently played cleared."
+  "Top 25 Most Played": "Top 25 Most Played",
+  "No Songs": "No Songs"
 }
