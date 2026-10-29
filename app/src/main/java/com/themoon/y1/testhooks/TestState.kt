@@ -308,16 +308,12 @@ internal class TestState(private val main: MainActivity, private val options: Op
                     .put("playbackState", exo.playbackState))
             } catch (_: Throwable) {}
         }
-        // Stored shuffle/repeat: AppPrefs (Settings, AudioPlayerManager) and y1_settings (older Now Playing code)
-        val stored = JSONObject()
-        for (name in listOf("AppPrefs", "y1_settings")) {
-            val p = main.getSharedPreferences(name, Context.MODE_PRIVATE)
-            val s = JSONObject()
-            if (p.contains("shuffle")) s.put("shuffle", p.getBoolean("shuffle", false))
-            if (p.contains("repeat_mode")) s.put("repeat_mode", p.getInt("repeat_mode", 0))
-            stored.put(name, s)
-        }
-        out.put("stored", stored)
+        // Stored shuffle/repeat in AppPrefs (in our build, Now Playing also keeps them there)
+        val p = main.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        val s = JSONObject()
+        if (p.contains("shuffle")) s.put("shuffle", p.getBoolean("shuffle", false))
+        if (p.contains("repeat_mode")) s.put("repeat_mode", p.getInt("repeat_mode", 0))
+        out.put("stored", JSONObject().put("AppPrefs", s))
         return out
     }
 

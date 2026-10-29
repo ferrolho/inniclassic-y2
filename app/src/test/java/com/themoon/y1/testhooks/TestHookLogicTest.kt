@@ -93,13 +93,19 @@ class TestHookLogicTest {
             "sound" to true,
             "loop_scroll_on" to false,
             "app_theme_name" to "Classic Light",
+            "list_edges_fade" to true,
+            "album_tilt_enabled" to false,
             "rating_/music/a.flac" to 4,
             "lastfm_password" to "x",
+            "vibration" to true,
             "unrelated" to 1
         )
         val s = TestHookLogic.keySettings(prefs)
-        assertEquals(3, s.length())
+        assertEquals(5, s.length())
         assertEquals("Classic Light", s.getString("app_theme_name"))
+        assertTrue(s.getBoolean("list_edges_fade"))
+        assertFalse(s.getBoolean("album_tilt_enabled"))
+        assertFalse(s.has("vibration"))
         assertFalse(s.has("unrelated"))
     }
 
@@ -111,11 +117,13 @@ class TestHookLogicTest {
             "book_pos_/books/b.m4b" to 1000,
             "lastfm_password" to "x",
             "jellyfin_token" to "y",
+            "lastfm_api_key" to "z",
             "favorite_songs_set" to setOf("a", "b"),
+            "pos_/videos/Session 1.mp4" to 5,
             "volume" to 0.5f
         )
         val s = TestHookLogic.allSettings(prefs)
-        assertEquals(setOf("sound", "favorite_songs_set", "volume"), s.keys().asSequence().toSet())
+        assertEquals(setOf("sound", "favorite_songs_set", "pos_/videos/Session 1.mp4", "volume"), s.keys().asSequence().toSet())
         assertEquals(2, s.getJSONObject("favorite_songs_set").getInt("setSize"))
     }
 

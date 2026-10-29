@@ -23,10 +23,15 @@ object EventLogLogic {
 
     // --- settings ---
 
+    // "api" also finds "apikey" and "api_key".
     private val SECRET_PARTS = listOf("password", "token", "session", "secret", "api")
 
-    /** Keys that can hold a secret. The log never shows their change. */
+    /**
+     * Keys that can hold a secret. The log and the test state never show their value.
+     * Keys with a file path (ratings, positions) are not secrets: the path can have any word.
+     */
     fun isSecretKey(key: String): Boolean {
+        if (key.contains('/')) return false
         val k = key.lowercase(Locale.US)
         return SECRET_PARTS.any { k.contains(it) }
     }

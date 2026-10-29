@@ -1,5 +1,6 @@
 package com.themoon.y1.testhooks
 
+import com.themoon.y1.eventlog.EventLogLogic
 import com.themoon.y1.models.SongItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -132,20 +133,13 @@ object TestHookLogic {
     }
 
     private val SETTING_KEYS = listOf(
-        "sound", "sound_effect", "vibrate", "vibration", "vibrate_strength", "vibration_level",
-        "double_click_favorite", "time_in_title_bar", "is_24h_format", "is_24_hour_format",
-        "screen_off_control", "loop_scroll_on", "app_theme_name", "current_theme_name",
-        "album_tilt_effect", "shuffle", "repeat_mode", "backlight_timer_index", "volume_limit_max",
-        "app_language", "language", "auto_theme_enabled"
+        "sound", "vibrate", "vibrate_strength", "double_click_favorite", "time_in_title_bar", "is_24h_format",
+        "screen_off_control", "loop_scroll_on", "list_edges_fade", "app_theme_name", "current_theme_name",
+        "album_tilt_enabled", "shuffle", "repeat_mode", "backlight_timer_index", "volume_limit_max",
+        "app_language", "auto_theme_enabled"
     )
 
-    private val SECRET_PARTS = listOf("password", "token", "secret", "apikey", "api_key", "session")
     private val BULK_PREFIXES = listOf("rating_", "book_pos_")
-
-    private fun isSecret(key: String): Boolean {
-        val k = key.lowercase(Locale.US)
-        return SECRET_PARTS.any { k.contains(it) }
-    }
 
     /** The key settings from AppPrefs (only keys that are set). */
     fun keySettings(all: Map<String, *>): JSONObject {
@@ -160,7 +154,7 @@ object TestHookLogic {
     fun allSettings(all: Map<String, *>): JSONObject {
         val out = JSONObject()
         for (key in all.keys.sorted()) {
-            if (isSecret(key) || BULK_PREFIXES.any { key.startsWith(it) }) continue
+            if (EventLogLogic.isSecretKey(key) || BULK_PREFIXES.any { key.startsWith(it) }) continue
             putScalar(out, key, all[key])
         }
         return out
