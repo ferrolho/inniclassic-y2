@@ -101,12 +101,14 @@ class AudioPlayerManager private constructor() {
     fun getMasterVolume(): Float = currentMasterVolume
 
     fun applyMasterVolume() {
+        // Play On: a speaker plays the track, the Y2 plays it with no sound
+        val volume = if (com.themoon.y1.cast.CastManager.isActive) 0f else currentMasterVolume
         try {
-            exoPlayer?.volume = currentMasterVolume
+            exoPlayer?.volume = volume
         } catch (ignored: Throwable) {}
 
         try {
-            legacyPlayer?.setVolume(currentMasterVolume, currentMasterVolume)
+            legacyPlayer?.setVolume(volume, volume)
         } catch (ignored: Throwable) {}
     }
 

@@ -21,7 +21,10 @@ import com.themoon.y1.navigation.SettingsSubMode
  */
 object ActionScreens {
 
-    class Action(val label: String, val run: () -> Unit)
+    /** [checked] not null: a choice row, with the check mark when true (as the Language list). */
+    class Action(val label: String, val checked: Boolean?, val run: () -> Unit) {
+        constructor(label: String, run: () -> Unit) : this(label, null, run)
+    }
 
     /**
      * [selectAction] false: no row is selected when the screen opens, and the first wheel step selects the first
@@ -93,6 +96,19 @@ object ActionScreens {
             main.changeScreen(route(key))
         }
         return key
+    }
+
+    /** Replaces all of screen [key] (for example the rows of a list that a search changes) and shows it now if it shows. */
+    fun replace(key: Int, spec: Spec) {
+        synchronized(this) {
+            if (!specs.containsKey(key)) return
+            specs[key] = spec
+        }
+        val main = MainActivity.instance ?: return
+        main.runOnUiThread {
+            val nav = NavigationManager.getInstance()
+            if (nav.currentState == route(key)) nav.activeController?.onRefreshUI()
+        }
     }
 
     /** Shows the new info rows of screen [key] now if it is the screen that shows. */

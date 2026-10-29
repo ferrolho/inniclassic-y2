@@ -285,6 +285,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var tvFastScrollLetter: TextView? = null
     var tvStatusBarTitle: TextView? = null
     var ivStatusWifi: ImageView? = null
+    var ivStatusPlayOn: ImageView? = null
     var ivStatusBluetooth: ImageView? = null
     var ivStatusHeadphone: ImageView? = null
     var tvStatusTime: TextView? = null
@@ -758,6 +759,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun adjustVolume(isUp: Boolean) {
+        // Play On: the wheel changes the volume of the speaker
+        if (com.themoon.y1.cast.CastManager.adjustVolume(isUp)) {
+            clickFeedback()
+            return
+        }
         restoreVolumeForOutput()
         val current = currentVirtualVolume.coerceAtLeast(0)
         val target = if (isUp) current + 1 else current - 1
@@ -895,6 +901,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int) {
         if (isScreenSleeping) return
+        // Play On: the wheel sets the volume of the speaker
+        findViewById<ImageView>(R.id.tv_overlay_volume_down)?.setImageResource(
+            if (com.themoon.y1.cast.CastManager.isActive) R.drawable.ic_play_on else R.drawable.ic_ipod_volume_down
+        )
         volumeProgress?.let {
             it.max = maxVol
             it.progress = currentVol
