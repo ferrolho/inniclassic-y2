@@ -77,6 +77,7 @@ import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.managers.OtaUpdateManager
 import com.themoon.y1.managers.BacklightTimer
 import com.themoon.y1.managers.PowerBacklightManager
+import com.themoon.y1.managers.PowerMenuInterceptor
 import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
 import com.themoon.y1.managers.VirtualVolumeManager
@@ -306,6 +307,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var webServerController: WebServerController
     var otaUpdateManager: OtaUpdateManager? = null
     var externalSdMountMonitor: ExternalSdMountMonitor? = null
+    private var powerMenuInterceptor: PowerMenuInterceptor? = null
     var powerBacklightManager: PowerBacklightManager? = null
 
     internal val usbStorageManager by lazy {
@@ -420,6 +422,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }, "y1-ums-init-check").start()
 
         registerReceivers()
+        // A long press of the Power button shows our Power screen, not Android's power menu
+        powerMenuInterceptor = PowerMenuInterceptor(this) { showPowerMenu() }.also { it.register() }
 
         try {
             val initBattery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -575,6 +579,14 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     fun getActiveScreenController(): ScreenController? = NavigationManager.getInstance().activeController
+
+    /** The Power screen (Restart, Power Off). Back goes to the screen that was open before. */
+    fun showPowerMenu() {
+        wakeFromFakeScreenOff()
+        // From Settings, Back comes back into the open group (SettingsController.onEnter)
+        if (NavigationManager.getInstance().currentState is ScreenState.Settings) backTargetForUtility = STATE_SETTINGS
+        changeScreen(ScreenState.Settings(SettingsSubMode.Power))
+    }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
@@ -1255,6 +1267,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         try {
             unregisterReceiver(systemStatusReceiver)
         } catch (_: Exception) {}
+        powerMenuInterceptor?.unregister()
         externalSdMountMonitor?.stop()
         audioVisualizer?.release()
         audioVisualizer = null

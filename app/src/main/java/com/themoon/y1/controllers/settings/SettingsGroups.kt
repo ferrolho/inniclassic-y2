@@ -29,11 +29,15 @@ object SettingsGroups {
         Group("Display", listOf(
             "Display Brightness", "Backlight Timer", "Screen Timeout"
         )),
+        // What Now Playing shows (rows of the Now Playing branch, before partly in the Now Playing menu; and the cover tilt)
+        Group("Now Playing", listOf(
+            "Spectrum", "Total Time", "Lyrics", "Lyrics Keep Screen On", "Album Cover Tilt"
+        )),
         Group("Status Bar", listOf(
             "Time in Title", "Battery", "Battery Percentage"
         )),
         Group("Appearance", listOf(
-            "Theme", "Background", "Toggle Style", "List Edges", "Album Cover Tilt",
+            "Theme", "Background", "Toggle Style", "List Edges", "Menu Cover Motion",
             "Fill Video Screen"
         )),
         Group("Menus", listOf(
@@ -55,7 +59,7 @@ object SettingsGroups {
             "Reset All Settings", "Power Off"
         )),
         Group("Developer", listOf(
-            "Wireless ADB"
+            "Wireless ADB", "Save Log"
         )),
     )
 
@@ -68,6 +72,10 @@ object SettingsGroups {
         "Backlight Timer" to "Backlight",
         "Reset All Settings" to "Reset Settings",
         "Time in Title" to "Clock",
+        // The tilt is only on Now Playing; the group gives the place, so "Album" is not necessary
+        "Album Cover Tilt" to "Cover Tilt",
+        // The row opens the Power screen (Restart, Power Off), as a long press of the Power button does
+        "Power Off" to "Power",
     )
 
     const val TOP = -1
@@ -201,7 +209,7 @@ class SettingsGroupPages {
     }
 
     /** Now, and again after changeScreen() and the screen-change listener, which write "Settings". */
-    private fun showTitle(title: TextView?, container: LinearLayout, text: String) {
+    fun showTitle(title: TextView?, container: LinearLayout, text: String) {
         val generation = ++titleGeneration
         title?.text = text
         title?.post { if (generation == titleGeneration && container.isShown) title.text = text }

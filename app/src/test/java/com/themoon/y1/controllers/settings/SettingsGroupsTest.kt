@@ -54,11 +54,11 @@ class SettingsGroupsTest {
     }
 
     @Test
-    fun topLevelHasAtMostElevenShortEntries() {
-        assertTrue(GROUPS.size in 6..11)
+    fun topLevelHasAtMostTwelveShortEntries() {
+        assertTrue(GROUPS.size in 6..12)
         assertEquals(
             listOf(
-                "Playback", "Display", "Status Bar", "Appearance", "Menus", "Controls", "Connectivity", "Library",
+                "Playback", "Display", "Now Playing", "Status Bar", "Appearance", "Menus", "Controls", "Connectivity", "Library",
                 "Date & Time", "General", "Developer"
             ),
             GROUPS.map { it.title }
@@ -79,7 +79,7 @@ class SettingsGroupsTest {
         assertEquals(listOf("Shuffle Mode", "Repeat Mode", "Equalizer & Audio Effects"), GROUPS[0].rows.take(3))
         assertEquals("About", GROUPS.first { it.title == "General" }.rows.first())
         assertEquals("Power Off", GROUPS.first { it.title == "General" }.rows.last())
-        assertEquals(listOf("Wireless ADB"), GROUPS.last().rows)
+        assertEquals(listOf("Wireless ADB", "Save Log"), GROUPS.last().rows)
     }
 
     @Test
