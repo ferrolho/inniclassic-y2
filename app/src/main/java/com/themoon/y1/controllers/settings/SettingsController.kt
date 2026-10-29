@@ -1337,20 +1337,32 @@ class SettingsController(
         if (index >= 0) containerSettingsItems.getChildAt(index)?.requestFocus()
     }
 
-    private fun applySystemTimeZone(zoneId: String) {
-        try {
-            // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
-            // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
-            // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
-            proc.waitFor()
-            TimeZone.setDefault(null)
-            if (TimeZone.getDefault().id != zoneId) {
-                Notice.error(activity, localize("Failed: Root access required."))
+    // Time Zone list: su runs, so a second click waits
+    private var timeZoneRunning = false
+
+    /** Sets the zone through su on a background thread, then calls [onDone] on the main thread. */
+    private fun applySystemTimeZone(zoneId: String, onDone: () -> Unit) {
+        timeZoneRunning = true
+        Thread {
+            val ok = try {
+                // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
+                // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
+                // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
+                val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
+                proc.waitFor()
+                true
+            } catch (_: Exception) {
+                false
             }
-        } catch (_: Exception) {
-            Notice.error(activity, localize("Failed: Root access required."))
-        }
+            activity.runOnUiThread {
+                timeZoneRunning = false
+                TimeZone.setDefault(null)
+                if (!ok || TimeZone.getDefault().id != zoneId) {
+                    Notice.error(activity, localize("Failed: Root access required."))
+                }
+                onDone()
+            }
+        }.start()
     }
 
     private fun buildTimeZoneSelectorUI() {
@@ -1370,16 +1382,14 @@ class SettingsController(
                 ThemeManager.getListButtonFocusedTextColor()
             )
             btn.setOnClickListener {
+                if (timeZoneRunning) return@setOnClickListener
                 clickFeedback()
-                applySystemTimeZone(id)
-                // The clock itself is unchanged, but its local time moved, so reload the picker values
-                val c = Calendar.getInstance()
-                dtYear = c.get(Calendar.YEAR)
-                dtMonth = c.get(Calendar.MONTH) + 1
-                dtDay = c.get(Calendar.DAY_OF_MONTH)
-                dtHour = c.get(Calendar.HOUR_OF_DAY)
-                dtMinute = c.get(Calendar.MINUTE)
-                buildDateTimeUI()
+                applySystemTimeZone(id) {
+                    // The clock itself is unchanged, but its local time moved, so reload the picker values
+                    refreshDateTimeScreen()
+                    // Back to Date & Time, if the user did not leave this list meanwhile
+                    if (containerSettingsItems.indexOfChild(btn) >= 0) buildDateTimeUI()
+                }
             }
             containerSettingsItems.addView(btn)
             if (isSelected) focusBtn = btn
