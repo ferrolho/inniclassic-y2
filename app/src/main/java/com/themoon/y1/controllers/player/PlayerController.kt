@@ -508,7 +508,6 @@ class PlayerController(
         val songItem = MainActivity.customLibrary.firstOrNull { it.file.absolutePath == file.absolutePath }
 
         NowPlayingContextMenu.show(
-            activity = activity,
             songFile = file,
             songItem = songItem,
             isFavorite = isFav,
