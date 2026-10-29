@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.PowerManager
 import android.view.KeyEvent
 import android.view.View
+import android.widget.AbsListView
 import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
@@ -184,8 +185,15 @@ class InputRouter private constructor() {
             }
 
             // A screen with no own wheel code: one step in the list of the selected row
-            val rows = activeController?.rootView?.findFocus()?.parent as? LinearLayout
-            if (rows != null && RowFocus.step(rows, delta) != null) {
+            val focus = activeController?.rootView?.findFocus()
+            val rows = focus?.parent
+            val moved = when {
+                focus is AbsListView -> RowFocus.step(focus, delta) // the list has the focus, not a row
+                rows is AbsListView -> RowFocus.step(rows, delta)
+                rows is LinearLayout -> RowFocus.step(rows, delta)
+                else -> null
+            }
+            if (moved != null) {
                 (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
                 return true
             }
