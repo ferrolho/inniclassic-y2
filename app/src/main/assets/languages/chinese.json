@@ -172,6 +172,7 @@
   "Folders": "文件夹",
   "Artists": "艺术家",
   "Albums": "专辑",
+  "Compilations": "合辑",
   "All Songs": "所有歌曲",
   "Playlists": "播放列表",
   "Switch to Audiobooks": "切换至有声书",
@@ -235,6 +236,8 @@
   "HIDDEN": "隐藏",
   "SHOW": "显示",
   "Shuffle Mode": "随机播放",
+  "Shuffle Songs": "随机播放歌曲",
+  "No playable audio files found.": "未找到可播放的音频文件。",
   "Shuffle": "随机播放",
   "Song": "首歌曲",
   "Songs": "首歌曲",
@@ -334,6 +337,9 @@
   "Keyboard Layout": "键盘布局",
   "Original": "原版",
   "QWERTY": "QWERTY",
+  "Group Albums": "专辑分组",
+  "By Title": "按标题",
+  "By Title and Artist": "按标题和艺人",
   "Next": "下一步",
   "Login": "登录",
   "Add to Favorites": "添加到收藏",
@@ -456,8 +462,6 @@
   "Buy 1 Heart ($1,500)": "购买 1 颗心 ($1,500)",
   "Heart Purchased": "已购买心",
   "Recently Played": "最近播放",
-  "No recently played albums yet.": "暂无最近播放的专辑。",
-  "Clear Recently Played": "清除最近播放",
-  "Are you sure you want to clear your recently played history?": "确定要清除最近播放历史记录吗？",
-  "Recently played cleared.": "已清除最近播放记录。"
+  "Top 25 Most Played": "最常播放的 25 首",
+  "No Songs": "没有歌曲"
 }
