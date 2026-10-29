@@ -23,7 +23,6 @@ internal fun MainActivity.initViewBindings() {
     layoutMusicQuizMode = findViewById(R.id.layout_music_quiz_mode)
     layoutVideosMode = findViewById(R.id.layout_videos_mode)
     layoutVideoPlayerMode = findViewById(R.id.layout_video_player_mode)
-    layoutVolumeOverlay = findViewById(R.id.layout_volume_overlay)
 
     val rootContent = findViewById<ViewGroup>(android.R.id.content)
     val d = resources.displayMetrics.density
@@ -36,18 +35,6 @@ internal fun MainActivity.initViewBindings() {
             rightMargin = (30 * d).toInt()
         }
         rootContent.addView(this, lp)
-    }
-
-    volumeProgress = findViewById(R.id.volume_progress)
-    volumeProgress?.max = MainActivity.VIRTUAL_VOLUME_STEPS
-
-    findViewById<View>(R.id.tv_overlay_volume_down)?.setOnClickListener {
-        adjustVolume(false)
-        clickFeedback()
-    }
-    findViewById<View>(R.id.tv_overlay_volume_up)?.setOnClickListener {
-        adjustVolume(true)
-        clickFeedback()
     }
 
     ivMainBg = findViewById(R.id.iv_main_bg)

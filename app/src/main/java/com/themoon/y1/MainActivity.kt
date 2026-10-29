@@ -257,7 +257,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var layoutMusicQuizMode: View
     lateinit var layoutVideosMode: View
     lateinit var layoutVideoPlayerMode: View
-    lateinit var layoutVolumeOverlay: View
 
     var ivMainBg: ImageView? = null
     lateinit var ivAlbumArt: ImageView
@@ -283,7 +282,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var tvStatusTime: TextView? = null
     var tvStatusBattery: TextView? = null
     var batteryIconView: BatteryIconView? = null
-    var volumeProgress: ProgressBar? = null
     var layoutLoadingOverlay: LinearLayout? = null
     var pbLoadingProgress: ProgressBar? = null
     var tvLoadingProgress: TextView? = null
@@ -295,6 +293,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var homeWidgetsController: HomeWidgetsController? = null
     lateinit var browserController: BrowserController
     fun isBrowserControllerInitialized(): Boolean = ::browserController.isInitialized
+    fun isPlayerControllerInitialized(): Boolean = ::playerController.isInitialized
     lateinit var playlistController: PlaylistController
     lateinit var coverFlowController: CoverFlowController
     lateinit var playerController: PlayerController
@@ -333,11 +332,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 ListItemViewFactory.createListButtonWithIcon(this, icon, text)
             }
         )
-    }
-
-    private val volumeHandler = Handler(Looper.getMainLooper())
-    private val hideVolumeTask = Runnable {
-        layoutVolumeOverlay.visibility = View.GONE
     }
 
     private val fastScrollHandler = Handler(Looper.getMainLooper())
@@ -709,15 +703,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS)
     }
 
-    fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int) {
+    /** Shows the volume at the iPod place of the screen ([VolumeBar]); [leftIcon] is the Play On icon for a speaker. */
+    fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int, leftIcon: Int = R.drawable.ic_ipod_volume_down) {
         if (isScreenSleeping) return
-        volumeProgress?.let {
-            it.max = maxVol
-            it.progress = currentVol
-        }
-        layoutVolumeOverlay.visibility = View.VISIBLE
-        volumeHandler.removeCallbacks(hideVolumeTask)
-        volumeHandler.postDelayed(hideVolumeTask, 1500)
+        com.themoon.y1.views.VolumeBar.show(this, currentVol, maxVol, leftIcon)
     }
 
     fun updatePlayerUI() {
