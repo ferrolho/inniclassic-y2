@@ -43,6 +43,7 @@ class MenuSlide private constructor(
     private enum class Phase { IDLE, HOLD, WAIT, RUN }
 
     private var phase = Phase.IDLE
+    private var endDrawn = false
     private var kind = Kind.FULL
     private var push = true
 
@@ -175,6 +176,12 @@ class MenuSlide private constructor(
                 lp.topMargin = top
                 art.layoutParams = lp
                 art.artLeft = artLayer[2]
+                // Until the first draw of the layer: the left-most edge that the art can have (the largest zoom, the
+                // art at its right end), so that Back starts with all of the art right of the screen.
+                val pw = (root.width - pane).toFloat()
+                val drawnW = bitmap.width *
+                    CoverMotion.cropScale(bitmap.width.toFloat(), bitmap.height.toFloat(), pw, lp.height.toFloat())
+                art.artEdge = (artLayer[2] + pw - CoverMotion.ZOOM_MAX * drawnW).coerceAtLeast(0f)
                 art.setImageDrawable(BitmapDrawable(resources, bitmap))
                 art.visibility = View.VISIBLE
                 // The art layer needs a layout pass: the slide starts at the next frame.
@@ -183,6 +190,7 @@ class MenuSlide private constructor(
         }
         removeCallbacks(holdTimeout)
         phase = Phase.RUN
+        endDrawn = false
         frames = 0
         lateFrames = 0
         maxGapNanos = 0L
@@ -208,9 +216,14 @@ class MenuSlide private constructor(
         frames++
         val elapsed = (frameTimeNanos - startNanos) / 1_000_000L
         if (!MenuSlideMotion.running(kind, push, elapsed)) {
-            // The end of the slide is the screen under the layer.
-            finishNow()
-            return
+            if (endDrawn) {
+                // The end of the slide is the screen under the layer.
+                finishNow()
+                return
+            }
+            // One frame at the end positions first (depth clamps the time): the last frame before can be far from
+            // them (t² of Cover Flow), and what moves out must leave the screen, not go away at once.
+            endDrawn = true
         }
         applyFrame(elapsed)
         Choreographer.getInstance().postFrameCallback(this)
@@ -218,7 +231,9 @@ class MenuSlide private constructor(
 
     private fun applyFrame(elapsedMs: Long) {
         MenuSlideMotion.depth(kind, push, elapsedMs, depth)
-        MenuSlideMotion.offsets(kind, depth[0], depth[1], root.width.toFloat(), pane.toFloat(), off)
+        // The left edge of the art on the screen at art offset 0 (the art layer also draws the art left of the pane).
+        val artLeft = if (art.visibility == View.VISIBLE) artLayer[0] + art.artEdge else pane.toFloat()
+        MenuSlideMotion.offsets(kind, depth[0], depth[1], root.width.toFloat(), pane.toFloat(), off, artLeft)
         if (kind == Kind.COVER_FLOW) art.translationX = off[2]
         invalidate()
     }

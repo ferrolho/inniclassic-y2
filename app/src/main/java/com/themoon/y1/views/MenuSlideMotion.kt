@@ -97,9 +97,14 @@ object MenuSlideMotion {
     /**
      * The x offsets (px) at depth [listDepth] (and [artDepth] for Cover Flow) for a slide area [width] wide whose
      * split screens have their list pane [pane] wide. [out]: 0 = A (for split screens: A's list pane),
-     * 1 = B, 2 = the art pane of the split screen (Cover Flow only; else 0).
+     * 1 = B, 2 = the art pane of the split screen (Cover Flow only; else 0). [artLeft] (Cover Flow only): the x of
+     * the left edge of the art at art offset 0. The art layer also draws the art left of the pane edge, so the art
+     * goes right until this edge is at [width]: all of the art leaves the screen, not only the pane.
      */
-    fun offsets(kind: Kind, listDepth: Float, artDepth: Float, width: Float, pane: Float, out: FloatArray) {
+    fun offsets(
+        kind: Kind, listDepth: Float, artDepth: Float, width: Float, pane: Float, out: FloatArray,
+        artLeft: Float = pane
+    ) {
         when (kind) {
             Kind.PANE -> {
                 out[0] = -pane * listDepth
@@ -120,7 +125,7 @@ object MenuSlideMotion {
             Kind.COVER_FLOW -> {
                 out[0] = -pane * listDepth
                 out[1] = 0f
-                out[2] = (width - pane) * artDepth
+                out[2] = (width - minOf(artLeft, pane)) * artDepth
             }
         }
     }

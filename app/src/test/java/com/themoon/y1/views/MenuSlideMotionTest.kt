@@ -111,12 +111,25 @@ class MenuSlideMotionTest {
         // The art pane in the layer is at the pane edge on the screen and has the pane width (same crop and zoom)
         assertEquals(240, l[0] + l[2])
         assertEquals(240, l[1] - l[2])
-        // At each art offset of the slide, the layer covers the full width: the art left of the pane edge shows
-        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o)
-        for (art in floatArrayOf(0f, 60f, 120f, o[2])) {
+        // At each art offset up to the pane width, the layer covers the full width: the art left of the pane edge shows
+        for (art in floatArrayOf(0f, 60f, 120f, 240f)) {
             assertTrue(l[0] + art <= 0f)
             assertTrue(l[0] + l[1] + art >= 480f)
         }
+    }
+
+    @Test
+    fun coverFlowArtLeavesTheScreen() {
+        // The art layer draws 92 px of art left of the pane edge (zoom): at the end all of it is right of the screen
+        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o, 148f)
+        assertEquals(480f, 148f + o[2], 1e-4f)
+        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 0f, 480f, 240f, o, 148f)
+        assertEquals(0f, o[2], 1e-4f)
+        // Without a value (or an art edge right of the pane), the pane edge goes to the right edge
+        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o)
+        assertEquals(240f, o[2], 1e-4f)
+        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o, 300f)
+        assertEquals(240f, o[2], 1e-4f)
     }
 
     @Test

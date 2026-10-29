@@ -41,6 +41,9 @@ class CoverArtView @JvmOverloads constructor(
     internal var slideLayer = false
     internal var artLeft = 0
 
+    /** Slide layer: the x of the left edge of the art in this view at the last draw (not less than 0: the clip). */
+    internal var artEdge = 0f
+
     init {
         scaleType = ScaleType.CENTER_CROP
     }
@@ -118,6 +121,8 @@ class CoverArtView @JvmOverloads constructor(
             val ch = d.intrinsicHeight.toFloat()
             if (cw > 0f && ch > 0f) {
                 val crop = CoverMotion.cropScale(cw, ch, w.toFloat(), h.toFloat())
+                val dx = CoverMotion.offset(x, cw * crop, w.toFloat(), zoom)
+                artEdge = (left + w / 2f + dx - zoom * cw * crop / 2f).coerceAtLeast(0f)
                 canvas.translate((w - cw * crop) / 2f, (h - ch * crop) / 2f)
                 canvas.scale(crop, crop)
                 d.setBounds(0, 0, cw.toInt(), ch.toInt())
