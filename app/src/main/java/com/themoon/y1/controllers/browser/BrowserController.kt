@@ -23,7 +23,6 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.AppPrefs
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
@@ -43,6 +42,7 @@ import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.ClassicMenuStyle
+import com.themoon.y1.views.Notice
 import java.io.File
 import java.util.ArrayList
 import java.util.Collections
@@ -476,7 +476,7 @@ class BrowserController(
                     AudioPlayerManager.getInstance().playTrackListWithOffset(bookChapters, targetIdx, savedPos)
                     onNavigateToScreen(ScreenState.Player)
                 } else {
-                    Toast.makeText(activity, localize("No audiobooks found"), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("No audiobooks found"))
                 }
             }
             containerBrowserItems.addView(btnContinue)
@@ -773,7 +773,7 @@ class BrowserController(
         }
 
         if (targetSongs.isEmpty()) {
-            Toast.makeText(activity, localize("No favorites added yet."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("No favorites added yet."))
         }
 
         val adapter = SongListAdapter(targetSongs)
@@ -869,7 +869,7 @@ class BrowserController(
                         activity.runOnUiThread {
                             MainActivity.instance?.dismissLoadingOverlay()
                             if (allAudio.isEmpty()) {
-                                Toast.makeText(activity, localize("No audio files found in subfolders."), Toast.LENGTH_SHORT).show()
+                                Notice.show(activity, localize("No audio files found in subfolders."))
                             } else {
                                 AudioPlayerManager.getInstance().playTrackList(allAudio, 0)
                                 onNavigateToScreen(ScreenState.Player)
@@ -900,7 +900,7 @@ class BrowserController(
                         MainActivity.instance?.updateMainMenuBackground()
                     } catch (e: Exception) {
                     }
-                    Toast.makeText(activity, localize("Background Applied!"), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Background Applied!"))
                     isPickingBackground = false
                     // Back to the Settings screen that opened the picker, over all its folder levels
                     NavigationManager.getInstance().popBackStackTo { it !is ScreenState.Browser }
@@ -1185,7 +1185,7 @@ class BrowserController(
             }
             activity.startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(activity, "Install failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            Notice.error(activity, "Install failed: ${e.message}")
         }
     }
 

@@ -21,7 +21,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.BluetoothDiscoverableLogic
@@ -32,6 +31,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 import java.lang.reflect.Method
@@ -189,7 +189,7 @@ class BluetoothController(
         btnToggle.setOnClickListener {
             val now = System.currentTimeMillis()
             if (now - lastBtToggleTime < 1500) {
-                Toast.makeText(activity, localize("Please wait a moment..."), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Please wait a moment..."))
                 return@setOnClickListener
             }
             lastBtToggleTime = now
@@ -326,7 +326,7 @@ class BluetoothController(
             clickFeedback()
             val on = !BluetoothDiscoverableManager.isDiscoverable()
             if (!BluetoothDiscoverableManager.setDiscoverable(on)) {
-                Toast.makeText(activity, localize("Cannot change Discoverable mode."), Toast.LENGTH_SHORT).show()
+                Notice.error(activity, localize("Cannot change Discoverable mode."))
             }
             updateDiscoverableValue()
         }
@@ -409,12 +409,12 @@ class BluetoothController(
                     val result = device.javaClass.getMethod("removeBond").invoke(device)
                     val removed = (result as? Boolean) == true
                     if (removed) {
-                        Toast.makeText(activity, localize("Removing device..."), Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, localize("Removing device..."))
                     } else {
-                        Toast.makeText(activity, localize("Failed to remove device. Try restarting Bluetooth."), Toast.LENGTH_LONG).show()
+                        Notice.error(activity, localize("Failed to remove device. Try restarting Bluetooth."))
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(activity, localize("Error: ") + e.message, Toast.LENGTH_LONG).show()
+                    Notice.error(activity, localize("Error: ") + e.message)
                 }
             }
         }
@@ -491,7 +491,7 @@ class BluetoothController(
         }
 
         if (targetDevice.bondState != BluetoothDevice.BOND_BONDED) {
-            Toast.makeText(activity, localize("Pairing with ") + targetDevice.name + "...", Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Pairing with ") + targetDevice.name + "...")
             bondRequestedAddress = targetDevice.address
             try {
                 targetDevice.javaClass.getMethod("createBond").invoke(targetDevice)
@@ -499,7 +499,7 @@ class BluetoothController(
             return
         }
 
-        Toast.makeText(activity, localize("Connecting Audio..."), Toast.LENGTH_SHORT).show()
+        Notice.show(activity, localize("Connecting Audio..."))
 
         if (globalA2dp != null) {
             executeA2dpConnect(targetDevice)
@@ -565,16 +565,16 @@ class BluetoothController(
             }
 
             if (connectMethod == null) {
-                Toast.makeText(activity, localize("Audio connection error: connect method not found"), Toast.LENGTH_LONG).show()
+                Notice.error(activity, localize("Audio connection error: connect method not found"))
                 return
             }
 
             connectMethod.isAccessible = true
             val result = connectMethod.invoke(a2dp, targetDevice) as? Boolean ?: false
             if (!result) {
-                Toast.makeText(activity, localize("Audio connection rejected by system."), Toast.LENGTH_SHORT).show()
+                Notice.error(activity, localize("Audio connection rejected by system."))
             } else {
-                Toast.makeText(activity, localize("Audio connection initiated."), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Audio connection initiated."))
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -587,7 +587,7 @@ class BluetoothController(
             } else {
                 errorStr += " - " + e.message
             }
-            Toast.makeText(activity, localize("Audio error: ") + errorStr, Toast.LENGTH_LONG).show()
+            Notice.error(activity, localize("Audio error: ") + errorStr)
         }
     }
 
@@ -596,7 +596,7 @@ class BluetoothController(
         targetDeviceForAudio = null
         lastManualDisconnectAddress = targetDevice.address
         lastManualDisconnectTime = System.currentTimeMillis()
-        Toast.makeText(activity, localize("Disconnecting Audio..."), Toast.LENGTH_SHORT).show()
+        Notice.show(activity, localize("Disconnecting Audio..."))
 
         if (globalA2dp != null) {
             executeA2dpDisconnect(targetDevice)
