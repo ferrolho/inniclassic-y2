@@ -12,11 +12,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.InputRouter
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.QwertyKeyboardView
 
 /**
@@ -251,7 +251,7 @@ class WifiKeyboardController(
         when (currentKeyboardMode) {
             1 -> {
                 if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a keyword."))
                     return
                 }
                 val keyword = typedText.trim()
@@ -259,7 +259,7 @@ class WifiKeyboardController(
             }
             4 -> {
                 if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a keyword."))
                     return
                 }
                 val keyword = typedText.trim()
@@ -268,7 +268,7 @@ class WifiKeyboardController(
             }
             2 -> {
                 if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a username."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a username."))
                     return
                 }
                 pendingLastFmUsername = typedText.trim()
@@ -278,7 +278,7 @@ class WifiKeyboardController(
             }
             3 -> {
                 if (typedText.isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a password."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a password."))
                     return
                 }
                 val password = typedText
@@ -287,7 +287,7 @@ class WifiKeyboardController(
             }
             5 -> {
                 if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a keyword."))
                     return
                 }
                 val url = typedText.trim()
@@ -296,7 +296,7 @@ class WifiKeyboardController(
             }
             6 -> {
                 if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a username."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a username."))
                     return
                 }
                 pendingJellyfinUsername = typedText.trim()
@@ -307,7 +307,7 @@ class WifiKeyboardController(
             7 -> {
                 val password = typedText
                 if (password.isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a password."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a password."))
                     return
                 }
                 currentKeyboardMode = 0
@@ -315,7 +315,7 @@ class WifiKeyboardController(
             }
             8 -> {
                 if (typedText.trim().isEmpty()) {
-                    Toast.makeText(activity, localize("Please enter a keyword."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Please enter a keyword."))
                     return
                 }
                 val token = typedText.trim()

@@ -9,9 +9,9 @@ import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
-import android.widget.Toast
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.views.Notice
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -186,11 +186,10 @@ class OtaUpdateManager(
                 if (!connected) {
                     activity.runOnUiThread {
                         ActionScreens.close(key)
-                        Toast.makeText(
+                        Notice.error(
                             activity,
-                            localize("Wi-Fi connection required. Please connect."),
-                            Toast.LENGTH_LONG
-                        ).show()
+                            localize("Wi-Fi connection required. Please connect.")
+                        )
                         onRequireWifi()
                     }
                     return@Thread
@@ -353,11 +352,10 @@ class OtaUpdateManager(
                 activity.runOnUiThread {
                     ActionScreens.close(key)
                     if (!cancelled.get()) {
-                        Toast.makeText(
+                        Notice.error(
                             activity,
-                            localize("Download failed. Check your internet connection."),
-                            Toast.LENGTH_LONG
-                        ).show()
+                            localize("Download failed. Check your internet connection.")
+                        )
                     }
                 }
             }
@@ -403,7 +401,7 @@ class OtaUpdateManager(
             activity.startActivity(intent)
         } catch (_: Exception) {
             activity.runOnUiThread {
-                Toast.makeText(activity, localize("Install Failed."), Toast.LENGTH_SHORT).show()
+                Notice.error(activity, localize("Install Failed."))
             }
         }
     }

@@ -11,10 +11,10 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.navigation.NavigationManager
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 
 class UsbStorageUiManager(
@@ -94,7 +94,7 @@ class UsbStorageUiManager(
         if (usbStorageBusy) return
         if (MediaLibraryManager.getInstance().isScanning) {
             // The scan keeps files open; vold would kill this app to unmount the volume.
-            Toast.makeText(activity, localize("Wait for the library scan to finish, then try again."), Toast.LENGTH_LONG).show()
+            Notice.error(activity, localize("Wait for the library scan to finish, then try again."))
             return
         }
         usbStorageBusy = true
@@ -114,7 +114,7 @@ class UsbStorageUiManager(
                     // The function switch reconnects USB; do not ask again at once.
                     lastUsbDialogShownMs = System.currentTimeMillis()
                     getExternalSdMountMonitor()?.setSuspended(false)
-                    Toast.makeText(activity, localize("Couldn't connect as USB storage."), Toast.LENGTH_LONG).show()
+                    Notice.error(activity, localize("Couldn't connect as USB storage."))
                 }
             }
         }, "y1-ums-on").start()
@@ -131,7 +131,7 @@ class UsbStorageUiManager(
             activity.runOnUiThread {
                 usbStorageBusy = false
                 if (stillOn) {
-                    Toast.makeText(activity, localize("Couldn't eject USB storage."), Toast.LENGTH_LONG).show()
+                    Notice.error(activity, localize("Couldn't eject USB storage."))
                     return@runOnUiThread
                 }
                 // The function switch reconnects USB; do not ask again at once.

@@ -14,7 +14,6 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.controllers.settings.confirmScreen
 import com.themoon.y1.MainActivity
@@ -25,6 +24,7 @@ import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.Notice
 import java.util.Locale
 
 /**
@@ -146,7 +146,7 @@ class FmRadioController(
 
     fun tuneToNextSavedRadioChannel(isNext: Boolean) {
         if (savedRadioStations.isEmpty()) {
-            Toast.makeText(activity, localize("No saved channels."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("No saved channels."))
             return
         }
         var target = savedRadioStations[0]
@@ -208,7 +208,7 @@ class FmRadioController(
                 fmManager.routeFmAudio()
                 activity.volumeControlStream = fmManager.getFmStreamType()
             } else {
-                Toast.makeText(activity, "Radio Error: ${fmManager.lastError}", Toast.LENGTH_SHORT).show()
+                Notice.error(activity, "Radio Error: ${fmManager.lastError}")
             }
         }
 
@@ -224,7 +224,7 @@ class FmRadioController(
 
     fun seekRadioStation(isUp: Boolean) {
         if (!fmManager.isPowerUp) return
-        Toast.makeText(activity, localize("Seeking FM Station..."), Toast.LENGTH_SHORT).show()
+        Notice.show(activity, localize("Seeking FM Station..."))
         val found = fmManager.seekStation(isUp)
         if (found > 0) {
             val clean = Math.round(found * 10.0f) / 10.0f
@@ -258,7 +258,7 @@ class FmRadioController(
                 audioPlayerManager.playOrPauseMusic()
             }
             if (!fmManager.powerUp(fmManager.currentFreq)) {
-                Toast.makeText(activity, "Radio Error: ${fmManager.lastError}", Toast.LENGTH_SHORT).show()
+                Notice.error(activity, "Radio Error: ${fmManager.lastError}")
                 return
             }
             fmManager.routeFmAudio()
@@ -312,18 +312,17 @@ class FmRadioController(
                     fmManager.tune(first)
                     saveLastRadioFreq(first)
 
-                    Toast.makeText(
+                    Notice.show(
                         activity,
                         localize("Scan Complete!\nFound") + " ${savedRadioStations.size} " +
                                 localize("channels.\nTuning to") + " " + String.format(Locale.US, "%.1f MHz", first),
-                        Toast.LENGTH_LONG
-                    ).show()
+                        long = true
+                    )
                 } else {
-                    Toast.makeText(
+                    Notice.error(
                         activity,
-                        localize("No stations found.") + if (fmManager.lastError.isNotEmpty()) " (${fmManager.lastError})" else "",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        localize("No stations found.") + if (fmManager.lastError.isNotEmpty()) " (${fmManager.lastError})" else ""
+                    )
                 }
                 buildRadioUI()
             }
@@ -526,14 +525,14 @@ class FmRadioController(
                     clickFeedback()
                     if (isSaved) {
                         savedRadioStations.remove(fmManager.currentFreq)
-                        Toast.makeText(activity, localize("Removed from saved channels."), Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, localize("Removed from saved channels."))
                     } else {
                         val cleanFreq = Math.round(fmManager.currentFreq * 10.0f) / 10.0f
                         if (!savedRadioStations.contains(cleanFreq)) {
                             savedRadioStations.add(cleanFreq)
                         }
                         savedRadioStations.sort()
-                        Toast.makeText(activity, localize("Channel saved!"), Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, localize("Channel saved!"))
                     }
                     saveRadioStationsToPrefs()
                     buildRadioUI()

@@ -35,6 +35,7 @@ import android.view.MotionEvent
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.BatteryIconView
 import com.themoon.y1.views.ClassicMenuStyle
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
@@ -43,7 +44,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.controllers.browser.BrowserController
 import com.themoon.y1.controllers.connectivity.BluetoothController
@@ -833,10 +833,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val path = currentFile.absolutePath
         if (favoritePaths.contains(path)) {
             favoritePaths.remove(path)
-            Toast.makeText(this, t("Removed from Favorites."), Toast.LENGTH_SHORT).show()
+            Notice.show(this, t("Removed from Favorites."))
         } else {
             favoritePaths.add(path)
-            Toast.makeText(this, t("Added to Favorites."), Toast.LENGTH_SHORT).show()
+            Notice.show(this, t("Added to Favorites."))
         }
         prefs.edit().putStringSet("favorite_songs_set", favoritePaths).apply()
     }
@@ -866,7 +866,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun showRemoveFromFavoritesDialog(songFile: File) {
         favoritePaths.remove(songFile.absolutePath)
         prefs.edit().putStringSet("favorite_songs_set", favoritePaths).apply()
-        Toast.makeText(this, t("Removed from Favorites."), Toast.LENGTH_SHORT).show()
+        Notice.show(this, t("Removed from Favorites."))
         browserController.buildVirtualSongsForFavorites()
     }
 
@@ -1140,11 +1140,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     val currentDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     if (profileState == BluetoothProfile.STATE_DISCONNECTED) {
                         bluetoothController.clearTargetDeviceForAudio()
-                        Toast.makeText(this@MainActivity, t("Audio Disconnected"), Toast.LENGTH_SHORT).show()
+                        Notice.show(this@MainActivity, t("Audio Disconnected"))
                     } else if (profileState == BluetoothProfile.STATE_CONNECTED) {
                         bluetoothController.clearTargetDeviceForAudio()
                         val name = currentDevice?.name ?: "Unknown"
-                        Toast.makeText(this@MainActivity, t("Audio Connected to ") + name, Toast.LENGTH_SHORT).show()
+                        Notice.show(this@MainActivity, t("Audio Connected to ") + name)
                     }
                     if (profileState == BluetoothProfile.STATE_CONNECTED || profileState == BluetoothProfile.STATE_DISCONNECTED) {
                         bluetoothController.isBtConnectingState = false
@@ -1196,7 +1196,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 "com.themoon.y1.REBUILD_COVER_CACHE" -> {
                     rebuildUniqueAlbumList()
                     com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, true)
-                    Toast.makeText(this@MainActivity, t("Rebuilding album cover cache..."), Toast.LENGTH_SHORT).show()
+                    Notice.show(this@MainActivity, t("Rebuilding album cover cache..."))
                 }
                 "com.themoon.y1.RESCAN_LIBRARY" -> {
                     startMediaLibraryScan()

@@ -11,7 +11,6 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
@@ -23,6 +22,7 @@ import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.AlphabetIndexBar
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -229,7 +229,7 @@ class PlaylistController(
         }
 
         if (songs.isEmpty()) {
-            Toast.makeText(activity, localize("No valid tracks found in this playlist."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("No valid tracks found in this playlist."))
         }
 
         val adapter = SongListAdapter(songs)
@@ -342,10 +342,10 @@ class PlaylistController(
             listOf(m3uFile.nameWithoutExtension, localize("Are you sure you want to delete this playlist?")),
             listOf(ActionScreens.Action(localize("Delete")) {
                 if (m3uFile.exists() && m3uFile.delete()) {
-                    Toast.makeText(activity, localize("Playlist deleted."), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Playlist deleted."))
                     buildPlaylistsUI()
                 } else {
-                    Toast.makeText(activity, localize("Failed to delete playlist."), Toast.LENGTH_SHORT).show()
+                    Notice.error(activity, localize("Failed to delete playlist."))
                 }
             })
         ))
@@ -359,7 +359,7 @@ class PlaylistController(
             listOf(ActionScreens.Action(localize("Remove")) {
                 removeSongFromM3uFile(currentM3u, audioFile)
                 buildM3uSongsUI(currentM3u)
-                Toast.makeText(activity, localize("Track removed."), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Track removed."))
             })
         ))
     }
@@ -404,18 +404,17 @@ class PlaylistController(
             } while (newPlaylistFile.exists())
 
             writeSongToM3uFile(newPlaylistFile, songFile, false)
-            Toast.makeText(
+            Notice.show(
                 activity,
-                localize("Created Playlist ") + (count - 1) + " " + localize("successfully!"),
-                Toast.LENGTH_SHORT
-            ).show()
+                localize("Created Playlist ") + (count - 1) + " " + localize("successfully!")
+            )
         }
         for (targetM3u in playlistFiles) {
             val dotIdx = targetM3u.name.lastIndexOf(".")
             val cleanName = if (dotIdx > 0) targetM3u.name.substring(0, dotIdx) else targetM3u.name
             targets += ActionScreens.Action(cleanName) {
                 writeSongToM3uFile(targetM3u, songFile, true)
-                Toast.makeText(activity, localize("Added to playlist successfully!"), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Added to playlist successfully!"))
             }
         }
         ActionScreens.open(ActionScreens.Spec(localize("Add to Playlist"), actions = targets))
@@ -435,7 +434,7 @@ class PlaylistController(
             } catch (ignored: Exception) {}
         }
         writeSongToM3uFile(onTheGoFile, songFile, true)
-        Toast.makeText(activity, localize("Added to On-The-Go."), Toast.LENGTH_SHORT).show()
+        Notice.show(activity, localize("Added to On-The-Go."))
     }
 
     fun writeSongToM3uFile(m3uFile: File, songFile: File, append: Boolean) {

@@ -17,7 +17,6 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
@@ -31,6 +30,7 @@ import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.quiz.MusicQuizEngine
 import com.themoon.y1.quiz.QuizLeaderboardManager
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.SquareImageView
 import java.io.File
 import java.io.FileInputStream
@@ -151,7 +151,7 @@ class MusicQuizController(
 
         val hasEnoughSongs = engine.resetSession(libraryProvider())
         if (!hasEnoughSongs) {
-            Toast.makeText(activity, localize("Not enough songs in your library for Music Quiz."), Toast.LENGTH_LONG).show()
+            Notice.error(activity, localize("Not enough songs in your library for Music Quiz."))
             showStartHub()
             return
         }
@@ -517,7 +517,7 @@ class MusicQuizController(
                 returnToLeaderboard = fromGameOver
                 ActionScreens.open(confirmScreen(localize("Leaderboard"), "", localize("Clear Scores")) {
                     leaderboardManager.clearLeaderboard()
-                    Toast.makeText(activity, localize("Scores Cleared"), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Scores Cleared"))
                     showLeaderboardView(fromGameOver)
                 })
             }
