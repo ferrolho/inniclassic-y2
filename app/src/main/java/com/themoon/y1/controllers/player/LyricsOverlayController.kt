@@ -7,6 +7,7 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -62,6 +63,9 @@ class LyricsOverlayController(
     }
 
     private val currentLyrics = TreeMap<Int, String>()
+    // Romanised lines (pinyin, romaji) from <track>.romanised.lrc: by timestamp, or in order for plain lyrics
+    private val romanisedLyrics = TreeMap<Int, String>()
+    private var romanisedPlain: String? = null
     private var lyricTimestamps = ArrayList<Int>()
     private var plainLyrics: String? = null
     private var lastLyricIndex = -1
@@ -145,8 +149,65 @@ class LyricsOverlayController(
         } else {
             tvLyrics.setTextColor(plainColor)
             tvLyrics.setPadding(SIDE_PADDING, edgePadding, SIDE_PADDING, edgePadding)
+            applyPlainText()
         }
         scheduleFrame()
+    }
+
+    private fun scriptMode(): Int = LyricsScript.normalize(
+        context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE).getInt(LyricsScript.PREF, LyricsScript.ORIGINAL)
+    )
+
+    /** Plain lyrics in the form of the Lyrics setting; the romanised lines are smaller. */
+    private fun applyPlainText() {
+        val original = plainLyrics ?: return
+        val lines = LyricsScript.plainLines(original, romanisedPlain, scriptMode())
+        if (lines == null) {
+            tvLyrics.text = original
+            return
+        }
+        val sb = SpannableStringBuilder()
+        for ((i, line) in lines.withIndex()) {
+            if (i > 0) sb.append("\n")
+            val start = sb.length
+            sb.append(line.first)
+            if (line.second >= 0) {
+                sb.setSpan(RelativeSizeSpan(ROMANISED_SIZE), start + line.second, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        tvLyrics.text = sb
+    }
+
+    /** Reads <track>.romanised.lrc: timestamped lines for synced lyrics, all other lines (in order) for plain lyrics. */
+    private fun loadRomanised(audioFile: File) {
+        val path = LyricsScript.sidecarPath(audioFile.absolutePath) ?: return
+        val file = File(path)
+        if (!file.exists()) return
+        try {
+            val pattern = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\](.*)")
+            val plain = ArrayList<String>()
+            BufferedReader(InputStreamReader(FileInputStream(file), "UTF-8")).use { br ->
+                var line = br.readLine()
+                while (line != null) {
+                    val l = line.removePrefix("\uFEFF")
+                    val m = pattern.matcher(l)
+                    if (m.find()) {
+                        val msStr = m.group(3) ?: "0"
+                        var ms = msStr.toInt()
+                        if (msStr.length == 2) ms *= 10
+                        val totalMs = (m.group(1)!!.toInt() * 60 + m.group(2)!!.toInt()) * 1000 + ms
+                        val text = m.group(4)?.trim() ?: ""
+                        if (text.isNotEmpty()) romanisedLyrics[totalMs] = text
+                    } else {
+                        plain.add(l)
+                    }
+                    line = br.readLine()
+                }
+            }
+            if (romanisedLyrics.isEmpty() && plainLyrics != null) romanisedPlain = plain.joinToString("\n").trim()
+        } catch (ignored: Exception) {
+            romanisedLyrics.clear()
+        }
     }
 
     fun hide() {
@@ -224,6 +285,13 @@ class LyricsOverlayController(
     fun isShowing(): Boolean = lyricScrollView.visibility == View.VISIBLE
 
     fun loadLyrics(audioFile: File?) {
+        romanisedLyrics.clear()
+        romanisedPlain = null
+        loadOriginalLyrics(audioFile)
+        if (audioFile != null && hasLyrics && !audioFile.path.endsWith(".m4b", ignoreCase = true)) loadRomanised(audioFile)
+    }
+
+    private fun loadOriginalLyrics(audioFile: File?) {
         currentLyrics.clear()
         lyricTimestamps.clear()
         lastLyricIndex = -1
@@ -422,11 +490,17 @@ class LyricsOverlayController(
         val sb = SpannableStringBuilder()
         lineStarts = IntArray(lyricTimestamps.size)
         lineEnds = IntArray(lyricTimestamps.size)
+        val mode = scriptMode()
         for (i in lyricTimestamps.indices) {
             if (i > 0) sb.append("\n\n")
             lineStarts[i] = sb.length
-            sb.append(currentLyrics[lyricTimestamps[i]])
+            // Original + Romanised: the romanised line under the original, smaller; the highlight covers the pair
+            val (text, romanisedStart) = LyricsScript.line(currentLyrics[lyricTimestamps[i]] ?: "", romanisedLyrics[lyricTimestamps[i]], mode)
+            sb.append(text)
             lineEnds[i] = sb.length
+            if (romanisedStart >= 0) {
+                sb.setSpan(RelativeSizeSpan(ROMANISED_SIZE), lineStarts[i] + romanisedStart, lineEnds[i], Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
         }
         tvLyrics.setTextColor(otherLineColor)
         tvLyrics.setPadding(SIDE_PADDING, edgePadding, SIDE_PADDING, edgePadding)
@@ -533,5 +607,7 @@ class LyricsOverlayController(
         /** Full-width lyrics: about the size of the iPod list text, so a line reads from arm's length. */
         const val TEXT_SIZE_SP = 22f
         const val SIDE_PADDING = 24
+        /** Text size of a romanised line under its original line (setting Original + Romanised). */
+        const val ROMANISED_SIZE = 0.8f
     }
 }
