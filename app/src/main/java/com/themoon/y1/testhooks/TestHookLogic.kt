@@ -1,5 +1,6 @@
 package com.themoon.y1.testhooks
 
+import com.themoon.y1.eventlog.EventLogLogic
 import com.themoon.y1.models.SongItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -137,13 +138,7 @@ object TestHookLogic {
         "app_language", "auto_theme_enabled"
     )
 
-    private val SECRET_PARTS = listOf("password", "token", "secret", "apikey", "api_key", "session")
     private val BULK_PREFIXES = listOf("rating_", "book_pos_")
-
-    private fun isSecret(key: String): Boolean {
-        val k = key.lowercase(Locale.US)
-        return SECRET_PARTS.any { k.contains(it) }
-    }
 
     /** The key settings from AppPrefs (only keys that are set). */
     fun keySettings(all: Map<String, *>): JSONObject {
@@ -158,7 +153,7 @@ object TestHookLogic {
     fun allSettings(all: Map<String, *>): JSONObject {
         val out = JSONObject()
         for (key in all.keys.sorted()) {
-            if (isSecret(key) || BULK_PREFIXES.any { key.startsWith(it) }) continue
+            if (EventLogLogic.isSecretKey(key) || BULK_PREFIXES.any { key.startsWith(it) }) continue
             putScalar(out, key, all[key])
         }
         return out

@@ -117,11 +117,13 @@ class TestHookLogicTest {
             "book_pos_/books/b.m4b" to 1000,
             "lastfm_password" to "x",
             "jellyfin_token" to "y",
+            "lastfm_api_key" to "z",
             "favorite_songs_set" to setOf("a", "b"),
+            "pos_/videos/Session 1.mp4" to 5,
             "volume" to 0.5f
         )
         val s = TestHookLogic.allSettings(prefs)
-        assertEquals(setOf("sound", "favorite_songs_set", "volume"), s.keys().asSequence().toSet())
+        assertEquals(setOf("sound", "favorite_songs_set", "pos_/videos/Session 1.mp4", "volume"), s.keys().asSequence().toSet())
         assertEquals(2, s.getJSONObject("favorite_songs_set").getInt("setSize"))
     }
 

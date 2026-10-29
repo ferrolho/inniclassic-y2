@@ -26,7 +26,9 @@ class EventLogLogicTest {
         assertTrue(EventLogLogic.isSecretKey("AccessToken"))
         assertTrue(EventLogLogic.isSecretKey("lastfm_api_secret"))
         assertTrue(EventLogLogic.isSecretKey("apiKey"))
+        assertTrue(EventLogLogic.isSecretKey("lastfm_api_key"))
         assertFalse(EventLogLogic.isSecretKey("app_theme_name"))
+        assertFalse(EventLogLogic.isSecretKey("rating_/music/Session Token.flac"))
         assertFalse(EventLogLogic.isSecretKey("vibrate_strength"))
     }
 
