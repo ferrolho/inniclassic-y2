@@ -263,7 +263,8 @@ class FmRadioManager private constructor(context: Context) {
             } catch (ignored: Exception) {}
 
             player.setAudioStreamType(streamFm)
-            VirtualVolumeManager.getInstance().registerMediaPlayer(player)
+            // VirtualVolumeManager gives each later gain change through setMasterVolume
+            setMasterVolume(VirtualVolumeManager.getInstance().getMasterGain())
             player.prepare()
             val start = Runnable {
                 if (fmPlayer !== player || !isPowerUp) return@Runnable
@@ -291,7 +292,6 @@ class FmRadioManager private constructor(context: Context) {
 
         val player = fmPlayer
         if (player != null) {
-            VirtualVolumeManager.getInstance().unregisterMediaPlayer(player)
             try {
                 if (player.isPlaying) player.stop()
                 player.release()

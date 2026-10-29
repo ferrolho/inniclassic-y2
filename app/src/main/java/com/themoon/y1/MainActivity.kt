@@ -187,7 +187,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var isMediaLongPressConsumed: Boolean = false
     var lastJellyfinLongClickTime: Long = 0L
     var isRadioUIShowing: Boolean = false
-    var activePlayer: Int = 0
 
     var isFakeScreenOff: Boolean = false
     var isPlaylistOpenedFromLibrary: Boolean = false
