@@ -75,7 +75,6 @@ class LyricsOverlayController(
     private var plainColor = 0xFFFFFFFF.toInt()
     private var activeLineColor = 0xFF2588DC.toInt()
     private var otherLineColor = 0x8CFFFFFF.toInt()
-    private var colorsOverridden = false
 
     // Playback position from the last progress tick; frames extrapolate from it while playing
     private var progressPos = 0
@@ -136,7 +135,7 @@ class LyricsOverlayController(
 
     fun show() {
         if (!hasLyrics) return
-        if (!colorsOverridden) applyThemeColors()
+        applyThemeColors()
         placeInRegion()
         albumViews.forEach { it.visibility = View.INVISIBLE }
         lyricScrollView.visibility = View.VISIBLE
@@ -219,12 +218,6 @@ class LyricsOverlayController(
         albumViews.forEach { it.visibility = View.VISIBLE }
     }
 
-    /** Overrides the theme colours that show() uses by default. */
-    fun applyColors(primary: Int, secondary: Int, highlight: Int) {
-        colorsOverridden = true
-        setColors(primary, secondary, highlight)
-    }
-
     /** Same text colours as Now Playing; the line being sung uses the focus colour of list rows. */
     private fun applyThemeColors() {
         // The iPod colours on the white Classic screen; the theme colours on a dark Now Playing screen
@@ -239,7 +232,7 @@ class LyricsOverlayController(
     /** The theme changed while the app runs: take its font and colours, also in the text that shows now. */
     fun onThemeChanged() {
         tvLyrics.typeface = ThemeManager.getCustomFontBold()
-        if (!colorsOverridden) applyThemeColors()
+        applyThemeColors()
         if (!isShowing()) return
         if (isSynced) {
             // The spans hold the old highlight colour; the next frame marks the sung line again
