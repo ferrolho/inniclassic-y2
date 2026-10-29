@@ -31,7 +31,7 @@ object SettingsGroups {
         )),
         // What Now Playing shows (rows of the Now Playing branch, before partly in the Now Playing menu; and the cover tilt)
         Group("Now Playing", listOf(
-            "Spectrum", "Total Time", "Lyrics", "Album Cover Tilt"
+            "Spectrum", "Total Time", "Lyrics", "Lyrics Keep Screen On", "Album Cover Tilt"
         )),
         Group("Status Bar", listOf(
             "Time in Title", "Battery", "Battery Percentage"
@@ -59,7 +59,7 @@ object SettingsGroups {
             "Reset All Settings", "Power Off"
         )),
         Group("Developer", listOf(
-            "Wireless ADB"
+            "Wireless ADB", "Save Log"
         )),
     )
 
