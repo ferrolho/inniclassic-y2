@@ -14,7 +14,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -29,6 +28,7 @@ import com.themoon.y1.sync.jellyfin.JellyfinClient
 import com.themoon.y1.sync.jellyfin.JellyfinMediaItem
 import com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.text.SimpleDateFormat
@@ -1890,11 +1890,10 @@ class JellyfinUiController(
             override fun onSuccess(serverName: String, version: String) {
                 activity.runOnUiThread {
                     ActionScreens.close(key)
-                    Toast.makeText(
+                    Notice.show(
                         activity,
-                        "${localize("Connected")}: $serverName",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                        "${localize("Connected")}: $serverName"
+                    )
                     if (currentDepth == 1) {
                         buildSettingsUI()
                     }
@@ -1904,11 +1903,10 @@ class JellyfinUiController(
             override fun onError(errorMessage: String) {
                 activity.runOnUiThread {
                     ActionScreens.close(key)
-                    Toast.makeText(
+                    Notice.error(
                         activity,
-                        "${localize("Cannot reach server. Check URL and network.")}\n$errorMessage",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        "${localize("Cannot reach server. Check URL and network.")}\n$errorMessage"
+                    )
                 }
             }
         })
@@ -1916,7 +1914,7 @@ class JellyfinUiController(
 
     fun fetchLibraries() {
         if (!provider.isConfigured()) {
-            Toast.makeText(activity, localize("Connect to discover libraries."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Connect to discover libraries."))
             return
         }
 
@@ -1932,7 +1930,7 @@ class JellyfinUiController(
                 provider.fetchLibraries(MediaSyncProvider.CancellationToken())
                 activity.runOnUiThread {
                     ActionScreens.close(key)
-                    Toast.makeText(activity, localize("Libraries updated"), Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Libraries updated"))
                     if (currentDepth == 1) {
                         buildSettingsUI()
                     }
@@ -1940,11 +1938,10 @@ class JellyfinUiController(
             } catch (e: Exception) {
                 activity.runOnUiThread {
                     ActionScreens.close(key)
-                    Toast.makeText(
+                    Notice.error(
                         activity,
-                        "${localize("Failed to fetch libraries")}: ${e.message ?: ""}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        "${localize("Failed to fetch libraries")}: ${e.message ?: ""}"
+                    )
                 }
             }
         }.start()
@@ -1953,7 +1950,7 @@ class JellyfinUiController(
     fun startQuickConnect() {
         val serverUrl = provider.serverUrl
         if (serverUrl.isBlank()) {
-            Toast.makeText(activity, localize("Server URL is empty"), Toast.LENGTH_SHORT).show()
+            Notice.error(activity, localize("Server URL is empty"))
             return
         }
 
@@ -1979,7 +1976,7 @@ class JellyfinUiController(
                 if (!client.isQuickConnectEnabled()) {
                     activity.runOnUiThread {
                         ActionScreens.update(key, info(null, localize("Server does not support QuickConnect")))
-                        Toast.makeText(activity, localize("Server does not support QuickConnect"), Toast.LENGTH_LONG).show()
+                        Notice.error(activity, localize("Server does not support QuickConnect"))
                     }
                     return@Thread
                 }
@@ -2026,11 +2023,11 @@ class JellyfinUiController(
 
                 activity.runOnUiThread {
                     ActionScreens.close(key)
-                    Toast.makeText(
+                    Notice.show(
                         activity,
                         "${localize("QuickConnect Paired!")} ${localize("Paired as ")}${auth.serverName}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        long = true
+                    )
                     if (currentDepth == 1) {
                         buildSettingsUI()
                     }
@@ -2040,7 +2037,7 @@ class JellyfinUiController(
                 activity.runOnUiThread {
                     val msg = e.message ?: localize("Connection Error")
                     ActionScreens.update(key, info(null, msg))
-                    Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
+                    Notice.error(activity, msg)
                 }
             }
         }.start()
@@ -2048,12 +2045,12 @@ class JellyfinUiController(
 
     fun launchSync() {
         if (isCustomScanning()) {
-            Toast.makeText(activity, localize("Scanning Media..."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Scanning Media..."))
             return
         }
 
         if (syncManager.isSyncing) {
-            Toast.makeText(activity, localize("Syncing..."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Syncing..."))
             return
         }
 
@@ -2111,13 +2108,13 @@ class JellyfinUiController(
                     ActionScreens.update(key, listOf(message ?: ""))
                     when (state) {
                         SyncManager.SyncState.COMPLETE -> {
-                            Toast.makeText(activity, localize("Sync Complete"), Toast.LENGTH_SHORT).show()
+                            Notice.show(activity, localize("Sync Complete"))
                             ActionScreens.close(key)
                             if (currentDepth == 1) buildSettingsUI()
                             onSyncFinished()
                         }
                         SyncManager.SyncState.ERROR -> {
-                            Toast.makeText(activity, message ?: "Error", Toast.LENGTH_LONG).show()
+                            Notice.error(activity, message ?: "Error")
                             ActionScreens.close(key)
                         }
                         SyncManager.SyncState.CANCELLED -> {

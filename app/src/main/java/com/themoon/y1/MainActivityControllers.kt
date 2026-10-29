@@ -48,6 +48,7 @@ import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
 import com.themoon.y1.views.EdgeFadeListView
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.Notice
 
 internal fun MainActivity.initControllers() {
     val rootContent = findViewById<ViewGroup>(android.R.id.content)
@@ -258,7 +259,7 @@ internal fun MainActivity.initControllers() {
         onExitRadio = { NavigationManager.getInstance().popBackStack() },
         showLoadingPopup = { showLoadingPopup() },
         dismissLoadingOverlay = { dismissLoadingOverlay() },
-        updateLoadingProgress = { _, _ -> },
+        updateLoadingProgress = { progress, message -> updateLoadingProgress(progress, message) },
         localize = { t(it) }
     )
 
@@ -637,7 +638,7 @@ internal fun MainActivity.initControllers() {
 internal fun MainActivity.shuffleAllSongs() {
     val tracks = MainActivity.customLibrary.map { it.file }
     if (tracks.isEmpty()) {
-        android.widget.Toast.makeText(this, t("No playable audio files found."), android.widget.Toast.LENGTH_SHORT).show()
+        Notice.show(this, t("No playable audio files found."))
         return
     }
     isShuffleMode = true
@@ -693,7 +694,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_PLAYER" -> {
             if (currentPlaylist.isEmpty()) {
-                android.widget.Toast.makeText(this@handleMainMenuAction, t("No music is currently playing."), android.widget.Toast.LENGTH_SHORT).show()
+                Notice.show(this@handleMainMenuAction, t("No music is currently playing."))
             } else {
                 changeScreen(MainActivity.STATE_PLAYER)
             }

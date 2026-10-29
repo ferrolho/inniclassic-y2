@@ -12,10 +12,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
-import android.widget.Toast
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.managers.BluetoothPairingPolicy.Action
 import com.themoon.y1.managers.BluetoothPairingPolicy.FailureOutcome
+import com.themoon.y1.views.Notice
 
 /**
  * Answers Bluetooth pairing requests for the Y2, which has no touch screen.
@@ -200,7 +200,7 @@ class BluetoothPairingAgent(
     }
 
     private fun toast(text: String) {
-        Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
+        Notice.error(activity, text)
     }
 
     companion object {

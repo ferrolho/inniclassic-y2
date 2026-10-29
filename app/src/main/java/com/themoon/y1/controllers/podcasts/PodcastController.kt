@@ -8,7 +8,6 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.controllers.ScreenController
@@ -22,6 +21,7 @@ import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.ArrayList
@@ -149,7 +149,7 @@ class PodcastController(
                     clickFeedback()
                     lastFocusText = ch.title
                     buildEpisodesUI(ch.title, ch.rssUrl)
-                    Toast.makeText(activity, localize("Connecting to server: ") + ch.title, Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Connecting to server: ") + ch.title)
                 }
                 containerBrowserItems.addView(btnCh)
             }
@@ -188,11 +188,10 @@ class PodcastController(
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
-                    Toast.makeText(
+                    Notice.error(
                         activity,
-                        localize("Failed to fetch episodes: ") + (e.message ?: "Unknown error"),
-                        Toast.LENGTH_LONG
-                    ).show()
+                        localize("Failed to fetch episodes: ") + (e.message ?: "Unknown error")
+                    )
                 }
             }
         }.start()
@@ -292,7 +291,7 @@ class PodcastController(
             }
         } else {
             actions += ActionScreens.Action(localize("Stream (Play)")) {
-                Toast.makeText(activity, "${localize("Connecting to server: ")}\n$title", Toast.LENGTH_SHORT).show()
+                Notice.show(activity, "${localize("Connecting to server: ")}\n$title")
                 val streamKey = "/PODCAST_STREAM/$safeChannel/$safeTitle"
                 var savedPos = prefs.getInt("book_pos_$streamKey", 0)
                 if (savedPos == 0) savedPos = prefs.getInt("book_pos_${localFile.absolutePath}", 0)
@@ -329,7 +328,7 @@ class PodcastController(
                 activity.runOnUiThread {
                     onHideLoadingPopup()
                     if (results.isEmpty()) {
-                        Toast.makeText(activity, "${localize("No podcasts found for: ")}$keyword", Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, "${localize("No podcasts found for: ")}$keyword")
                     } else {
                         showSearchResultsDialog(results)
                     }
@@ -337,7 +336,7 @@ class PodcastController(
             } catch (e: Exception) {
                 activity.runOnUiThread {
                     onHideLoadingPopup()
-                    Toast.makeText(activity, "Search Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Notice.error(activity, "Search Failed: ${e.message}")
                 }
             }
         }.start()
@@ -356,10 +355,10 @@ class PodcastController(
                         val safeName = item.name.replace("|", "-")
                         subFile.appendText("\n$safeName|${item.feedUrl}")
 
-                        Toast.makeText(activity, "✅ ${localize("Subscribed: ")}$safeName", Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, "✅ ${localize("Subscribed: ")}$safeName")
                         buildChannelsUI()
                     } catch (e: Exception) {
-                        Toast.makeText(activity, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Notice.error(activity, "Error saving: ${e.message}")
                     }
                 }
             }
