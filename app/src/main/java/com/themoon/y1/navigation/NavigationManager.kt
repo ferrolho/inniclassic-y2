@@ -38,19 +38,42 @@ class NavigationManager private constructor() {
         this.transitionListener = listener
     }
 
+    /** The direction of a screen change: one list deeper (PUSH), back up (POP), or in place (NONE). */
+    enum class Direction { PUSH, POP, NONE }
+
+    /**
+     * Told before the old screen exits and after the new screen entered, with the direction of the change
+     * (for example to slide the lists as on the iPod). Not told when the same state only refreshes.
+     */
+    interface DirectionListener {
+        fun onBeforeTransition(from: ScreenState?, to: ScreenState, direction: Direction) {}
+        fun onAfterTransition(from: ScreenState?, to: ScreenState, direction: Direction) {}
+    }
+
+    private val directionListeners = ArrayList<DirectionListener>()
+
+    fun addDirectionListener(listener: DirectionListener) {
+        if (listener !in directionListeners) directionListeners.add(listener)
+    }
+
+    fun removeDirectionListener(listener: DirectionListener) {
+        directionListeners.remove(listener)
+    }
+
     fun registerController(stateClass: Class<out ScreenState>, controller: ScreenController) {
         controllerMap[stateClass] = controller
     }
 
     fun navigateTo(newState: ScreenState, addToBackStack: Boolean = true) {
-        navigate(newState, addToBackStack, null)
+        navigate(newState, addToBackStack, null, pop = false)
     }
 
     /**
      * Back rule (as on the iPod): a list that opens going down selects its first row; Back selects again the
      * row that opened the deeper list. [returnRow] is that row when Back comes to [newState].
+     * [pop] = the change comes from the back stack (Back).
      */
-    private fun navigate(newState: ScreenState, addToBackStack: Boolean, returnRow: RowKey?) {
+    private fun navigate(newState: ScreenState, addToBackStack: Boolean, returnRow: RowKey?, pop: Boolean) {
         if (newState == currentState && activeController != null) {
             activeController?.onRefreshUI()
             return
@@ -58,6 +81,8 @@ class NavigationManager private constructor() {
 
         ListRows.cancelPending()
         val previous = currentState
+        val direction = directionOf(previous, newState, addToBackStack, pop)
+        for (l in directionListeners.toTypedArray()) l.onBeforeTransition(previous, newState, direction)
         var back = returnRow
         if (newState is ScreenState.MainMenu) {
             // The bottom entry: going to the main menu (with Back or directly) takes all entries off
@@ -91,19 +116,20 @@ class NavigationManager private constructor() {
         if (previous != null) {
             transitionListener?.onScreenTransition(previous, newState)
         }
+        for (l in directionListeners.toTypedArray()) l.onAfterTransition(previous, newState, direction)
     }
 
     fun popBackStack(): Boolean {
         if (backStack.isEmpty()) {
             if (currentState != ScreenState.MainMenu) {
-                navigateTo(ScreenState.MainMenu, addToBackStack = false)
+                navigate(ScreenState.MainMenu, addToBackStack = false, returnRow = null, pop = true)
                 return true
             }
             return false
         }
 
         val entry = backStack.pop()
-        navigate(entry.state, addToBackStack = false, returnRow = entry.row)
+        navigate(entry.state, addToBackStack = false, returnRow = entry.row, pop = true)
         return true
     }
 
@@ -128,6 +154,7 @@ class NavigationManager private constructor() {
         activeController = null
         controllerMap.clear()
         transitionListener = null
+        directionListeners.clear()
     }
 
     private fun findControllerForState(state: ScreenState): ScreenController? {
@@ -136,6 +163,17 @@ class NavigationManager private constructor() {
     }
 
     companion object {
+        /**
+         * Back (or a change to the main menu, the bottom entry) goes up; a change that keeps the old list on the
+         * back stack goes one list deeper; a change that replaces the list (no back-stack entry) stays in place.
+         */
+        fun directionOf(from: ScreenState?, to: ScreenState, addToBackStack: Boolean, pop: Boolean): Direction = when {
+            from == null -> Direction.NONE
+            pop || to is ScreenState.MainMenu -> Direction.POP
+            addToBackStack -> Direction.PUSH
+            else -> Direction.NONE
+        }
+
         @Volatile
         private var instance: NavigationManager? = null
 

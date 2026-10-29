@@ -1,7 +1,6 @@
 package com.themoon.y1.controllers.settings
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
@@ -88,8 +87,9 @@ class SettingsController(
         }
     var settingsSubMode: Int = 0
     private var isUiActive = false
-    /** The Power screen (Restart, Power Off) is open: Back goes to the screen before it. */
-    private var isPowerScreen = false
+    /** The open action screen (Power, or a screen in place of a dialog: ActionScreen.kt), or null. Back goes to the screen before it. */
+    private var actionPage: SettingsSubMode? = null
+    private val isActionScreen: Boolean get() = actionPage != null
 
     // Temporary variables for Date/Time picker
     var dtYear: Int = 2026
@@ -172,6 +172,7 @@ class SettingsController(
         when (val shown = page) {
             is SettingsSubMode.Page -> buildPage(shown)
             is SettingsSubMode.Power -> buildPowerUI()
+            is SettingsSubMode.Action -> buildActionUI(shown, ActionScreens.spec(shown.key))
             else -> {
                 val title = (shown as? SettingsSubMode.Group)?.title
                 groupPages.show(SettingsGroups.GROUPS.indexOfFirst { it.title == title })
@@ -220,11 +221,14 @@ class SettingsController(
 
     override fun onExit() {
         isUiActive = false
+        actionPage = null
+        containerSettingsItems.isFocusable = false
     }
 
     override fun onRefreshUI() {
-        if (isPowerScreen) {
-            buildPowerUI()
+        val shownAction = actionPage
+        if (shownAction != null) {
+            onEnter(ScreenState.Settings(shownAction))
         } else if (currentSettingsDepth == 0) {
             buildSettingsUI()
         }
@@ -244,8 +248,9 @@ class SettingsController(
 
     /** Back: the list of the top back-stack entry (NavigationManager builds it again and selects its row). */
     override fun onBackPressed(): Boolean {
-        if (isPowerScreen) {
-            onNavigateBack()
+        if (isActionScreen) {
+            clickFeedback()
+            ActionScreens.cancel((actionPage as? SettingsSubMode.Action)?.let { ActionScreens.spec(it.key) }) { onNavigateBack() }
             return true
         }
         if (isMenuReorderMode) {
@@ -386,7 +391,7 @@ class SettingsController(
     }
 
     fun buildSettingsUI() {
-        isPowerScreen = false
+        actionPage = null
         // A row's screen asks for its list (a value was chosen): Back to that list
         if (page is SettingsSubMode.Page) {
             onNavigateBack()
@@ -734,14 +739,11 @@ class SettingsController(
         val btnClearCache = createSettingRow(localize("Clear Album Art & Info"), "〉 ")
         btnClearCache.setOnClickListener {
             clickFeedback()
-            AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(localize("Clear Cache & Track Info"))
-                .setMessage(localize("Delete all downloaded album covers and saved track information (Title/Artist)?"))
-                .setPositiveButton(localize("Clear")) { _, _ ->
-                    onClearCacheConfirmed()
-                }
-                .setNegativeButton(localize("Cancel"), null)
-                .show()
+            ActionScreens.open(confirmScreen(
+                localize("Clear Album Art & Info"),
+                localize("Delete all downloaded album covers and saved track information (Title/Artist)?"),
+                localize("Clear")
+            ) { onClearCacheConfirmed() })
         }
         containerSettingsItems.addView(btnClearCache)
 
@@ -773,15 +775,14 @@ class SettingsController(
         btnLastFmAccount.setOnClickListener {
             clickFeedback()
             if (scrobbler.isLoggedIn()) {
-                AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                    .setTitle(localize("Last.fm Account"))
-                    .setMessage(localize("Log out of ") + "@" + scrobbler.getUsername() + "?")
-                    .setPositiveButton(localize("Log Out")) { _, _ ->
-                        scrobbler.logout()
-                        buildSettingsUI()
-                    }
-                    .setNegativeButton(localize("Cancel"), null)
-                    .show()
+                ActionScreens.open(confirmScreen(
+                    localize("Last.fm Account"),
+                    localize("Log out of ") + "@" + scrobbler.getUsername() + "?",
+                    localize("Log Out")
+                ) {
+                    scrobbler.logout()
+                    buildSettingsUI()
+                })
             } else {
                 onNavigateToScreen(7) // STATE_WIFI_KEYBOARD
             }
@@ -866,14 +867,11 @@ class SettingsController(
         val btnResetAll = createSettingRow(localize("Reset All Settings"), "〉 ")
         btnResetAll.setOnClickListener {
             clickFeedback()
-            AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(localize("Reset All Settings"))
-                .setMessage(localize("Reset all settings to their default values? This won't delete any music or playlists."))
-                .setPositiveButton(localize("Reset")) { _, _ ->
-                    resetAllAppSettings()
-                }
-                .setNegativeButton(localize("Cancel"), null)
-                .show()
+            ActionScreens.open(confirmScreen(
+                localize("Reset All Settings"),
+                localize("Reset all settings to their default values? This won't delete any music or playlists."),
+                localize("Reset")
+            ) { resetAllAppSettings() })
         }
         containerSettingsItems.addView(btnResetAll)
 
@@ -902,14 +900,8 @@ class SettingsController(
 
     /** The Power screen: Restart and Power Off. The centre button does the action at once; Back closes the screen. */
     private fun buildPowerUI() {
-        isPowerScreen = true
-        settingsSubMode = 0
-        currentSettingsDepth = 1
-        containerSettingsItems.removeAllViews()
-        for (action in PowerMenu.Action.values()) {
-            val row = createSettingRow(localize(action.label), "")
-            row.setOnClickListener {
-                clickFeedback()
+        val spec = ActionScreens.Spec(localize("Power"), actions = PowerMenu.Action.values().map { action ->
+            ActionScreens.Action(localize(action.label)) {
                 PowerMenu.run(activity, action) {
                     Toast.makeText(
                         activity,
@@ -918,11 +910,43 @@ class SettingsController(
                     ).show()
                 }
             }
-            containerSettingsItems.addView(row)
+        })
+        buildActionUI(SettingsSubMode.Power, spec)
+    }
+
+    /**
+     * An action screen (ActionScreen.kt): the title in the status bar, grey info rows, one row for each action.
+     * A row closes the screen (Back), then does its action. A screen whose content is gone (an old entry) closes.
+     */
+    private fun buildActionUI(page: SettingsSubMode, spec: ActionScreens.Spec?) {
+        actionPage = page
+        settingsSubMode = 0
+        currentSettingsDepth = 1
+        containerSettingsItems.removeAllViews()
+        if (spec == null) {
+            containerSettingsItems.post { if (actionPage == page) onNavigateBack() }
+            return
         }
-        groupPages.showTitle(mainActivity?.tvStatusBarTitle, containerSettingsItems, localize("Power"))
+        for (line in spec.info) containerSettingsItems.addView(ActionScreens.infoRow(activity, line))
+        var firstAction: View? = null
+        for (action in spec.actions) {
+            val row = createSettingRow(action.label, "")
+            row.setOnClickListener {
+                clickFeedback()
+                ActionScreens.choose(action) { onNavigateBack() }
+            }
+            containerSettingsItems.addView(row)
+            if (firstAction == null) firstAction = row
+        }
+        groupPages.showTitle(mainActivity?.tvStatusBarTitle, containerSettingsItems, spec.title)
         (containerSettingsItems.parent as? ScrollView)?.scrollTo(0, 0)
-        containerSettingsItems.getChildAt(0)?.let { first -> first.post { first.requestFocus() } }
+        if (spec.selectAction && firstAction != null) {
+            firstAction.post { firstAction.requestFocus() }
+        } else {
+            // No row selected: the list itself has the focus, and the first wheel step selects the first action
+            containerSettingsItems.isFocusable = true
+            containerSettingsItems.post { containerSettingsItems.requestFocus() }
+        }
     }
 
     private fun buildLanguageSelectorUI() {
