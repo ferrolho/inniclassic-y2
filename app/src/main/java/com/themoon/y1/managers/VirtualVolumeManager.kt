@@ -13,17 +13,12 @@ import java.util.ArrayList
  * - Movies & Videos (VideoPlayerManager / LibVLC)
  * - Music Quiz preview playback (MediaPlayer)
  * - FM Radio (FmRadioManager / MediaPlayer)
- * - Any future media players / engines via registration or MasterVolumeObserver
+ * - Any future MediaPlayer via [applyTo] or [registerMediaPlayer]
  */
 class VirtualVolumeManager private constructor() {
 
-    interface MasterVolumeObserver {
-        fun onMasterVolumeChanged(gain: Float)
-    }
-
     private var currentMasterGain = 1.0f
     private val registeredMediaPlayers = ArrayList<WeakReference<MediaPlayer>>()
-    private val registeredObservers = ArrayList<WeakReference<MasterVolumeObserver>>()
 
     @Synchronized
     fun getMasterGain(): Float {
@@ -40,8 +35,7 @@ class VirtualVolumeManager private constructor() {
     }
 
     /**
-     * Applies the current master gain to all known playback engines, registered MediaPlayers,
-     * and custom observers.
+     * Applies the current master gain to all known playback engines and registered MediaPlayers.
      */
     @Synchronized
     fun applyMasterGain() {
@@ -63,7 +57,7 @@ class VirtualVolumeManager private constructor() {
             fm?.setMasterVolume(currentMasterGain)
         } catch (ignored: Throwable) {}
 
-        // 4. Registered MediaPlayers (e.g. Music Quiz preview player, FM Radio player)
+        // 4. Registered MediaPlayers (e.g. Music Quiz preview player)
         val playerIt = registeredMediaPlayers.iterator()
         while (playerIt.hasNext()) {
             val mp = playerIt.next().get()
@@ -72,19 +66,6 @@ class VirtualVolumeManager private constructor() {
             } else {
                 try {
                     mp.setVolume(currentMasterGain, currentMasterGain)
-                } catch (ignored: Throwable) {}
-            }
-        }
-
-        // 5. Registered observers
-        val observerIt = registeredObservers.iterator()
-        while (observerIt.hasNext()) {
-            val obs = observerIt.next().get()
-            if (obs == null) {
-                observerIt.remove()
-            } else {
-                try {
-                    obs.onMasterVolumeChanged(currentMasterGain)
                 } catch (ignored: Throwable) {}
             }
         }
@@ -125,34 +106,6 @@ class VirtualVolumeManager private constructor() {
         while (it.hasNext()) {
             val p = it.next().get()
             if (p == null || p == player) {
-                it.remove()
-            }
-        }
-    }
-
-    @Synchronized
-    fun registerObserver(observer: MasterVolumeObserver?) {
-        if (observer == null) return
-        val it = registeredObservers.iterator()
-        while (it.hasNext()) {
-            val obs = it.next().get()
-            if (obs == null || obs == observer) {
-                it.remove()
-            }
-        }
-        registeredObservers.add(WeakReference(observer))
-        try {
-            observer.onMasterVolumeChanged(currentMasterGain)
-        } catch (ignored: Throwable) {}
-    }
-
-    @Synchronized
-    fun unregisterObserver(observer: MasterVolumeObserver?) {
-        if (observer == null) return
-        val it = registeredObservers.iterator()
-        while (it.hasNext()) {
-            val obs = it.next().get()
-            if (obs == null || obs == observer) {
                 it.remove()
             }
         }

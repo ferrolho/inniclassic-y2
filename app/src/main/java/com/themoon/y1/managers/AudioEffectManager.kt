@@ -44,11 +44,6 @@ class AudioEffectManager private constructor() {
 
         main.isSoftwareEqEnabled = settings.softwareEq
         main.isSoundCheckEnabled = settings.soundCheck
-        main.currentEqProfile = settings.eqProfile
-        main.currentBassBoostStep = settings.bassBoostStep
-        main.currentVirtualizerStep = settings.virtualizerStep
-        main.currentCrossfeedStep = settings.crossfeedStep
-        settings.eqBandLevels.copyInto(main.customBandLevels, endIndex = minOf(settings.eqBandLevels.size, main.customBandLevels.size))
 
         // Software DSP (ExoPlayer): with a neutral setting it only copies the buffer.
         if (plan.softwareEq) {
@@ -75,7 +70,6 @@ class AudioEffectManager private constructor() {
             if (preset != null) {
                 if (preset >= eq.numberOfPresets) return@keepEffect false
                 eq.usePreset(preset.toShort())
-                main.currentEqPresetIndex = preset
             } else {
                 val bands = minOf(eq.numberOfBands.toInt(), settings.eqBandLevels.size)
                 for (i in 0 until bands) eq.setBandLevel(i.toShort(), settings.eqBandLevels[i].toShort())
@@ -101,7 +95,7 @@ class AudioEffectManager private constructor() {
         val profile = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"
         val name = AudioEffectPlan.levelsName(profile, softwareEq)
         val levels = if (name == null) IntArray(0) else IntArray(AudioEffectPlan.bandCount(softwareEq)) {
-            prefs.getInt("eq_custom_" + name + "_band_" + it, 0)
+            prefs.getInt(AudioEffectPlan.bandLevelKey(name, it), 0)
         }
         return AudioEffectSettings(
             softwareEq = softwareEq,
@@ -153,14 +147,30 @@ class AudioEffectManager private constructor() {
         main.loudnessEnhancer = null
     }
 
-    fun saveCustomEqProfile(name: String) {
+    /**
+     * Saves one band level of the custom profile [name] in the prefs (the levels that [syncAudioEffects] reads)
+     * and in the profile file, then applies it.
+     */
+    fun setCustomBandLevel(name: String, band: Int, level: Int) {
+        val main = MainActivity.instance ?: return
+        main.prefs.edit().putInt(AudioEffectPlan.bandLevelKey(name, band), level).apply()
+        exportEqProfileToFile(name)
+        syncAudioEffects()
+    }
+
+    /** Save Current Configuration: writes the levels of the custom profile [name] (in the prefs) to its file. */
+    fun saveCustomEqProfile(name: String) = exportEqProfileToFile(name)
+
+    /** Sets all band levels of the custom profile [name] to 0 (flat), in the prefs and in the profile file. */
+    fun resetCustomEqProfile(name: String) {
         val main = MainActivity.instance ?: return
         val bands = AudioEffectPlan.bandCount(main.prefs.getBoolean("software_eq_enabled", false))
         val editor = main.prefs.edit()
         for (i in 0 until bands) {
-            editor.putInt("eq_custom_" + name + "_band_" + i, main.customBandLevels[i])
+            editor.putInt(AudioEffectPlan.bandLevelKey(name, i), 0)
         }
         editor.commit()
+        exportEqProfileToFile(name)
     }
 
     fun deleteCustomEqProfile(name: String) {
@@ -188,13 +198,17 @@ class AudioEffectManager private constructor() {
         editor.putString("custom_eq_list", sb.toString())
 
         for (i in 0 until 32) {
-            editor.remove("eq_custom_" + name + "_band_" + i)
+            editor.remove(AudioEffectPlan.bandLevelKey(name, i))
         }
         editor.commit()
 
         Notice.show(main, "Profile Deleted Completely.")
     }
 
+    /**
+     * Writes the levels of the custom profile [name] from the prefs to its file in the EQ folder.
+     * [loadAndSyncExternalEqProfiles] reads the files back into the prefs, so each change must also go to the file.
+     */
     fun exportEqProfileToFile(name: String) {
         val main = MainActivity.instance ?: return
         try {
@@ -208,7 +222,7 @@ class AudioEffectManager private constructor() {
             val bandsArray = JSONArray()
             val bands = AudioEffectPlan.bandCount(main.prefs.getBoolean("software_eq_enabled", false))
             for (i in 0 until bands) {
-                bandsArray.put(main.prefs.getInt("eq_custom_" + name + "_band_" + i, 0))
+                bandsArray.put(main.prefs.getInt(AudioEffectPlan.bandLevelKey(name, i), 0))
             }
             json.put("bands", bandsArray)
 
@@ -247,7 +261,7 @@ class AudioEffectManager private constructor() {
 
                             if (bandsArray != null) {
                                 for (i in 0 until bandsArray.length()) {
-                                    editor.putInt("eq_custom_" + name + "_band_" + i, bandsArray.getInt(i))
+                                    editor.putInt(AudioEffectPlan.bandLevelKey(name, i), bandsArray.getInt(i))
                                 }
                                 if (!validCustomList.contains(name)) {
                                     validCustomList.add(name)

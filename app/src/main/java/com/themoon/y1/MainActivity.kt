@@ -188,16 +188,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var isScreenSleeping: Boolean = false
     var isLongPressConsumed: Boolean = false
     var isMediaLongPressConsumed: Boolean = false
-    var activePlayer: Int = 0
 
     var isFakeScreenOff: Boolean = false
     var backTargetForUtility: Int = STATE_SETTINGS
     var isPendingUpdateCheckAfterWifi: Boolean = false
-    var currentEqPresetIndex: Int = 0
-    var currentEqProfile: String = "preset_0"
-    var currentBassBoostStep: Int = 0
-    var currentVirtualizerStep: Int = 0
-    var currentCrossfeedStep: Int = 0
     val eqPresetNames: ArrayList<String> = ArrayList()
 
     var isCustomScanning: Boolean = false
@@ -231,7 +225,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var virtualizer: Virtualizer? = null
     var loudnessEnhancer: LoudnessEnhancer? = null
     var currentAudioSessionId: Int = -1
-    val customBandLevels = IntArray(32)
 
     private var usbStateReceiverReady: Boolean = false
     internal val rootFolder: File by lazy { StoragePaths.getPrimaryRoot() }

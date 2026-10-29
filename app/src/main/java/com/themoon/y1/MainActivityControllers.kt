@@ -223,11 +223,9 @@ internal fun MainActivity.initControllers() {
         localize = { t(it) }
     )
 
-    val customBandLevels = IntArray(10)
     equalizerController = EqualizerController(
         activity = this,
         rootView = layoutSettingsMode as ViewGroup,
-        customBandLevels = customBandLevels,
         eqPresetNames = eqPresetNames,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         createCategoryHeader = { title ->

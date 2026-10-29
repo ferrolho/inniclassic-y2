@@ -91,6 +91,21 @@ class AudioEffectPlanTest {
     }
 
     @Test
+    fun bandLevelKey_isTheSavedProfileKey() {
+        // Saved profiles use this pref key: do not change it
+        assertEquals("eq_custom_User EQ 1_band_0", AudioEffectPlan.bandLevelKey("User EQ 1", 0))
+        assertEquals("eq_custom_Flat_band_9", AudioEffectPlan.bandLevelKey("Flat", 9))
+    }
+
+    @Test
+    fun stepBandLevel_staysInRange() {
+        assertEquals(100, AudioEffectPlan.stepBandLevel(0, 100))
+        assertEquals(-100, AudioEffectPlan.stepBandLevel(0, -100))
+        assertEquals(1500, AudioEffectPlan.stepBandLevel(1500, 100))
+        assertEquals(-1500, AudioEffectPlan.stepBandLevel(-1450, -100))
+    }
+
+    @Test
     fun strengthForStep_matchesOldMapping() {
         assertEquals(0.toShort(), AudioEffectPlan.strengthForStep(0))
         assertEquals(333.toShort(), AudioEffectPlan.strengthForStep(1))
