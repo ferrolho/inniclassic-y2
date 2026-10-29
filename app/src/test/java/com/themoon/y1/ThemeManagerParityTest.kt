@@ -100,7 +100,6 @@ class ThemeManagerParityTest {
         return ThemeManager.ThemeData(
             folderPath = "/dummy/$name",
             name = name,
-            bgImage = "",
             customFont = Typeface.DEFAULT,
             textPrimary = textPrimary,
             textSecondary = textSecondary,
