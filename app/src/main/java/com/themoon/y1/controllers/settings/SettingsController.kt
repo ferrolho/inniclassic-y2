@@ -97,24 +97,6 @@ class SettingsController(
         val TIMEOUT_VALUES = intArrayOf(15000, 30000, 60000, 300000)
         val TIMEOUT_NAMES = arrayOf("15 Sec", "30 Sec", "1 Min", "5 Min")
         val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
-
-        val MUSIC_MENU_ITEMS = arrayOf(
-            arrayOf("coverflow", "Cover Flow"),
-            arrayOf("playlists", "Playlists"),
-            arrayOf("track_artists", "Artists"),
-            arrayOf("artists", "Album Artists"),
-            arrayOf("albums", "Albums"),
-            arrayOf("compilations", "Compilations"),
-            arrayOf("songs", "Songs"),
-            arrayOf("shuffle_songs", "Shuffle Songs"),
-            arrayOf("genres", "Genres"),
-            arrayOf("composers", "Composers"),
-            arrayOf("years", "Years"),
-            arrayOf("recently_added", "Recently Added"),
-            arrayOf("favorites", "My Favorites"),
-            arrayOf("folders", "Folders"),
-            arrayOf("search", "Search")
-        )
     }
 
     init {
@@ -1358,12 +1340,12 @@ class SettingsController(
             } catch (_: Exception) {}
         }
 
-        for (item in MUSIC_MENU_ITEMS) {
-            val id = item[0]
+        for (item in com.themoon.y1.controllers.browser.MusicMenuItems.ITEMS) {
+            val id = item.id
             val isHidden = com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
             val stateIcon = if (isHidden) "\uE5CD" else "\uE8F4"
 
-            val row = createSettingRow(localize(item[1]), stateIcon)
+            val row = createSettingRow(localize(item.label), stateIcon)
             val tvRight = row.getChildAt(1) as? TextView
             if (materialIconFont != null) {
                 tvRight?.typeface = materialIconFont
