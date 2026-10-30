@@ -91,6 +91,16 @@ class PrefsTest {
     }
 
     @Test
+    fun perSongKeysAreNotSettings() {
+        for (k in listOf("rating_/a.mp3", "book_pos_/b.m4b", "book_dur_/b.m4b", "video_pos_/v.mp4", "album_art_/a.mp3", "meta_title_/p.mp3")) {
+            assertTrue(k, Prefs.isPerSong(k))
+            assertFalse(k, Prefs.isSetting(k))
+        }
+        assertFalse(Prefs.isPerSong("hide_btn_btn_music"))
+        assertFalse(Prefs.isPerSong("shuffle"))
+    }
+
+    @Test
     fun typedPrefsReadDefaultsAndWrite() {
         val map = mutableMapOf<String, Any?>()
         val prefs = FakePrefs(map)
