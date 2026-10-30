@@ -175,7 +175,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 prefs.edit().putBoolean("usb_storage_prompt", value).apply()
             }
         }
-    var isAutoFetchEnabled: Boolean = true
     var is24HourFormat: Boolean = ClockSettings.DEFAULT_24_HOUR_FORMAT
     var isTimeInTitleBar: Boolean = ClockSettings.DEFAULT_TIME_IN_TITLE
     var isShowBatteryPercentage: Boolean = false
@@ -193,7 +192,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var isFakeScreenOff: Boolean = false
     var backTargetForUtility: Int = STATE_SETTINGS
     var isPendingUpdateCheckAfterWifi: Boolean = false
-    var lastSettingsFocusIndex: Int = 0
     val eqPresetNames: ArrayList<String> = ArrayList()
 
     var isCustomScanning: Boolean = false
