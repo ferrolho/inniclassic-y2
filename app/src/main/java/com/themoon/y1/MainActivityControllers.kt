@@ -412,7 +412,6 @@ internal fun MainActivity.initControllers() {
         rootView = layoutStorageMode as ViewGroup,
         songsProvider = { MainActivity.customLibrary },
         videosProvider = { videoFiles },
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
         localize = { t(it) }
     )
