@@ -20,7 +20,9 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.navigation.JellyfinLevel
 import com.themoon.y1.navigation.KeyboardTarget
+import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.MediaSyncProvider
 import com.themoon.y1.sync.SyncManager
@@ -55,8 +57,7 @@ class JellyfinUiController(
     private val customLibrary: MutableList<SongItem>,
     private val trackNumberMap: MutableMap<String, Int>,
     private val localize: (String) -> String,
-    private val isCustomScanning: () -> Boolean = { false },
-    private val onDepthChanged: ((depth: Int) -> Unit)? = null
+    private val isCustomScanning: () -> Boolean = { false }
 ) : ScreenController {
 
     companion object {
@@ -71,28 +72,12 @@ class JellyfinUiController(
     private val provider: JellyfinSyncProvider get() = JellyfinSyncProvider.getInstance(activity)
     private val syncManager: SyncManager get() = SyncManager.getInstance(activity)
 
-    var currentDepth: Int = 1
-        private set(value) {
-            field = value
-            onDepthChanged?.invoke(value)
-        }
+    /** The depth of the list that the builders made last (1 = settings ... 5 = episodes), for the focus indexes. */
+    private var currentDepth: Int = 1
 
     var activeLibrary: MediaSyncProvider.LibraryInfo? = null
         private set
     var currentHierarchy: JellyfinSyncHierarchy? = null
-        private set
-
-    var currentSelectedSeries: JellyfinSyncHierarchy.SeriesNode? = null
-        private set
-    var currentSelectedSeason: JellyfinSyncHierarchy.SeasonNode? = null
-        private set
-    var currentSelectedArtist: JellyfinSyncHierarchy.ArtistNode? = null
-        private set
-    var currentSelectedAlbum: JellyfinSyncHierarchy.AlbumNode? = null
-        private set
-    var currentSelectedAuthor: JellyfinSyncHierarchy.AuthorNode? = null
-        private set
-    var currentSelectedBook: JellyfinSyncHierarchy.BookNode? = null
         private set
 
     var lastLongClickTime: Long = 0L
@@ -105,13 +90,78 @@ class JellyfinUiController(
     var lastBrowseDepth5FocusIndex: Int = -1
 
     override fun onEnter(state: ScreenState) {
-        buildSettingsUI()
+        show((state as? ScreenState.Jellyfin)?.level ?: JellyfinLevel.Root)
     }
 
     override fun onExit() {
-        currentDepth = 1
         isLongPressActive = false
     }
+
+    /** The Jellyfin level that shows now, or null when another screen shows. */
+    private val shownLevel: JellyfinLevel?
+        get() = (NavigationManager.getInstance().currentState as? ScreenState.Jellyfin)?.level
+
+    /** Opens a deeper level: a new back-stack entry, so Back comes back to the row that opened it. */
+    private fun open(level: JellyfinLevel) {
+        (activity as? com.themoon.y1.MainActivity)?.changeScreen(ScreenState.Jellyfin(level))
+    }
+
+    private fun library(id: String): MediaSyncProvider.LibraryInfo? =
+        activeLibrary?.takeIf { it.id == id } ?: provider.getCachedLibraries().firstOrNull { it.id == id }
+
+    /** Builds the list of [level]. A level whose library or items are gone shows the level above it. */
+    private fun show(level: JellyfinLevel) {
+        val lib = when (level) {
+            is JellyfinLevel.Root -> null
+            is JellyfinLevel.Library -> library(level.libraryId)
+            is JellyfinLevel.Browse -> library(level.libraryId)
+            is JellyfinLevel.Group -> library(level.libraryId)
+            is JellyfinLevel.Items -> library(level.libraryId)
+        }
+        if (lib == null) {
+            buildSettingsUI()
+            return
+        }
+        when (level) {
+            is JellyfinLevel.Root -> buildSettingsUI()
+            is JellyfinLevel.Library -> buildLibraryConfigUI(lib)
+            is JellyfinLevel.Browse -> buildBrowseSelectUI(lib)
+            is JellyfinLevel.Group -> {
+                val h = currentHierarchy?.takeIf { activeLibrary?.id == lib.id } ?: return buildBrowseSelectUI(lib)
+                when {
+                    isTv(lib) -> h.seriesList.getOrNull(level.group)?.let { buildTvSeasonsListUI(it) }
+                    isMusic(lib) -> h.artistsList.getOrNull(level.group)?.let { buildMusicAlbumsListUI(it) }
+                    isBooks(lib) -> h.authorsList.getOrNull(level.group)?.let { buildBookTitlesListUI(it) }
+                    else -> null
+                } ?: buildBrowseSelectUI(lib)
+            }
+            is JellyfinLevel.Items -> {
+                val h = currentHierarchy?.takeIf { activeLibrary?.id == lib.id } ?: return buildBrowseSelectUI(lib)
+                when {
+                    isTv(lib) -> h.seriesList.getOrNull(level.group)?.let { s -> s.seasons.getOrNull(level.item)?.let { buildTvEpisodesListUI(s, it) } }
+                    isMusic(lib) -> h.artistsList.getOrNull(level.group)?.let { a -> a.albums.getOrNull(level.item)?.let { buildMusicSongsListUI(a, it) } }
+                    isBooks(lib) -> h.authorsList.getOrNull(level.group)?.let { a -> a.books.getOrNull(level.item)?.let { buildBookChaptersListUI(a, it) } }
+                    else -> null
+                } ?: buildBrowseSelectUI(lib)
+            }
+        }
+    }
+
+    /** The place of a series, artist or author in the list of its library. */
+    private fun groupIndexOf(node: Any): Int {
+        val h = currentHierarchy ?: return -1
+        return when (node) {
+            is JellyfinSyncHierarchy.SeriesNode -> h.seriesList.indexOf(node)
+            is JellyfinSyncHierarchy.ArtistNode -> h.artistsList.indexOf(node)
+            is JellyfinSyncHierarchy.AuthorNode -> h.authorsList.indexOf(node)
+            else -> -1
+        }
+    }
+
+    private fun isTv(lib: MediaSyncProvider.LibraryInfo) = "tvshows".equals(lib.collectionType, ignoreCase = true)
+    private fun isMusic(lib: MediaSyncProvider.LibraryInfo) = "music".equals(lib.collectionType, ignoreCase = true)
+    private fun isBooks(lib: MediaSyncProvider.LibraryInfo) =
+        "books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == 23) {
@@ -141,59 +191,6 @@ class JellyfinUiController(
             }
         }
         return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        when (currentDepth) {
-            5 -> {
-                val lib = activeLibrary
-                if (lib != null) {
-                    if ("tvshows".equals(lib.collectionType, ignoreCase = true)) {
-                        currentSelectedSeries?.let { buildTvSeasonsListUI(it) } ?: buildLibraryConfigUI(lib)
-                    } else if ("music".equals(lib.collectionType, ignoreCase = true)) {
-                        currentSelectedArtist?.let { buildMusicAlbumsListUI(it) } ?: buildLibraryConfigUI(lib)
-                    } else if ("books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)) {
-                        currentSelectedAuthor?.let { buildBookTitlesListUI(it) } ?: buildLibraryConfigUI(lib)
-                    } else {
-                        buildLibraryConfigUI(lib)
-                    }
-                } else {
-                    buildSettingsUI()
-                }
-                return true
-            }
-            4 -> {
-                val lib = activeLibrary
-                if (lib != null) {
-                    if ("tvshows".equals(lib.collectionType, ignoreCase = true)) {
-                        buildTvSeriesListUI()
-                    } else if ("music".equals(lib.collectionType, ignoreCase = true)) {
-                        buildMusicArtistsListUI()
-                    } else if ("books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)) {
-                        buildBookAuthorsListUI()
-                    } else {
-                        buildLibraryConfigUI(lib)
-                    }
-                } else {
-                    buildSettingsUI()
-                }
-                return true
-            }
-            3 -> {
-                val lib = activeLibrary
-                if (lib != null) {
-                    buildLibraryConfigUI(lib)
-                } else {
-                    buildSettingsUI()
-                }
-                return true
-            }
-            2 -> {
-                buildSettingsUI()
-                return true
-            }
-            else -> return false
-        }
     }
 
     private fun createWrappedSettingRow(title: String, value: String): LinearLayout {
@@ -333,7 +330,7 @@ class JellyfinUiController(
                         val fetched = provider.fetchLibraries(MediaSyncProvider.CancellationToken())
                         if (!fetched.isNullOrEmpty()) {
                             activity.runOnUiThread {
-                                if (currentDepth == 1) {
+                                if (shownLevel == JellyfinLevel.Root) {
                                     buildSettingsUI()
                                 }
                             }
@@ -373,7 +370,7 @@ class JellyfinUiController(
                 val rowLib = createLibraryRow(libIcon, lib.name, modeLabel) {
                     clickFeedback()
                     lastLibConfigFocusIndex = -1
-                    buildLibraryConfigUI(lib)
+                    open(JellyfinLevel.Library(lib.id))
                 }
                 containerSettingsItems.addView(rowLib)
             }
@@ -520,7 +517,7 @@ class JellyfinUiController(
             btnBrowse.setOnClickListener {
                 clickFeedback()
                 lastBrowseDepth3FocusIndex = -1
-                buildBrowseSelectUI(library)
+                open(JellyfinLevel.Browse(library.id))
             }
             containerSettingsItems.addView(btnBrowse)
 
@@ -589,7 +586,7 @@ class JellyfinUiController(
                 val progressListener = object : JellyfinClient.ItemsFetchProgressListener {
                     override fun onProgress(loaded: Int, total: Int) {
                         activity.runOnUiThread {
-                            if (currentDepth != 3) return@runOnUiThread
+                            if (shownLevel != JellyfinLevel.Browse(library.id)) return@runOnUiThread
                             if (total > 0) {
                                 pbLoading.isIndeterminate = false
                                 pbLoading.max = total
@@ -612,23 +609,19 @@ class JellyfinUiController(
                 )
 
                 activity.runOnUiThread {
-                    if (currentDepth != 3) return@runOnUiThread
-                    if ("tvshows".equals(library.collectionType, ignoreCase = true)) {
-                        currentHierarchy = JellyfinSyncHierarchy.buildTvHierarchy(items)
-                        buildTvSeriesListUI()
-                    } else if ("music".equals(library.collectionType, ignoreCase = true)) {
-                        currentHierarchy = JellyfinSyncHierarchy.buildMusicHierarchy(items)
-                        buildMusicArtistsListUI()
-                    } else if ("books".equals(library.collectionType, ignoreCase = true) || "audiobooks".equals(library.collectionType, ignoreCase = true)) {
-                        currentHierarchy = JellyfinSyncHierarchy.buildBooksHierarchy(items)
-                        buildBookAuthorsListUI()
-                    } else {
-                        currentHierarchy = JellyfinSyncHierarchy.buildMoviesHierarchy(items)
-                        buildMoviesListUI()
+                    // Keep the items also when the user went away: the next visit shows them at once
+                    if (activeLibrary?.id != library.id) return@runOnUiThread
+                    currentHierarchy = when {
+                        isTv(library) -> JellyfinSyncHierarchy.buildTvHierarchy(items)
+                        isMusic(library) -> JellyfinSyncHierarchy.buildMusicHierarchy(items)
+                        isBooks(library) -> JellyfinSyncHierarchy.buildBooksHierarchy(items)
+                        else -> JellyfinSyncHierarchy.buildMoviesHierarchy(items)
                     }
+                    if (shownLevel == JellyfinLevel.Browse(library.id)) buildBrowseSelectUI(library)
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
+                    if (shownLevel != JellyfinLevel.Browse(library.id)) return@runOnUiThread
                     tvLoading.text = localize("Cannot reach server. Check URL and network.")
                     pbLoading.visibility = View.GONE
                 }
@@ -679,7 +672,7 @@ class JellyfinUiController(
         }
         containerSettingsItems.addView(rowToggleAll)
 
-        for (series in hierarchy.seriesList) {
+        for ((groupIndex, series) in hierarchy.seriesList.withIndex()) {
             val sel = series.getSelectedCount(currentSelections)
             val tot = series.allEpisodeIds.size
             val st = series.getTriState(currentSelections)
@@ -692,9 +685,8 @@ class JellyfinUiController(
                 true,
                 clickListener = {
                     clickFeedback()
-                    currentSelectedSeries = series
                     lastBrowseDepth4FocusIndex = -1
-                    buildTvSeasonsListUI(series)
+                    open(JellyfinLevel.Group(library.id, groupIndex))
                 },
                 longClickListener = {
                     clickFeedback()
@@ -718,7 +710,6 @@ class JellyfinUiController(
     fun buildTvSeasonsListUI(series: JellyfinSyncHierarchy.SeriesNode) {
         val library = activeLibrary ?: return
         currentDepth = 4
-        currentSelectedSeries = series
         containerSettingsItems.removeAllViews()
 
         createCategoryHeader("━ ${series.name} ━")
@@ -756,7 +747,7 @@ class JellyfinUiController(
         }
         containerSettingsItems.addView(rowToggleAll)
 
-        for (season in series.seasons) {
+        for ((itemIndex, season) in series.seasons.withIndex()) {
             val sel = season.getSelectedCount(currentSelections)
             val tot = season.allEpisodeIds.size
             val st = season.getTriState(currentSelections)
@@ -769,9 +760,8 @@ class JellyfinUiController(
                 true,
                 clickListener = {
                     clickFeedback()
-                    currentSelectedSeason = season
                     lastBrowseDepth5FocusIndex = -1
-                    buildTvEpisodesListUI(series, season)
+                    open(JellyfinLevel.Items(library.id, groupIndexOf(series), itemIndex))
                 },
                 longClickListener = {
                     clickFeedback()
@@ -798,8 +788,6 @@ class JellyfinUiController(
     ) {
         val library = activeLibrary ?: return
         currentDepth = 5
-        currentSelectedSeries = series
-        currentSelectedSeason = season
         containerSettingsItems.removeAllViews()
 
         createCategoryHeader("━ ${series.name} - ${season.name} ━")
@@ -916,7 +904,7 @@ class JellyfinUiController(
         }
         containerSettingsItems.addView(rowToggleAll)
 
-        for (artist in hierarchy.artistsList) {
+        for ((groupIndex, artist) in hierarchy.artistsList.withIndex()) {
             val sel = artist.getSelectedCount(currentSelections)
             val tot = artist.allSongIds.size
             val st = artist.getTriState(currentSelections)
@@ -929,9 +917,8 @@ class JellyfinUiController(
                 true,
                 clickListener = {
                     clickFeedback()
-                    currentSelectedArtist = artist
                     lastBrowseDepth4FocusIndex = -1
-                    buildMusicAlbumsListUI(artist)
+                    open(JellyfinLevel.Group(library.id, groupIndex))
                 },
                 longClickListener = {
                     clickFeedback()
@@ -955,7 +942,6 @@ class JellyfinUiController(
     fun buildMusicAlbumsListUI(artist: JellyfinSyncHierarchy.ArtistNode) {
         val library = activeLibrary ?: return
         currentDepth = 4
-        currentSelectedArtist = artist
         containerSettingsItems.removeAllViews()
 
         createCategoryHeader("━ ${artist.name} ━")
@@ -993,7 +979,7 @@ class JellyfinUiController(
         }
         containerSettingsItems.addView(rowToggleAll)
 
-        for (album in artist.albums) {
+        for ((itemIndex, album) in artist.albums.withIndex()) {
             val sel = album.getSelectedCount(currentSelections)
             val tot = album.allSongIds.size
             val st = album.getTriState(currentSelections)
@@ -1006,9 +992,8 @@ class JellyfinUiController(
                 true,
                 clickListener = {
                     clickFeedback()
-                    currentSelectedAlbum = album
                     lastBrowseDepth5FocusIndex = -1
-                    buildMusicSongsListUI(artist, album)
+                    open(JellyfinLevel.Items(library.id, groupIndexOf(artist), itemIndex))
                 },
                 longClickListener = {
                     clickFeedback()
@@ -1035,8 +1020,6 @@ class JellyfinUiController(
     ) {
         val library = activeLibrary ?: return
         currentDepth = 5
-        currentSelectedArtist = artist
-        currentSelectedAlbum = album
         containerSettingsItems.removeAllViews()
 
         createCategoryHeader("━ ${artist.name} - ${album.name} ━")
@@ -1235,7 +1218,7 @@ class JellyfinUiController(
         }
         containerSettingsItems.addView(rowToggleAll)
 
-        for (author in hierarchy.authorsList) {
+        for ((groupIndex, author) in hierarchy.authorsList.withIndex()) {
             val sel = author.getSelectedCount(currentSelections)
             val tot = author.allChapterIds.size
             val st = author.getTriState(currentSelections)
@@ -1248,9 +1231,8 @@ class JellyfinUiController(
                 true,
                 clickListener = {
                     clickFeedback()
-                    currentSelectedAuthor = author
                     lastBrowseDepth4FocusIndex = -1
-                    buildBookTitlesListUI(author)
+                    open(JellyfinLevel.Group(library.id, groupIndex))
                 },
                 longClickListener = {
                     clickFeedback()
@@ -1274,7 +1256,6 @@ class JellyfinUiController(
     fun buildBookTitlesListUI(author: JellyfinSyncHierarchy.AuthorNode) {
         val library = activeLibrary ?: return
         currentDepth = 4
-        currentSelectedAuthor = author
         containerSettingsItems.removeAllViews()
 
         createCategoryHeader("━ ${author.name} ━")
@@ -1312,7 +1293,7 @@ class JellyfinUiController(
         }
         containerSettingsItems.addView(rowToggleAll)
 
-        for (book in author.books) {
+        for ((itemIndex, book) in author.books.withIndex()) {
             val sel = book.getSelectedCount(currentSelections)
             val tot = book.allChapterIds.size
             val st = book.getTriState(currentSelections)
@@ -1325,9 +1306,8 @@ class JellyfinUiController(
                 true,
                 clickListener = {
                     clickFeedback()
-                    currentSelectedBook = book
                     lastBrowseDepth5FocusIndex = -1
-                    buildBookChaptersListUI(author, book)
+                    open(JellyfinLevel.Items(library.id, groupIndexOf(author), itemIndex))
                 },
                 longClickListener = {
                     clickFeedback()
@@ -1354,8 +1334,6 @@ class JellyfinUiController(
     ) {
         val library = activeLibrary ?: return
         currentDepth = 5
-        currentSelectedAuthor = author
-        currentSelectedBook = book
         containerSettingsItems.removeAllViews()
 
         createCategoryHeader("━ ${author.name} - ${book.name} ━")
@@ -1891,7 +1869,7 @@ class JellyfinUiController(
                         activity,
                         "${localize("Connected")}: $serverName"
                     )
-                    if (currentDepth == 1) {
+                    if (shownLevel == JellyfinLevel.Root) {
                         buildSettingsUI()
                     }
                 }
@@ -1928,7 +1906,7 @@ class JellyfinUiController(
                 activity.runOnUiThread {
                     ActionScreens.close(key)
                     Notice.show(activity, localize("Libraries updated"))
-                    if (currentDepth == 1) {
+                    if (shownLevel == JellyfinLevel.Root) {
                         buildSettingsUI()
                     }
                 }
@@ -2025,7 +2003,7 @@ class JellyfinUiController(
                         "${localize("QuickConnect Paired!")} ${localize("Paired as ")}${auth.serverName}",
                         long = true
                     )
-                    if (currentDepth == 1) {
+                    if (shownLevel == JellyfinLevel.Root) {
                         buildSettingsUI()
                     }
                 }
@@ -2107,7 +2085,7 @@ class JellyfinUiController(
                         SyncManager.SyncState.COMPLETE -> {
                             Notice.show(activity, localize("Sync Complete"))
                             ActionScreens.close(key)
-                            if (currentDepth == 1) buildSettingsUI()
+                            if (shownLevel == JellyfinLevel.Root) buildSettingsUI()
                             onSyncFinished()
                         }
                         SyncManager.SyncState.ERROR -> {

@@ -550,7 +550,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_COVERFLOW -> ScreenState.CoverFlow
             STATE_EQUALIZER -> ScreenState.Equalizer
             STATE_FM_RADIO -> ScreenState.FmRadio
-            STATE_JELLYFIN -> ScreenState.Jellyfin
+            STATE_JELLYFIN -> ScreenState.Jellyfin()
             else -> ScreenState.MainMenu
         }
         changeScreen(screenState)
@@ -595,7 +595,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun changeScreen(state: ScreenState) {
         val targetState = when {
             state is ScreenState.Browser && state.mode is BrowserMode.CoverFlow -> ScreenState.CoverFlow
-            state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin
+            state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin()
             else -> state
         }
         if (::browserController.isInitialized) browserController.endLetterJump()
