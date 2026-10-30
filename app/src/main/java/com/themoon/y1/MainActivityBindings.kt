@@ -113,6 +113,7 @@ internal fun MainActivity.initViewBindings() {
             setColor(ThemeManager.getTextColorPrimary())
         }
         batteryIconView = biv
+        com.themoon.y1.controllers.settings.StatusBarSettings.applyBattery(this)
         val d = resources.displayMetrics.density
         val blp = LinearLayout.LayoutParams((30 * d).toInt(), (16 * d).toInt()).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -152,7 +153,6 @@ internal fun MainActivity.loadPreferences() {
     com.themoon.y1.models.AlbumKey.byArtist = prefs.getBoolean(com.themoon.y1.models.AlbumKey.PREF_BY_ARTIST, false)
     volumeLimitMax = prefs.getInt("volume_limit_max", -1)
     isSoftwareEqEnabled = prefs.getBoolean("software_eq_enabled", false)
-    currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
 
     eqPresetNames.clear()
     eqPresetNames.addAll(listOf("Off", "Acoustic", "Bass Booster", "Bass Reducer", "Classical", "Electronic", "Hip Hop", "Jazz", "Latin", "Loudness", "Pop", "R&B", "Rock", "Vocal Booster"))
