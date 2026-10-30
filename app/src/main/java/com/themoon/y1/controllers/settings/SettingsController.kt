@@ -61,7 +61,7 @@ import java.util.TimeZone
 /**
  * Controller for Settings screens:
  * Root settings menu, Date & Time, Theme selector, Language selector,
- * Background settings, Volume limit, Legal, Main Menu visibility, and Music Menu visibility.
+ * Volume limit, Legal, Main Menu visibility, and Music Menu visibility.
  */
 class SettingsController(
     private val activity: Activity,
@@ -78,9 +78,6 @@ class SettingsController(
     private val onOpenJellyfin: () -> Unit,
     private val onOpenUpdateCheck: () -> Unit,
     private val onClearCacheConfirmed: () -> Unit,
-    private val onApplyThemeBackground: () -> Unit,
-    private val onClearCustomBackground: () -> Unit,
-    private val onPickBackgroundFromStorage: () -> Unit,
     private val resetBacklightTimer: () -> Unit,
     private val applySoundSetting: () -> Unit,
     private val applyAlbumTiltSetting: () -> Unit,
@@ -185,7 +182,6 @@ class SettingsController(
         when (shown.id) {
             "Language" -> buildLanguageSelectorUI()
             "Theme" -> buildThemeSelectorUI()
-            "Background" -> buildBackgroundSettingsUI()
             "DateTime" -> {
                 val range = DATE_TIME_RANGES[shown.arg]
                 if (range == null) buildDateTimeUI() else buildDateTimeSelectorUI(shown.arg, range.first, range.last, dateTimeValue(shown.arg))
@@ -900,13 +896,6 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnStorageMenu)
 
-        val btnBgMenu = createSettingRow(localize("Background"), "〉 ")
-        btnBgMenu.setOnClickListener {
-            clickFeedback()
-            buildBackgroundSettingsUI()
-        }
-        containerSettingsItems.addView(btnBgMenu)
-
         val btnTime = createSettingRow(localize("Date & Time"), "〉")
         btnTime.setOnClickListener {
             clickFeedback()
@@ -1111,37 +1100,6 @@ class SettingsController(
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
         themeListFirstRow = containerSettingsItems.getChildAt(0)
-    }
-
-    fun buildBackgroundSettingsUI() {
-        if (!showsPage("Background")) return
-        currentSettingsDepth = 1
-        containerSettingsItems.removeAllViews()
-
-        val btnSelectBg = createSettingRow(localize("Select New Background"), "〉 ")
-        btnSelectBg.setOnClickListener {
-            clickFeedback()
-            onPickBackgroundFromStorage()
-        }
-        containerSettingsItems.addView(btnSelectBg)
-
-        val btnThemeBg = createSettingRow(localize("Apply Theme Background"), "〉 ")
-        btnThemeBg.setOnClickListener {
-            clickFeedback()
-            onApplyThemeBackground()
-        }
-        containerSettingsItems.addView(btnThemeBg)
-
-        val btnClearBg = createSettingRow(localize("Clear Custom Background"), "〉 ")
-        btnClearBg.setOnClickListener {
-            clickFeedback()
-            onClearCustomBackground()
-        }
-        containerSettingsItems.addView(btnClearBg)
-
-        if (containerSettingsItems.childCount > 0) {
-            containerSettingsItems.getChildAt(0)?.requestFocus()
-        }
     }
 
     fun buildDateTimeUI() {
