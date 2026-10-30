@@ -421,15 +421,6 @@ internal fun MainActivity.initControllers() {
     jellyfinUiController = JellyfinUiController(
         activity = this,
         rootView = layoutSettingsMode as ViewGroup,
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
-        createCategoryHeader = { title ->
-            val container = findViewById<LinearLayout>(R.id.container_settings_items)
-            if (container != null) ListItemViewFactory.createCategoryHeader(this, container, title)
-        },
-        createTablerButton = { icon, text ->
-            ListItemViewFactory.createTablerListButton(this, icon, text, ThemeManager.getTextColorPrimary(), ThemeManager.getListButtonFocusedTextColor())
-        },
-        createDialogButton = { text -> ListItemViewFactory.createDialogButton(this, text) },
         clickFeedback = { clickFeedback() },
         onOpenKeyboard = { target ->
             changeScreen(ScreenState.WifiKeyboard(target))
