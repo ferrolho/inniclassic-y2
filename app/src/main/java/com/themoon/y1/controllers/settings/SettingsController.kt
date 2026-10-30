@@ -21,6 +21,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.ClockSettings
+import com.themoon.y1.Prefs
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.player.LyricsKeepScreenOn
 import com.themoon.y1.controllers.player.NowPlayingTime
@@ -1707,32 +1708,8 @@ class SettingsController(
     private fun resetAllAppSettings() {
         AutoThemeManager.reset(activity, prefs)
         try {
-            prefs.edit()
-                .remove(ClockSettings.KEY_24_HOUR_FORMAT)
-                .remove(ClockSettings.KEY_TIME_IN_TITLE)
-                .remove("show_battery_percentage")
-                .remove(StatusBarSettings.KEY_SHOW_BATTERY)
-                .remove("volume_limit_max")
-                .remove(ToggleStyle.PREF_KEY)
-                .remove("sound_check_enabled")
-                .remove("video_stretch_fill")
-                .remove("album_tilt_enabled")
-                .remove(LyricsKeepScreenOn.PREF)
-                .remove("show_total_time")
-                .remove(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF)
-                .remove("lyrics_script")
-                .remove("backlight_timer_index")
-                .remove(com.themoon.y1.managers.ClickVolume.PREF)
-                .remove("screen_off_control")
-                .remove("double_click_favorite")
-                .remove("repeat_mode")
-                .remove("loop_scroll_on")
-                .remove(ListEdges.PREF_KEY)
-                .remove("eq_preset")
-                .remove("eq_profile_id")
-                .remove(AlbumKey.PREF_BY_ARTIST)
-                .remove(com.themoon.y1.views.CoverPane.PREF)
-                .commit()
+            // The keys with resettable = true in Prefs
+            Prefs.resetAll(prefs)
         } catch (_: Exception) {}
 
         mainActivity?.isSoundCheckEnabled = false
