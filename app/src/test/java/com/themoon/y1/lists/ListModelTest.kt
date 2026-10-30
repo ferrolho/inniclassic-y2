@@ -105,4 +105,19 @@ class ListModelTest {
         // At the end only a header: the row before it
         assertEquals(3, ListModel.keptRow(rows, "Car", 4, notHeader))
     }
+
+    @Test
+    fun theLetterJumpTakesTheRowLabelsAndNotTheEmptyRow() {
+        val rows = ListModel.shownRows(ListSpec("Music", rows = listOf(RowSpec("Albums"), RowSpec("Songs", key = "songs")), letters = true))
+        assertEquals(listOf("Albums", "Songs"), ListModel.letterTexts(rows))
+        val empty = ListModel.shownRows(ListSpec("Artists", empty = "No Songs", letters = true))
+        assertEquals(listOf<String?>(null), ListModel.letterTexts(empty))
+    }
+
+    @Test
+    fun aListHasNoPaneAndNoLetterJumpByDefault() {
+        val spec = ListSpec("Wi-Fi")
+        assertTrue(spec.pane == null)
+        assertFalse(spec.letters)
+    }
 }

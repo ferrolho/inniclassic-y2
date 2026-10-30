@@ -63,7 +63,7 @@ object RowFocus {
      * Selects row [position] of [list]. A row that is not on the screen comes into the list first. With
      * List Edges = Fade the row stays clear of the fades ([ListEdges.focusRow]).
      */
-    private fun showRow(list: AbsListView, position: Int) {
+    fun showRow(list: AbsListView, position: Int) {
         if (list is ListView && ListEdges.focusRow(list, position)) return
         val first = list.firstVisiblePosition
         val row = if (position in first..list.lastVisiblePosition) list.getChildAt(position - first) else null

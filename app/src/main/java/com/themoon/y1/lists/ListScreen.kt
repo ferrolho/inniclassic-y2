@@ -1,7 +1,9 @@
 package com.themoon.y1.lists
 
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -10,6 +12,7 @@ import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.navigation.LetterJump
 import com.themoon.y1.navigation.RowFocus
 import com.themoon.y1.views.ListItemViewFactory
 
@@ -23,13 +26,18 @@ import com.themoon.y1.views.ListItemViewFactory
  * - [wheel]: one step ([RowFocus]: Wheel Loop Scroll, rows that cannot take the focus are skipped,
  *   List Edges fade in the ListView), with the click feedback.
  * - Rows: one click feedback, then the row's action; a hold (long press) does the row's hold action.
+ * - [ListSpec.pane]: the split screen shows with the list, and goes when a list without it shows or the screen exits.
+ * - [ListSpec.letters]: the iPod letter jump ([LetterJump.Mode]) in [wheel], with the letter in [letterBox]; the
+ *   screen gives its keys to [key] (a centre press ends letter mode).
  */
 class ListScreen(
     private val rows: LinearLayout,
     private val list: ListView? = null,
     private val clickFeedback: () -> Unit,
-    /** Told the text of each focused [RowLook.MENU] row (the letter box of the Music lists). */
-    private val onRowFocus: ((String) -> Unit)? = null
+    /** Told the text of each focused [RowLook.MENU] row. */
+    private val onRowFocus: ((String) -> Unit)? = null,
+    /** Shows the letter of the letter jump ([ListSpec.letters]). */
+    private val letterBox: LetterBox? = null
 ) {
     private val context = rows.context
     private val scroll: View? = rows.parent as? View
@@ -40,10 +48,24 @@ class ListScreen(
 
     private var shown: List<RowSpec> = emptyList()
     private val lastKeys = HashMap<String, String>()
+    private var pane: Pane? = null
+
+    private val letterMode = LetterJump.Mode()
+    private val letterIdle = Runnable { endLetters() }
+    private var letters: List<String?>? = null
+    private var lettersOf: ListSpec? = null
+
+    /** The row of the long list that the wheel selected last (its view can still be on the way); -1 = none. */
+    private var longIndex = -1
+
+    /** The letter in the letter box during letter mode; null when the wheel steps row by row. */
+    var jumpLetter: String? = null
+        private set
 
     val title: String? get() = spec?.title
 
     fun show(spec: ListSpec) {
+        endLetters()
         build(spec)
         if (spec.isLong) {
             val lv = list ?: return
@@ -102,23 +124,125 @@ class ListScreen(
         (scroll as? ScrollView)?.scrollTo(0, scrollY)
     }
 
-    /** One wheel step in the list that shows. True when this screen has a list (the wheel is used, also at an end). */
-    fun wheel(delta: Int): Boolean {
+    /**
+     * One wheel step in the list that shows, at [timeMs] (the key event time, for the letter jump). True when this
+     * screen has a list (the wheel is used, also at an end).
+     */
+    fun wheel(delta: Int, timeMs: Long = SystemClock.uptimeMillis()): Boolean {
         val s = spec ?: return false
-        val moved = if (s.isLong) list?.let { RowFocus.step(it, delta) } else RowFocus.step(rows, delta)
+        if (s.letters && letterStep(s, delta, timeMs)) return true
+        val moved = if (s.isLong) list?.let { stepLong(s, it, delta) } else RowFocus.step(rows, delta)
         if (moved != null) clickFeedback()
         return true
     }
 
-    /** Remove the rows (the screen exits). The custom views go back to no parent, for the next [show]. */
+    /**
+     * [RowFocus.step] in the ListView. A fast wheel can come before the row of the last step has its view (and the
+     * focus): then the step starts from that row ([longIndex]), not from the first row.
+     */
+    private fun stepLong(s: ListSpec, lv: ListView, delta: Int): Int? {
+        val current = selectedIndex(s).takeIf { it >= 0 } ?: longIndex
+        val adapter = lv.adapter
+        val i = RowFocus.next(lv.count, current, delta, RowFocus.isLoopOn(lv.context)) { adapter?.isEnabled(it) != false }
+            ?: return null
+        RowFocus.showRow(lv, i)
+        longIndex = i
+        return i
+    }
+
+    /** A key of the screen ([com.themoon.y1.controllers.ScreenController.dispatchKeyEvent]). True = used (letter mode). */
+    fun key(event: KeyEvent): Boolean =
+        when (letterMode.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount)) {
+            LetterJump.Press.PASS -> false
+            LetterJump.Press.DROP -> true
+            LetterJump.Press.END -> { endLetters(); true }
+            LetterJump.Press.END_AND_PASS -> { endLetters(); false }
+        }
+
+    /** Selects row [index] after [show] (a row that the screen chooses, for example the song that plays), centred. */
+    fun select(index: Int) {
+        val s = spec ?: return
+        if (s.isLong) {
+            list?.let { if (index in 0 until it.count) RowFocus.showRow(it, index) }
+            return
+        }
+        val row = rows.getChildAt(index) ?: return
+        row.requestFocus()
+        centreAfterLayout(row)
+    }
+
+    /** Remove the rows and the split screen (the screen exits). The custom views go back to no parent, for the next [show]. */
     fun clear() {
+        endLetters()
+        pane?.hide()
         rows.removeAllViews()
         rows.isFocusable = false
         shown = emptyList()
     }
 
+    /** Ends letter mode (idle wheel, a key, another screen): the list stays at the row of the letter, the box goes. */
+    fun endLetters() {
+        rows.removeCallbacks(letterIdle)
+        letterMode.end()
+        if (jumpLetter == null) return
+        jumpLetter = null
+        letterBox?.hide()
+    }
+
+    /**
+     * Letter mode ([LetterJump.Mode]): selects the first row of the next or previous letter, shows the letter and
+     * returns true. Else false: the wheel steps one row.
+     */
+    private fun letterStep(s: ListSpec, delta: Int, timeMs: Long): Boolean {
+        if (letterMode.isIdle(timeMs)) endLetters() // the idle timer did not run yet
+        // In letter mode the jump goes on from the letter row: its view (and the focus) can still be on the way
+        val from = if (letterMode.isActive) letterMode.row else selectedIndex(s).takeIf { it >= 0 } ?: longIndex
+        if (from < 0) return false
+        val step = letterMode.onStep(delta, timeMs, from) {
+            if (lettersOf !== s) {
+                letters = LetterJump.lettersFor(rowTexts(s))
+                lettersOf = s
+            }
+            letters
+        }
+        if (step == LetterJump.Step.ROW) return false
+        jumpLetter = letters?.getOrNull(letterMode.row) // before the focus moves: the focused row can show the box
+        if (step == LetterJump.Step.LETTER) {
+            if (s.isLong) {
+                list?.let { RowFocus.showRow(it, letterMode.row) }
+                longIndex = letterMode.row
+            } else {
+                rows.getChildAt(letterMode.row)?.requestFocus()
+            }
+            clickFeedback()
+        }
+        jumpLetter?.let { letterBox?.show(it) }
+        rows.removeCallbacks(letterIdle)
+        rows.postDelayed(letterIdle, LetterJump.IDLE_END_MS)
+        return true
+    }
+
+    private fun rowTexts(s: ListSpec): List<String?> {
+        if (!s.isLong) return ListModel.letterTexts(shown)
+        val adapter = s.adapter ?: return emptyList()
+        val texts = adapter as? RowTexts
+        return (0 until adapter.count).map { if (texts != null) texts.rowText(it) else adapter.getItem(it) as? String }
+    }
+
+    /** The index of the focused row, or -1. */
+    private fun selectedIndex(s: ListSpec): Int {
+        if (!s.isLong) return focusedIndex()
+        val lv = list ?: return -1
+        val focus = lv.findFocus() ?: return -1
+        return if (focus === lv) -1 else lv.getPositionForView(focus)
+    }
+
     private fun build(spec: ListSpec) {
         this.spec = spec
+        longIndex = -1
+        val newPane = spec.pane
+        if (newPane != null) newPane.show() else pane?.hide()
+        if (newPane != null) pane = newPane
         rows.removeAllViews()
         rows.isFocusable = false
         val long = spec.isLong
@@ -143,6 +267,11 @@ class ListScreen(
             RowLook.CHOICE ->
                 if (row.glyphs.isEmpty()) ListItemViewFactory.createCheckListButton(context, row.label, row.checked)
                 else ListItemViewFactory.createChoiceRowWithRightIcons(context, row.label, row.checked, row.glyphs)
+            RowLook.ART -> ArtRow.of(null, context, inListView = false).also { art ->
+                art.bind(row.label, row.value)
+                val image = row.image
+                if (image != null) image(art.image) else art.image.visibility = View.GONE
+            }.view
             RowLook.CUSTOM -> row.view!!.also { (it.parent as? ViewGroup)?.removeView(it) }
             RowLook.HEADER -> headerRow(row.label)
             RowLook.INFO -> infoRow(row.label)
