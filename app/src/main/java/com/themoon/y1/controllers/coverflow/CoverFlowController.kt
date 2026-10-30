@@ -70,6 +70,17 @@ class CoverFlowController(
         buildCoverFlowUI()
     }
 
+    override fun onThemeChanged() {
+        // A rebuild takes about 1.2 s; only the card texts take theme colours
+        for (card in cfViews ?: return) {
+            card?.findViewById<TextView>(TITLE_VIEW_ID)?.apply {
+                setTextColor(ThemeManager.getTextColorPrimary())
+                typeface = ThemeManager.getCustomFontBold()
+            }
+            card?.findViewById<TextView>(ARTIST_VIEW_ID)?.setTextColor(ThemeManager.getTextColorSecondary())
+        }
+    }
+
     override fun onExit() {
         cancelAllAnimations()
         // Keep the layout and its cards for the next entry (no new views and bitmaps).
