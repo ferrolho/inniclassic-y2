@@ -52,20 +52,20 @@ class EqualizerController(
         set(value) = Prefs.SOFTWARE_EQ.setAsync(prefs, value)
 
     var currentEqProfile: String
-        get() = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"
-        set(value) = prefs.edit().putString("eq_profile_id", value).apply()
+        get() = Prefs.EQ_PROFILE.get(prefs)
+        set(value) = Prefs.EQ_PROFILE.setAsync(prefs, value)
 
     var currentBassBoostStep: Int
-        get() = prefs.getInt("bass_boost_step", 0)
-        set(value) = prefs.edit().putInt("bass_boost_step", value).apply()
+        get() = Prefs.BASS_BOOST.get(prefs)
+        set(value) = Prefs.BASS_BOOST.setAsync(prefs, value)
 
     var currentVirtualizerStep: Int
-        get() = prefs.getInt("virtualizer_step", 0)
-        set(value) = prefs.edit().putInt("virtualizer_step", value).apply()
+        get() = Prefs.VIRTUALIZER.get(prefs)
+        set(value) = Prefs.VIRTUALIZER.setAsync(prefs, value)
 
     var currentCrossfeedStep: Int
-        get() = prefs.getInt("crossfeed_step", 0)
-        set(value) = prefs.edit().putInt("crossfeed_step", value).apply()
+        get() = Prefs.CROSSFEED.get(prefs)
+        set(value) = Prefs.CROSSFEED.setAsync(prefs, value)
 
     private var currentAdjustingBand: Short = -1
     /** The sliders of the open Graphic Equalizer, one for each band. */
@@ -185,7 +185,7 @@ class EqualizerController(
         val btnCreate = createListButton("\uE145", localize("Create New Profile"))
         btnCreate.setOnClickListener {
             clickFeedback()
-            var listStr = prefs.getString("custom_eq_list", "") ?: ""
+            var listStr = Prefs.CUSTOM_EQ_LIST.get(prefs)
             var count = 1
             while (listStr.contains("User EQ $count")) {
                 count++
@@ -193,7 +193,7 @@ class EqualizerController(
             val newName = "User EQ $count"
             if (listStr.isNotEmpty()) listStr += ","
             listStr += newName
-            prefs.edit().putString("custom_eq_list", listStr).apply()
+            Prefs.CUSTOM_EQ_LIST.setAsync(prefs, listStr)
             currentEqProfile = "custom_$newName"
 
             AudioEffectManager.getInstance().resetCustomEqProfile(newName)
@@ -355,7 +355,7 @@ class EqualizerController(
             if (isCurrent) currentRow = row
         }
 
-        val customList = prefs.getString("custom_eq_list", "") ?: ""
+        val customList = Prefs.CUSTOM_EQ_LIST.get(prefs)
         if (customList.isNotEmpty()) {
             createCategoryHeader("━ " + localize("CUSTOM PROFILES") + " ━")
             for (name in customList.split(",")) {

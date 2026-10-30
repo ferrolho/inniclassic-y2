@@ -329,7 +329,7 @@ class SettingsController(
         settingsSubMode = 0
         containerSettingsItems.removeAllViews()
 
-        val isShuffleMode = prefs.getBoolean("shuffle", false)
+        val isShuffleMode = Prefs.SHUFFLE.get(prefs)
         val btnShuffle = createSettingRow(
             localize("Shuffle Mode"),
             onOff(isShuffleMode, localize)
@@ -338,12 +338,12 @@ class SettingsController(
             clickFeedback()
             toggleShuffleMode()
             val tvStatus = btnShuffle.getChildAt(1) as? TextView
-            val newShuffle = prefs.getBoolean("shuffle", false)
+            val newShuffle = Prefs.SHUFFLE.get(prefs)
             tvStatus?.text = onOff(newShuffle, localize)
         }
         containerSettingsItems.addView(btnShuffle)
 
-        val repeatMode = prefs.getInt("repeat_mode", 0)
+        val repeatMode = Prefs.REPEAT_MODE.get(prefs)
         val btnRepeat = createSettingRow(
             localize("Repeat Mode"),
             localize(getRepeatModeText(repeatMode))
@@ -352,12 +352,12 @@ class SettingsController(
             clickFeedback()
             cycleRepeatMode()
             val tvStatus = btnRepeat.getChildAt(1) as? TextView
-            val newRepeat = prefs.getInt("repeat_mode", 0)
+            val newRepeat = Prefs.REPEAT_MODE.get(prefs)
             tvStatus?.text = localize(getRepeatModeText(newRepeat))
         }
         containerSettingsItems.addView(btnRepeat)
 
-        val currentEqProfile = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"
+        val currentEqProfile = Prefs.EQ_PROFILE.get(prefs)
         var eqDisplayName = "Normal"
         if (currentEqProfile.startsWith("preset_")) {
             val pIdx = currentEqProfile.replace("preset_", "").toIntOrNull() ?: 0
@@ -374,7 +374,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnEq)
 
-        val volumeLimitMax = prefs.getInt("volume_limit_max", -1)
+        val volumeLimitMax = Prefs.VOLUME_LIMIT.get(prefs)
         val volumeLimitDisplay = if (volumeLimitMax < 0) localize("Off") else volumeLimitMax.toString()
         val btnVolumeLimit = createSettingRow(localize("Volume Limit"), "$volumeLimitDisplay 〉")
         btnVolumeLimit.setOnClickListener {
@@ -383,7 +383,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnVolumeLimit)
 
-        var isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
+        var isSoundCheckEnabled = Prefs.SOUND_CHECK.get(prefs)
         val btnSoundCheck = createSettingRow(
             localize("Sound Check"),
             onOff(isSoundCheckEnabled, localize)
@@ -397,21 +397,21 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnSoundCheck)
 
-        val videoStretchFill = prefs.getBoolean("video_stretch_fill", false)
+        val videoStretchFill = Prefs.VIDEO_FILL.get(prefs)
         val btnVideoFill = createSettingRow(
             localize("Fill Video Screen"),
             onOff(videoStretchFill, localize)
         )
         btnVideoFill.setOnClickListener {
             clickFeedback()
-            val newState = !prefs.getBoolean("video_stretch_fill", false)
-            prefs.edit().putBoolean("video_stretch_fill", newState).commit()
+            val newState = !Prefs.VIDEO_FILL.get(prefs)
+            Prefs.VIDEO_FILL.set(prefs, newState)
             val tvStatus = btnVideoFill.getChildAt(1) as? TextView
             tvStatus?.text = onOff(newState, localize)
         }
         if (com.themoon.y1.FeatureVisibility.videosBuilt) containerSettingsItems.addView(btnVideoFill)
 
-        var isAlbumTiltEnabled = prefs.getBoolean("album_tilt_enabled", true)
+        var isAlbumTiltEnabled = Prefs.ALBUM_TILT.get(prefs)
         val btnAlbumTilt = createSettingRow(
             localize("Album Cover Tilt"),
             onOff(isAlbumTiltEnabled, localize)
@@ -419,7 +419,7 @@ class SettingsController(
         btnAlbumTilt.setOnClickListener {
             clickFeedback()
             isAlbumTiltEnabled = !isAlbumTiltEnabled
-            prefs.edit().putBoolean("album_tilt_enabled", isAlbumTiltEnabled).commit()
+            Prefs.ALBUM_TILT.set(prefs, isAlbumTiltEnabled)
             val tvStatus = btnAlbumTilt.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isAlbumTiltEnabled, localize)
             applyAlbumTiltSetting()
@@ -507,14 +507,14 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnLyricsScreenOn)
 
-        var isSoundEffectEnabled = prefs.getBoolean("sound", true)
+        var isSoundEffectEnabled = Prefs.BUTTON_SOUND.get(prefs)
         val btnSound = createSettingRow(
             localize("Button Sound"),
             onOff(isSoundEffectEnabled, localize)
         )
         btnSound.setOnClickListener {
             isSoundEffectEnabled = !isSoundEffectEnabled
-            prefs.edit().putBoolean("sound", isSoundEffectEnabled).commit()
+            Prefs.BUTTON_SOUND.set(prefs, isSoundEffectEnabled)
             applySoundSetting()
             clickFeedback()
             val tvStatus = btnSound.getChildAt(1) as? TextView
@@ -540,8 +540,8 @@ class SettingsController(
 
         // Settings → Controls: Button Vibration and Vibration Strength (no Vibration sub-screen).
         // Vibration Strength is grey and the wheel skips it while Button Vibration is off.
-        var isVibrationEnabled = prefs.getBoolean("vibrate", true)
-        var vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
+        var isVibrationEnabled = Prefs.VIBRATE.get(prefs)
+        var vibrationStrengthLevel = Prefs.VIBRATE_STRENGTH.get(prefs)
         if (vibrationStrengthLevel !in VIBE_STRENGTH_NAMES.indices) vibrationStrengthLevel = 1
         val btnVibration = createSettingRow(
             localize("Button Vibration"),
@@ -578,7 +578,7 @@ class SettingsController(
         containerSettingsItems.addView(btnVibrationStrength)
         StatusBarSettings.setRowEnabled(btnVibrationStrength, isVibrationEnabled)
 
-        var isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
+        var isScreenOffControlEnabled = Prefs.SCREEN_OFF_CONTROL.get(prefs)
         val btnScreenOffCtrl = createSettingRow(
             localize("Screen-Off Control"),
             onOff(isScreenOffControlEnabled, localize)
@@ -591,7 +591,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnScreenOffCtrl)
 
-        var isDoubleClickFavoriteEnabled = prefs.getBoolean("double_click_favorite", true)
+        var isDoubleClickFavoriteEnabled = Prefs.DOUBLE_CLICK_FAVORITE.get(prefs)
         val btnDoubleClickFavorite = createSettingRow(
             localize("Double-Click to Favorite"),
             com.themoon.y1.core.extensions.onOff(isDoubleClickFavoriteEnabled, localize)
@@ -599,13 +599,13 @@ class SettingsController(
         btnDoubleClickFavorite.setOnClickListener {
             clickFeedback()
             isDoubleClickFavoriteEnabled = !isDoubleClickFavoriteEnabled
-            prefs.edit().putBoolean("double_click_favorite", isDoubleClickFavoriteEnabled).commit()
+            Prefs.DOUBLE_CLICK_FAVORITE.set(prefs, isDoubleClickFavoriteEnabled)
             val tvStatus = btnDoubleClickFavorite.getChildAt(1) as? TextView
             tvStatus?.text = com.themoon.y1.core.extensions.onOff(isDoubleClickFavoriteEnabled, localize)
         }
         containerSettingsItems.addView(btnDoubleClickFavorite)
 
-        var isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
+        var isUsbPromptEnabled = Prefs.USB_PROMPT.get(prefs)
         val btnUsbPrompt = createSettingRow(
             localize("Ask on USB Connect"),
             onOff(isUsbPromptEnabled, localize)
@@ -613,13 +613,13 @@ class SettingsController(
         btnUsbPrompt.setOnClickListener {
             clickFeedback()
             isUsbPromptEnabled = !isUsbPromptEnabled
-            prefs.edit().putBoolean("usb_storage_prompt", isUsbPromptEnabled).commit()
+            Prefs.USB_PROMPT.set(prefs, isUsbPromptEnabled)
             val tvStatus = btnUsbPrompt.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isUsbPromptEnabled, localize)
         }
         containerSettingsItems.addView(btnUsbPrompt)
 
-        var backlightTimerIndex = prefs.getInt("backlight_timer_index", 3)
+        var backlightTimerIndex = Prefs.BACKLIGHT_TIMER.get(prefs)
         if (backlightTimerIndex >= BACKLIGHT_TIMER_LABELS.size) backlightTimerIndex = 0
         val btnBacklightTimer = createSettingRow(
             localize("Backlight Timer"),
@@ -628,7 +628,7 @@ class SettingsController(
         btnBacklightTimer.setOnClickListener {
             clickFeedback()
             backlightTimerIndex = (backlightTimerIndex + 1) % BACKLIGHT_TIMER_LABELS.size
-            prefs.edit().putInt("backlight_timer_index", backlightTimerIndex).commit()
+            Prefs.BACKLIGHT_TIMER.set(prefs, backlightTimerIndex)
             val tvStatus = btnBacklightTimer.getChildAt(1) as? TextView
             tvStatus?.text = localize(BACKLIGHT_TIMER_LABELS[backlightTimerIndex])
             com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = backlightTimerIndex
@@ -677,7 +677,7 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnGroupAlbums)
 
-        var isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
+        var isLoopScrollOn = Prefs.LOOP_SCROLL.get(prefs)
         val btnLoopScrollToggle = createSettingRow(
             localize("Wheel Loop Scroll"),
             onOff(isLoopScrollOn, localize)
@@ -685,7 +685,7 @@ class SettingsController(
         btnLoopScrollToggle.setOnClickListener {
             clickFeedback()
             isLoopScrollOn = !isLoopScrollOn
-            prefs.edit().putBoolean("loop_scroll_on", isLoopScrollOn).commit()
+            Prefs.LOOP_SCROLL.set(prefs, isLoopScrollOn)
             val tvStatus = btnLoopScrollToggle.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isLoopScrollOn, localize)
         }
@@ -1034,7 +1034,7 @@ class SettingsController(
         )
         btnEng.setOnClickListener {
             clickFeedback()
-            prefs.edit().putString("app_language", "English (Default)").commit()
+            Prefs.LANGUAGE.set(prefs, "English (Default)")
             langMgr.applyLanguage("English (Default)")
             activity.recreate()
         }
@@ -1050,7 +1050,7 @@ class SettingsController(
             )
             btnLang.setOnClickListener {
                 clickFeedback()
-                prefs.edit().putString("app_language", f.name).commit()
+                Prefs.LANGUAGE.set(prefs, f.name)
                 langMgr.applyLanguage(f.name)
                 activity.recreate()
             }
@@ -1248,7 +1248,7 @@ class SettingsController(
 
     private fun onSyncDone(error: String?) {
         syncRunning = false
-        val is24Hour = prefs.getBoolean("is_24h_format", true)
+        val is24Hour = Prefs.CLOCK_24_HOUR.get(prefs)
         val time = java.text.SimpleDateFormat(if (is24Hour) "HH:mm:ss" else "h:mm:ss a", Locale.US).format(java.util.Date())
         syncResult = if (error == null) localize("Set to") + " " + time else localize("Failed")
         syncResultAt = android.os.SystemClock.elapsedRealtime()
@@ -1506,7 +1506,7 @@ class SettingsController(
         }
 
         for (el in buttons) {
-            val isHidden = prefs.getBoolean("hide_btn_" + el.id, false)
+            val isHidden = prefs.getBoolean(Prefs.MAIN_MENU_HIDDEN.key(el.id), false)
             val btnName = if (!el.textNormal.isNullOrBlank()) el.textNormal else el.id
             val stateIcon = if (isHidden) "\uE5CD" else "\uE8F4"
 
@@ -1526,7 +1526,7 @@ class SettingsController(
             row.setOnFocusChangeListener { v, hasFocus ->
                 if (isMenuReorderMode) return@setOnFocusChangeListener
                 rowHighlight?.onFocusChange(v, hasFocus)
-                val currHidden = prefs.getBoolean("hide_btn_" + el.id, false)
+                val currHidden = prefs.getBoolean(Prefs.MAIN_MENU_HIDDEN.key(el.id), false)
                 if (hasFocus) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 } else {
@@ -1549,8 +1549,8 @@ class SettingsController(
                     return@setOnClickListener
                 }
                 clickFeedback()
-                val newState = !prefs.getBoolean("hide_btn_" + el.id, false)
-                prefs.edit().putBoolean("hide_btn_" + el.id, newState).commit()
+                val newState = !prefs.getBoolean(Prefs.MAIN_MENU_HIDDEN.key(el.id), false)
+                prefs.edit().putBoolean(Prefs.MAIN_MENU_HIDDEN.key(el.id), newState).commit()
                 com.themoon.y1.FeatureVisibility.onMenuButtonToggled(activity, el.action, newState)
                 tvRight?.text = if (newState) "\uE5CD" else "\uE8F4"
                 if (row.hasFocus()) {
@@ -1610,7 +1610,7 @@ class SettingsController(
             row.setOnClickListener {
                 clickFeedback()
                 val newState = !com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
-                prefs.edit().putBoolean("hide_music_btn_$id", newState).commit()
+                prefs.edit().putBoolean(Prefs.MUSIC_MENU_HIDDEN.key(id), newState).commit()
                 tvRight?.text = if (newState) "\uE5CD" else "\uE8F4"
                 if (row.hasFocus()) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())

@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.menu
 
+import com.themoon.y1.Prefs
 import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.content.Context
@@ -441,7 +442,7 @@ class MainMenuController(
         val visibleButtonElements = ArrayList<ThemeManager.MenuElement>()
         for (el in buttonElements) {
             if (!com.themoon.y1.FeatureVisibility.isBuilt(el.action)) continue
-            if (!prefs.getBoolean("hide_btn_" + el.id, false)) {
+            if (!prefs.getBoolean(Prefs.MAIN_MENU_HIDDEN.key(el.id), false)) {
                 visibleButtonElements.add(el)
             }
         }

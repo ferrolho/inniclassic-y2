@@ -382,10 +382,10 @@ internal fun MainActivity.initControllers() {
             NavigationManager.getInstance().navigateTo(ScreenState.Browser(BrowserMode.Songs("SEARCH", keyword)), addToBackStack = false)
         },
         onSubmitLastFmUsername = { username ->
-            prefs.edit().putString("lastfm_username", username).apply()
+            prefs.edit().putString(Prefs.LASTFM_USERNAME.key, username).apply()
         },
         onSubmitLastFmPassword = { password ->
-            prefs.edit().putString("lastfm_password", password).apply()
+            prefs.edit().putString(Prefs.LASTFM_PASSWORD.key, password).apply()
             NavigationManager.getInstance().popBackStack()
         },
         onSubmitJellyfinServerUrl = { url ->

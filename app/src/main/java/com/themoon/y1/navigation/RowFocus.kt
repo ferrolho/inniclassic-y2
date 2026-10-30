@@ -1,5 +1,7 @@
 package com.themoon.y1.navigation
 
+import com.themoon.y1.AppPrefs
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
@@ -15,7 +17,7 @@ object RowFocus {
 
     /** Settings → Controls → Wheel Loop Scroll (default On). */
     fun isLoopOn(context: Context): Boolean =
-        context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE).getBoolean("loop_scroll_on", true)
+        Prefs.LOOP_SCROLL.get(AppPrefs.get(context))
 
     fun isSelectable(row: View?): Boolean = row != null && row.visibility == View.VISIBLE && row.isFocusable
 

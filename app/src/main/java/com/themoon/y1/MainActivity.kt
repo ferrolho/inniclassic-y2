@@ -336,8 +336,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
         val themeDir = File(filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeDir)
-        val savedThemeName = prefs.getString("app_theme_name", null)
-            ?: prefs.getString("current_theme_name", "Classic Light")
+        val savedThemeName = prefs.getString(Prefs.THEME_NAME.key, null)
+            ?: Prefs.CURRENT_THEME_NAME.get(prefs)
         val themeIdx = ThemeManager.findThemeIndexByName(savedThemeName)
         if (themeIdx != -1) ThemeManager.setThemeIndex(themeIdx)
         com.themoon.y1.managers.AutoThemeManager.applyAtStart(prefs)
@@ -1482,7 +1482,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
             if (!isScreenOn) {
                 val isScreenOffCtrl = instance?.isScreenOffControlEnabled
-                    ?: AppPrefs.get(context).getBoolean("screen_off_control", false)
+                    ?: Prefs.SCREEN_OFF_CONTROL.get(AppPrefs.get(context))
                 // Media keys from a remote (car, Bluetooth headphones, wired headset) always act
                 val keys = com.themoon.y1.navigation.RemoteMediaKeys
                 val device = keys.deviceName(event)

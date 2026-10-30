@@ -446,8 +446,8 @@ class PlayerController(
 
     private fun updateShuffleRepeatScrubLabels() {
         val prefs = playbackPrefs()
-        val isShuffle = prefs.getBoolean("shuffle", false)
-        val repeatMode = prefs.getInt("repeat_mode", 0)
+        val isShuffle = Prefs.SHUFFLE.get(prefs)
+        val repeatMode = Prefs.REPEAT_MODE.get(prefs)
 
         val repeatText = when (repeatMode) {
             1 -> localize("One")
@@ -516,8 +516,8 @@ class PlayerController(
 
     private fun updateShuffleRepeatStatusIcons() {
         val prefs = playbackPrefs()
-        val isShuffle = prefs.getBoolean("shuffle", false)
-        val repeatMode = prefs.getInt("repeat_mode", 0)
+        val isShuffle = Prefs.SHUFFLE.get(prefs)
+        val repeatMode = Prefs.REPEAT_MODE.get(prefs)
 
         ivPlayerShuffleStatus?.visibility = if (isShuffle) View.VISIBLE else View.GONE
         ivPlayerRepeatStatus?.visibility = if (repeatMode > 0) View.VISIBLE else View.GONE
@@ -674,7 +674,7 @@ class PlayerController(
             }
             if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
                 val prefs = activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE)
-                if (!prefs.getBoolean("double_click_favorite", true)) {
+                if (!Prefs.DOUBLE_CLICK_FAVORITE.get(prefs)) {
                     // No double-click to wait for, so act on the single press at once.
                     doubleClickHandler.removeCallbacks(singleClickRunnable)
                     lastCenterUpTime = 0
