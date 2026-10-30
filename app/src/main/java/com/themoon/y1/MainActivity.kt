@@ -36,6 +36,7 @@ import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.BatteryIconView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.Notice
+import com.themoon.y1.views.IpodClassicLayout
 import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
@@ -139,6 +140,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val trackNumberMap: HashMap<String, Int> = HashMap()
     }
 
+    private var menuSlide: com.themoon.y1.views.MenuSlide? = null
     var currentScreenState: Int = STATE_MENU
     var currentBrowserMode: Int = BROWSER_ROOT
     val currentPlaylist: ArrayList<File> = ArrayList()
@@ -373,6 +375,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 applyTheme()
             }
         })
+        // The iPod menu slides: one layer over the screens, below the status bar area
+        menuSlide = com.themoon.y1.views.MenuSlide.attach(
+            findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ViewGroup,
+            findViewById(R.id.layout_status_bar)
+        )
 
         val savedBacklightIdx = prefs.getInt(BacklightTimer.PREF_INDEX, BacklightTimer.DEFAULT_INDEX)
         powerBacklightManager = PowerBacklightManager.getInstance(this).apply {
@@ -432,6 +439,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         }, "y1-ums-init-check").start()
 
+        com.themoon.y1.views.LowBatteryWarningView.install(this)
         registerReceivers()
         // A long press of the Power button shows our Power screen, not Android's power menu
         powerMenuInterceptor = PowerMenuInterceptor(this) { showPowerMenu() }.also { it.register() }
@@ -461,6 +469,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             val ba = BluetoothAdapter.getDefaultAdapter()
             if (ba != null && ba.isEnabled) {
                 ivStatusBluetooth?.visibility = View.VISIBLE
+                queryStatusBarBluetooth()
             }
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             if (wm != null && wm.isWifiEnabled) {
@@ -604,6 +613,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
+        // A key during a menu slide ends the slide at once, then acts on the new screen as normal. Not the repeats of
+        // a held key: a held centre opens a screen (Now Playing menu, Add to Playlist), and its repeats must not stop
+        // the slide of that screen.
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) menuSlide?.finishNow()
         if (event.action == KeyEvent.ACTION_DOWN && (keyCode == 21 || keyCode == 22)) {
             val now = SystemClock.uptimeMillis()
             classicWheelStreak = if (now - lastClassicWheelTime < 200) classicWheelStreak + 1 else 1
@@ -711,6 +724,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (::playerController.isInitialized) {
             playerController.updatePlayerUI()
         }
+        IpodClassicLayout.refreshPlayIcon(this)
         val am = AudioPlayerManager.getInstance()
         sendBluetoothMetaToCar()
         BluetoothAvrcpManager.getInstance(this).updatePlaybackState(am.isPlaying())
@@ -1080,6 +1094,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 }
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
                     val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    onStatusBarBluetoothAdapterState(state)
                     if (state == BluetoothAdapter.STATE_ON) {
                         ivStatusBluetooth?.visibility = View.VISIBLE
                         updateStatusBarBluetooth()
@@ -1138,6 +1153,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
                     val profileState = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1)
                     val currentDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    onStatusBarA2dpState(currentDevice, profileState)
                     if (profileState == BluetoothProfile.STATE_DISCONNECTED) {
                         bluetoothController.clearTargetDeviceForAudio()
                         Notice.show(this@MainActivity, t("Audio Disconnected"))
@@ -1273,6 +1289,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun onDestroy() {
+        menuSlide?.let { NavigationManager.getInstance().removeDirectionListener(it) }
         updateScreenOffFeedback(true)
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)
         super.onDestroy()

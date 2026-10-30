@@ -24,6 +24,8 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.CustomAnalogClockView
+import com.themoon.y1.views.IpodClassicLayout
+import com.themoon.y1.views.IpodClassicLists
 import com.themoon.y1.views.WidgetBatteryBarView
 import java.util.Locale
 import java.io.File
@@ -42,7 +44,6 @@ class MainMenuController(
     private val clickFeedback: () -> Unit,
     private val onActionTriggered: (action: String) -> Unit,
     private val onButtonFocusChanged: (element: ThemeManager.MenuElement) -> Unit,
-    private val startCoverPanAnimation: (iv: ImageView, maxDx: Int, maxDy: Int) -> Unit,
     private val onLongPressScreenOff: View.OnLongClickListener,
     private val localize: (String) -> String,
     private val onDynamicUiBuilt: (() -> Unit)? = null
@@ -118,7 +119,7 @@ class MainMenuController(
     fun buildDynamicMainMenuUI() {
         val safeMenuIndex = lastMainMenuFocusIndex
         val mainMenu = layoutMainMenu
-        val statusBarHeightDp = 26
+        val statusBarHeightDp = ClassicMenuStyle.STATUS_HEIGHT_DP
         val density = activity.resources.displayMetrics.density
         val safeTopPadding = (statusBarHeightDp * density).toInt()
 
@@ -167,7 +168,7 @@ class MainMenuController(
         ivWidgetFocusImage = null
         ivAnimatedCover = null
 
-        val elements = ThemeManager.getCurrentTheme().menuElements
+        val elements = IpodClassicLists.menuElements(ThemeManager.getCurrentTheme().menuElements, activity)
         val buttonElements = ArrayList<ThemeManager.MenuElement>()
         val widgetElements = ArrayList<ThemeManager.MenuElement>()
 
@@ -211,19 +212,6 @@ class MainMenuController(
                     canvas.addView(sv)
                     listContainers[el.id] = innerLayout
                     createdWidgetView = sv
-
-                    val listShadow = View(activity).apply {
-                        background = GradientDrawable(
-                            GradientDrawable.Orientation.LEFT_RIGHT,
-                            intArrayOf(0x50000000, 0x00000000)
-                        )
-                    }
-                    val shadowWidth = (10 * density).toInt()
-                    val shadowLp = FrameLayout.LayoutParams(shadowWidth, (el.height * density).toInt()).apply {
-                        leftMargin = ((el.x + el.width) * density).toInt()
-                        topMargin = (el.y * density).toInt() + safeTopPadding
-                    }
-                    canvas.addView(listShadow, shadowLp)
                 }
 
                 "box" -> {
@@ -404,33 +392,29 @@ class MainMenuController(
                     val animContainer = FrameLayout(activity)
                     val dm = activity.resources.displayMetrics
                     val leftPx = (el.x * density).toInt()
+                    // The iPod Classic layout (Classic themes) puts the cover below the full-width status bar (IpodClassicLists.menuElements).
+                    val topPx = if (IpodClassicLayout.isActive) (el.y * density).toInt() else 0
                     val contW = dm.widthPixels - leftPx
-                    val contH = dm.heightPixels
+                    val contH = dm.heightPixels - topPx
 
                     val coverLp = FrameLayout.LayoutParams(contW, contH).apply {
                         leftMargin = leftPx
-                        topMargin = 0
+                        topMargin = topPx
                     }
                     animContainer.layoutParams = coverLp
                     animContainer.clipChildren = true
                     animContainer.clipToPadding = true
-                    animContainer.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    // No software layer: the art view clips its own drawing, and a software layer would draw
+                    // the full pane again on the CPU for each frame of the pan and zoom.
                     if (widgetBg != null) animContainer.background = widgetBg
 
-                    val overW = (contW * 1.35f).toInt()
-                    val overH = (contH * 1.35f).toInt()
-
-                    val animIv = ImageView(activity).apply {
-                        scaleType = ImageView.ScaleType.CENTER_CROP
-                        layoutParams = FrameLayout.LayoutParams(overW, overH).apply {
-                            gravity = Gravity.CENTER
-                        }
+                    // The same art view and zoom rule as the other split screens (CoverPane)
+                    val animIv = com.themoon.y1.views.CoverArtView(activity).apply {
                         setImageResource(R.drawable.default_album)
                     }
                     ivAnimatedCover = animIv
                     animContainer.addView(animIv)
-
-                    startCoverPanAnimation(animIv, overW - contW, overH - contH)
+                    com.themoon.y1.views.CoverPane.attach(animIv)
 
                     canvas.addView(animContainer)
                     createdWidgetView = animContainer
@@ -690,6 +674,7 @@ class MainMenuController(
 
         currentButtons.clear()
         currentButtons.addAll(createdButtons)
+        IpodClassicLists.styleMainMenuButtons(createdButtons)
 
         // 3. Chain Focus Navigation Loop
         val totalBtns = createdButtons.size
