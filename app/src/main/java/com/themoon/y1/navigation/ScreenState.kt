@@ -105,7 +105,7 @@ sealed interface BrowserMode {
  */
 sealed interface SettingsSubMode {
     data object Root : SettingsSubMode
-    /** A group of the top level, by its English title (SettingsGroups). */
+    /** A group of the top level, by its English title (SettingsController.groups). */
     data class Group(val title: String) : SettingsSubMode
     /** The screen of a Settings row, by its id (for example "Theme"); [arg] for a screen of one value ("DateTime", "Year"). */
     data class Page(val id: String, val arg: String = "") : SettingsSubMode
