@@ -347,17 +347,6 @@ internal fun MainActivity.initControllers() {
     wifiController = WifiController(
         activity = this,
         rootView = layoutWifiMode as ViewGroup,
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
-        createTablerListButton = { iconPaths, text, rightIconPaths, iconColor, textColor ->
-            ListItemViewFactory.createTablerListButtonWithRightIcon(
-                context = this,
-                iconPaths = iconPaths,
-                text = text,
-                rightIconPaths = rightIconPaths,
-                iconColor = iconColor,
-                textColor = textColor
-            )
-        },
         clickFeedback = { clickFeedback() },
         onConnectToSavedNetwork = { _, _ -> },
         onOpenWifiKeyboard = { ssid, isOpen ->
