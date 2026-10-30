@@ -326,17 +326,6 @@ internal fun MainActivity.initControllers() {
     bluetoothController = BluetoothController(
         activity = this,
         rootView = layoutBluetoothMode as ViewGroup,
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
-        createTablerListButton = { iconPaths, text, rightIconPaths, iconColor, textColor ->
-            ListItemViewFactory.createTablerListButtonWithRightIcon(
-                context = this,
-                iconPaths = iconPaths,
-                text = text,
-                rightIconPaths = rightIconPaths,
-                iconColor = iconColor,
-                textColor = textColor
-            )
-        },
         clickFeedback = { clickFeedback() },
         localize = { t(it) }
     )
