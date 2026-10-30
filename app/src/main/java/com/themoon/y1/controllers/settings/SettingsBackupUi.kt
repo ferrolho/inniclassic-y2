@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.settings
 
+import com.themoon.y1.Prefs
 import android.app.Activity
 import android.content.Context
 import android.util.Log
@@ -76,7 +77,7 @@ internal object SettingsBackupUi {
             return
         }
         val prefs = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-        LanguageManager.getInstance(activity).applyLanguage(prefs.getString("app_language", "English (Default)"))
+        LanguageManager.getInstance(activity).applyLanguage(Prefs.LANGUAGE.get(prefs))
         try {
             AudioEffectManager.getInstance().applySoundCheck()
             AudioEffectManager.getInstance().applyEqProfile()

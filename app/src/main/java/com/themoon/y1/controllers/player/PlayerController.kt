@@ -1,6 +1,7 @@
 package com.themoon.y1.controllers.player
 
 import android.app.Activity
+import com.themoon.y1.Prefs
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
@@ -445,8 +446,8 @@ class PlayerController(
 
     private fun updateShuffleRepeatScrubLabels() {
         val prefs = playbackPrefs()
-        val isShuffle = prefs.getBoolean("shuffle", false)
-        val repeatMode = prefs.getInt("repeat_mode", 0)
+        val isShuffle = Prefs.SHUFFLE.get(prefs)
+        val repeatMode = Prefs.REPEAT_MODE.get(prefs)
 
         val repeatText = when (repeatMode) {
             1 -> localize("One")
@@ -497,19 +498,15 @@ class PlayerController(
     }
 
     private fun toggleShuffleMode() {
-        val prefs = playbackPrefs()
-        val isShuffle = !prefs.getBoolean("shuffle", false)
-        prefs.edit().putBoolean("shuffle", isShuffle).commit()
-        MainActivity.instance?.isShuffleMode = isShuffle
+        val isShuffle = Prefs.SHUFFLE.toggle(playbackPrefs())
         AudioPlayerManager.getInstance().setShuffleMode(isShuffle)
         updateShuffleRepeatStatusIcons()
     }
 
     private fun cycleRepeatMode() {
         val prefs = playbackPrefs()
-        val repeatMode = (prefs.getInt("repeat_mode", 0) + 1) % 3
-        prefs.edit().putInt("repeat_mode", repeatMode).commit()
-        MainActivity.instance?.repeatMode = repeatMode
+        val repeatMode = (Prefs.REPEAT_MODE.get(prefs) + 1) % 3
+        Prefs.REPEAT_MODE.set(prefs, repeatMode)
         AudioPlayerManager.getInstance().setRepeatMode(repeatMode)
         updateShuffleRepeatStatusIcons()
     }
@@ -519,8 +516,8 @@ class PlayerController(
 
     private fun updateShuffleRepeatStatusIcons() {
         val prefs = playbackPrefs()
-        val isShuffle = prefs.getBoolean("shuffle", false)
-        val repeatMode = prefs.getInt("repeat_mode", 0)
+        val isShuffle = Prefs.SHUFFLE.get(prefs)
+        val repeatMode = Prefs.REPEAT_MODE.get(prefs)
 
         ivPlayerShuffleStatus?.visibility = if (isShuffle) View.VISIBLE else View.GONE
         ivPlayerRepeatStatus?.visibility = if (repeatMode > 0) View.VISIBLE else View.GONE
@@ -677,7 +674,7 @@ class PlayerController(
             }
             if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
                 val prefs = activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE)
-                if (!prefs.getBoolean("double_click_favorite", true)) {
+                if (!Prefs.DOUBLE_CLICK_FAVORITE.get(prefs)) {
                     // No double-click to wait for, so act on the single press at once.
                     doubleClickHandler.removeCallbacks(singleClickRunnable)
                     lastCenterUpTime = 0
