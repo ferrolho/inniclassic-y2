@@ -261,29 +261,16 @@ internal fun MainActivity.initControllers() {
         rootView = layoutBrowserMode as ViewGroup,
         containerBrowserItems = containerBrowserItems,
         listVirtualSongs = listVirtualSongs,
-        tvBrowserPath = tvBrowserPath,
         repository = PodcastRepository.getInstance(),
         downloadManager = PodcastDownloadManager.getInstance(),
         onRequestSearch = {
             changeScreen(ScreenState.WifiKeyboard(KeyboardTarget.PodcastSearch))
         },
         onNavigateToPlayer = { changeScreen(MainActivity.STATE_PLAYER) },
-        createListButton = { icon, text, color -> createListButton(text, icon, color) },
-        createTablerButton = { icon, text, textColor, iconColor ->
-            ListItemViewFactory.createTablerListButtonWithRightIcon(
-                context = this,
-                iconPaths = icon,
-                text = text,
-                rightIconPaths = null,
-                iconColor = iconColor,
-                textColor = textColor
-            )
-        },
         clickFeedback = { clickFeedback() },
         localize = { t(it) },
         showLoadingPopup = { showLoadingPopup() },
-        onHideLoadingPopup = { dismissLoadingOverlay() },
-        onExitPodcasts = { NavigationManager.getInstance().popBackStack() }
+        onHideLoadingPopup = { dismissLoadingOverlay() }
     )
 
     musicQuizController = MusicQuizController(
