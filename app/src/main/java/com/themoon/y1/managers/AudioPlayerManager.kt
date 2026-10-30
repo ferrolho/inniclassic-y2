@@ -70,6 +70,10 @@ class AudioPlayerManager private constructor() {
     private var pendingScrobblePath: String? = null
 
     @Volatile var isPlayingActive: Boolean = false
+        set(value) {
+            if (field != value) com.themoon.y1.battery.BatteryHistory.setPlaying(com.themoon.y1.battery.BatteryHistory.MUSIC, value)
+            field = value
+        }
     @Volatile var currentlyPlayingFilePath: String? = null
 
     internal var isRestoringPlaybackState: Boolean = false
