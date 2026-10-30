@@ -33,7 +33,12 @@ sealed interface ScreenState {
     data class PodcastEpisodes(val channelTitle: String, val rssUrl: String) : ScreenState
     data object PodcastManage : ScreenState
     data object Equalizer : ScreenState
+    /** The FM tuner. It opens directly from the main menu; Back (Menu) goes to [FmRadioMenu], as on the iPod nano. */
     data object FmRadio : ScreenState
+    /** The Radio menu: tuner, power, saved channels, scan. */
+    data object FmRadioMenu : ScreenState
+    /** The list of the saved channels. */
+    data object FmRadioSaved : ScreenState
     data object Jellyfin : ScreenState
 }
 

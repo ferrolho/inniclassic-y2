@@ -50,6 +50,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.ListEdges
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import com.themoon.y1.views.ToggleStyle
 import java.io.File
@@ -474,11 +475,10 @@ class SettingsController(
             AudioPlayerManager.getInstance().setPlaybackSpeed(speedValues[nextIdx])
             val tvStatus = btnSpeed.getChildAt(1) as? TextView
             tvStatus?.text = localize(speedLabels[nextIdx])
-            Toast.makeText(
+            Notice.show(
                 activity,
-                localize("Speed set to ") + localize(speedLabels[nextIdx]),
-                Toast.LENGTH_SHORT
-            ).show()
+                localize("Speed set to ") + localize(speedLabels[nextIdx])
+            )
         }
         containerSettingsItems.addView(btnSpeed)
 
@@ -798,7 +798,7 @@ class SettingsController(
                 val tvStatus = btnCellRadio.getChildAt(1) as? TextView
                 tvStatus?.text = com.themoon.y1.core.extensions.onOff(isOn, localize)
                 if (isOn != turnOn) {
-                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                    Notice.error(activity, localize("Failed: Root access required."))
                 }
             }
         }
@@ -988,11 +988,10 @@ class SettingsController(
         val spec = ActionScreens.Spec(localize("Power"), actions = PowerMenu.Action.values().map { action ->
             ActionScreens.Action(localize(action.label)) {
                 PowerMenu.run(activity, action) {
-                    Toast.makeText(
+                    Notice.error(
                         activity,
-                        localize("System security prevents powering off directly from the app."),
-                        Toast.LENGTH_LONG
-                    ).show()
+                        localize("System security prevents powering off directly from the app.")
+                    )
                 }
             }
         })
@@ -1305,7 +1304,7 @@ class SettingsController(
         syncResult = if (error == null) localize("Set to") + " " + time else localize("Failed")
         syncResultAt = android.os.SystemClock.elapsedRealtime()
         val message = if (error == null) localize("Time set from the internet:") + " " + time else localize(error)
-        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        Notice.show(activity, message)
         refreshDateTimeScreen()
     }
 
@@ -1315,7 +1314,7 @@ class SettingsController(
         Thread {
             val error = DateTimeSync.setSystemTime(target, manual = true)
             activity.runOnUiThread {
-                if (error != null) Toast.makeText(activity, localize(error), Toast.LENGTH_SHORT).show()
+                if (error != null) Notice.error(activity, localize(error))
                 refreshDateTimeScreen()
             }
         }.start()
@@ -1370,7 +1369,7 @@ class SettingsController(
                 timeZoneRunning = false
                 TimeZone.setDefault(null)
                 if (!ok || TimeZone.getDefault().id != zoneId) {
-                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                    Notice.error(activity, localize("Failed: Root access required."))
                 }
                 onDone()
             }
@@ -1731,7 +1730,7 @@ class SettingsController(
                 }
             }
             com.themoon.y1.controllers.menu.MenuOrder.save(prefs, sb.toString())
-            Toast.makeText(activity, localize("Menu order saved!"), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Menu order saved!"))
         }
     }
 
@@ -1797,7 +1796,7 @@ class SettingsController(
         mainActivity?.setVolumeLimit(-1)
         mainActivity?.let { StatusBarSettings.applyBattery(it) }
 
-        Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
+        Notice.show(activity, localize("All settings have been reset."))
         buildSettingsUI()
     }
 
