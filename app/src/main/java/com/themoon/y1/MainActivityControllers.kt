@@ -176,9 +176,6 @@ internal fun MainActivity.initControllers() {
         layoutIndexContainer = layoutIndexContainer,
         musicRootFolder = rootFolder,
         isAudioFile = { MediaLibraryManager.getInstance().isAudioFile(it) },
-        createListButtonWithIcon = { icon, text, color ->
-            createListButton(text, icon, color)
-        },
         clickFeedback = { clickFeedback() },
         onPlaylistSelected = { file ->
             changeScreen(ScreenState.M3uPlaylistSongs(file))
