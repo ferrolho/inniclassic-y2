@@ -32,7 +32,6 @@ import android.provider.Settings
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.themoon.y1.views.BatteryIconView
-import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.IpodClassicLayout
 import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
@@ -1169,18 +1168,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     fun updateStatusBarWidth() {
-        val statusBar = findViewById<View>(R.id.layout_status_bar) ?: return
-        val density = resources.displayMetrics.density
-        val slp = statusBar.layoutParams ?: return
-        val targetWidth = if (isPaneBasedScreen()) {
-            (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
-        } else {
-            ViewGroup.LayoutParams.MATCH_PARENT
-        }
-        if (slp.width != targetWidth) {
-            slp.width = targetWidth
-            statusBar.layoutParams = slp
-        }
+        findViewById<View>(R.id.layout_status_bar)?.let { com.themoon.y1.lists.Pane.fitStatusBar(it, isPaneBasedScreen()) }
     }
 
     fun showUsbStorageDialog() = usbStorageManager.showUsbStorageDialog()

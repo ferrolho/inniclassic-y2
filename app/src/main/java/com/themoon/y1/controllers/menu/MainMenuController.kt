@@ -135,9 +135,7 @@ class MainMenuController(
 
         val statusBarForWidth = activity.findViewById<View>(R.id.layout_status_bar)
         if (statusBarForWidth != null) {
-            val slpMenu = statusBarForWidth.layoutParams
-            slpMenu.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
-            statusBarForWidth.layoutParams = slpMenu
+            com.themoon.y1.lists.Pane.fitStatusBar(statusBarForWidth, split = true)
             statusBarForWidth.background = ThemeManager.createStatusBarBackground()
         }
 

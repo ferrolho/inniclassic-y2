@@ -126,9 +126,6 @@ internal fun MainActivity.initControllers() {
         hzIndexScroll = hzIndexScroll,
         layoutIndexContainer = layoutIndexContainer,
         clickFeedback = { clickFeedback() },
-        createListButtonWithIcon = { icon, text, color ->
-            createListButton(text, icon, color)
-        },
         onNavigateToScreen = { state ->
             changeScreen(state)
         },
