@@ -1,6 +1,8 @@
 package com.themoon.y1.managers
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
@@ -42,6 +44,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.util.Collections
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /**
  * Audio playback coordinator managing ExoPlayer, fallback MediaPlayer for FLAC,
@@ -65,6 +68,10 @@ class AudioPlayerManager private constructor() {
     private var pendingScrobbleTitle: String? = null
     private var pendingScrobbleAlbum: String? = null
     private var pendingScrobblePath: String? = null
+
+    // The cover of a new track: read and decoded on its own thread, shown only for the track that is still loaded
+    private val artRequests = TrackArtRequests()
+    private val artExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "y1-track-art") }
 
     @Volatile var isPlayingActive: Boolean = false
     @Volatile var currentlyPlayingFilePath: String? = null
@@ -485,6 +492,7 @@ class AudioPlayerManager private constructor() {
             }
             exoPlayer?.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
 
+            artRequests.cancel()
             main.runOnUiThread {
                 main.isPausedByHand = false
                 main.tvPlayerTitle.text = title
@@ -792,69 +800,41 @@ class AudioPlayerManager private constructor() {
         }
 
         val ext = track.name.lowercase(Locale.US)
-        val isOpus = ext.endsWith(".opus")
         val isFlac = ext.endsWith(".flac")
         isUsingLegacyPlayer = isFlac && !flacLegacyFailedPaths.contains(track.absolutePath)
 
+        var t: String? = null
+        var a: String? = null
+        var album: String? = null
+        main.lastAlbumArtBytes = null
+
+        var safeFileName = track.name
+        val safeFileNameDot = safeFileName.lastIndexOf(".")
+        if (safeFileNameDot > 0) {
+            safeFileName = safeFileName.substring(0, safeFileNameDot)
+        }
+        val coverFile = File(StoragePaths.getCoversDir(), "$safeFileName.jpg")
+
+        val isPodcast = track.absolutePath.contains("/Podcasts/")
+        var podcastCoverFile: File? = null
+        if (isPodcast) {
+            val podcastFolder = track.parentFile
+            podcastCoverFile = File(podcastFolder, "cover.jpg")
+        }
+
         try {
-            var t: String? = null
-            var a: String? = null
-            var album: String? = null
-            main.lastAlbumArtBytes = null
-
-            if (isOpus) {
-                val opusTags = extractOpusMetadata(track)
-                if (opusTags[0] != null) t = opusTags[0] as String
-                if (opusTags[1] != null) a = opusTags[1] as String
-                if (opusTags[2] != null) album = opusTags[2] as String
-                if (opusTags[5] != null) main.lastAlbumArtBytes = opusTags[5] as ByteArray
-            } else if (isFlac) {
-                val flacTags = extractFlacMetadata(track)
-                if (flacTags[0] != null) t = flacTags[0] as String
-                if (flacTags[1] != null) a = flacTags[1] as String
-                if (flacTags[2] != null) album = flacTags[2] as String
-                if (flacTags[5] != null) main.lastAlbumArtBytes = flacTags[5] as ByteArray
-            } else if (ext.endsWith(".m4a") || ext.endsWith(".alac")) {
-                val alacTags = extractAlacMetadata(track)
-                if (alacTags[0] != null) t = alacTags[0] as String
-                if (alacTags[1] != null) a = alacTags[1] as String
-                if (alacTags[2] != null) album = alacTags[2] as String
-                if (alacTags[5] != null) main.lastAlbumArtBytes = alacTags[5] as ByteArray
-            } else if (ext.endsWith(".ogg")) {
-                val oggTags = extractOggVorbisMetadata(track)
-                if (oggTags[0] != null) t = oggTags[0] as String
-                if (oggTags[1] != null) a = oggTags[1] as String
-                if (oggTags[2] != null) album = oggTags[2] as String
-                if (oggTags[5] != null) main.lastAlbumArtBytes = oggTags[5] as ByteArray
+            // Title, artist and album from the library, so that a track change does not wait for a file read.
+            // Only a file that is not in the library (for example a podcast episode) is read here, without its cover.
+            val song = LibrarySongs.byPath(track.absolutePath)
+            if (song != null) {
+                t = song.title
+                a = song.artist.takeUnless { it == "Unknown Artist" || it == "Unknown Author" }
+                album = song.album.takeUnless { it == "Unknown Album" || it == "Unknown Book" }
             } else {
-                try {
-                    val mmr = MediaMetadataRetriever()
-                    val fisMmr = FileInputStream(track)
-                    mmr.setDataSource(fisMmr.fd)
-                    t = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                    a = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                    if (a.isNullOrEmpty()) {
-                        a = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR)
-                    }
-                    album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-                    main.lastAlbumArtBytes = mmr.embeddedPicture
-                    fisMmr.close()
-                    mmr.release()
-                } catch (ignored: Throwable) {}
-            }
-
-            var safeFileName = track.name
-            val safeFileNameDot = safeFileName.lastIndexOf(".")
-            if (safeFileNameDot > 0) {
-                safeFileName = safeFileName.substring(0, safeFileNameDot)
-            }
-            val coverFile = File(StoragePaths.getCoversDir(), "$safeFileName.jpg")
-
-            val isPodcast = track.absolutePath.contains("/Podcasts/")
-            var podcastCoverFile: File? = null
-            if (isPodcast) {
-                val podcastFolder = track.parentFile
-                podcastCoverFile = File(podcastFolder, "cover.jpg")
+                val tags = readTrackTags(track, includeArt = false)
+                t = tags.title
+                a = tags.artist
+                album = tags.album
             }
 
             if (main.prefs.contains("meta_title_" + track.absolutePath)) {
@@ -891,12 +871,15 @@ class AudioPlayerManager private constructor() {
             pendingScrobbleTitle = if (!t.isNullOrBlank()) t else safeFileName
             pendingScrobbleAlbum = album
             pendingScrobblePath = track.absolutePath
+        } catch (ignored: Throwable) {}
 
+        // The cover is read and decoded on the art thread, and shows here if the track is still the same
+        loadTrackArt(main, artRequests.start(track.absolutePath), track, coverFile, isPodcast, podcastCoverFile) { art ->
+            main.lastAlbumArtBytes = art.bytes
             var artApplied = false
             if (main.lastAlbumArtBytes != null && (main.lastAlbumArtBytes?.size ?: 0) > 0) {
                 try {
-                    val optsCenter = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
-                    val bmpCenter = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsCenter)
+                    val bmpCenter = art.embedded
                     if (bmpCenter != null) {
                         main.ivAlbumArt.setImageBitmap(bmpCenter)
                         main.updateMainMenuBackground()
@@ -923,17 +906,7 @@ class AudioPlayerManager private constructor() {
             if (!artApplied) {
                 if (isPodcast && podcastCoverFile != null && podcastCoverFile.exists()) {
                     try {
-                        val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
-
-                        var scale = 1
-                        while (opts.outWidth / scale > 500 || opts.outHeight / scale > 500) {
-                            scale *= 2
-                        }
-
-                        opts.inJustDecodeBounds = false
-                        opts.inSampleSize = scale
-                        val bmp = android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
+                        val bmp = art.podcastCover
                         if (bmp != null) {
                             main.ivAlbumArt.setImageBitmap(bmp)
 
@@ -957,12 +930,12 @@ class AudioPlayerManager private constructor() {
                         artApplied = true
                     }
                 } else if (coverFile.exists()) {
-                    main.applyCachedCoverArt(coverFile.absolutePath)
+                    showCoverFile(main, art)
                     artApplied = true
                 } else {
-                    val folderCover = main.findFolderCover(track.parentFile)
+                    val folderCover = art.folderCover
                     if (folderCover != null && folderCover.exists()) {
-                        main.applyCachedCoverArt(folderCover.absolutePath)
+                        showCoverFile(main, art)
                         artApplied = true
                     } else {
                         main.ivAlbumArt.setImageResource(R.drawable.default_album)
@@ -981,7 +954,9 @@ class AudioPlayerManager private constructor() {
                     }
                 }
             }
-        } catch (ignored: Throwable) {}
+            // The art reflection, and the cover in the AVRCP track data
+            if (artApplied) main.updatePlayerUI()
+        }
 
         try {
             if (isUsingLegacyPlayer) {
@@ -1116,6 +1091,136 @@ class AudioPlayerManager private constructor() {
             }
         }
     }
+
+    /** Title, artist and album of a file, and with [includeArt] its embedded cover. Any thread. */
+    internal class TrackTags(val title: String?, val artist: String?, val album: String?, val art: ByteArray?)
+
+    internal fun readTrackTags(track: File, includeArt: Boolean): TrackTags {
+        val name = track.name.lowercase(Locale.US)
+        val tags = when {
+            name.endsWith(".opus") -> extractOpusMetadata(track, includeArt)
+            name.endsWith(".flac") -> extractFlacMetadata(track, includeArt)
+            name.endsWith(".m4a") || name.endsWith(".alac") -> extractAlacMetadata(track, includeArt)
+            name.endsWith(".ogg") -> extractOggVorbisMetadata(track, includeArt)
+            else -> null
+        }
+        if (tags != null) {
+            return TrackTags(tags[0] as? String, tags[1] as? String, tags[2] as? String, if (includeArt) tags[5] as? ByteArray else null)
+        }
+        var mmr: MediaMetadataRetriever? = null
+        var fis: FileInputStream? = null
+        return try {
+            mmr = MediaMetadataRetriever()
+            fis = FileInputStream(track)
+            mmr.setDataSource(fis.fd)
+            var artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            if (artist.isNullOrEmpty()) {
+                artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR)
+            }
+            TrackTags(
+                mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),
+                artist,
+                mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM),
+                if (includeArt) mmr.embeddedPicture else null
+            )
+        } catch (ignored: Throwable) {
+            TrackTags(null, null, null, null)
+        } finally {
+            try { fis?.close() } catch (ignored: Throwable) {}
+            try { mmr?.release() } catch (ignored: Throwable) {}
+        }
+    }
+
+    /** True while the cover of a new track is still loading (Now Playing shows the default cover). */
+    fun isArtLoading(): Boolean = artRequests.isLoading
+
+    /**
+     * The cover of a track, read and decoded on the art thread, in the order that prepareMusicTrack uses:
+     * the embedded cover ([bytes], [embedded]), the podcast cover, the cached cover or the folder cover ([fileCover]).
+     */
+    internal class TrackArt {
+        var bytes: ByteArray? = null
+        var embedded: Bitmap? = null
+        var podcastCover: Bitmap? = null
+        var folderCover: File? = null
+        var fileCover: Bitmap? = null
+        var fileBytes: ByteArray? = null
+    }
+
+    /**
+     * Reads and decodes the cover of [track] on the art thread, then calls [show] on the main thread if
+     * the track is still the same. Until then Now Playing shows the default cover.
+     */
+    private fun loadTrackArt(
+        main: MainActivity, ticket: TrackArtRequests.Ticket, track: File, coverFile: File,
+        isPodcast: Boolean, podcastCoverFile: File?, show: (TrackArt) -> Unit
+    ) {
+        artExecutor.execute {
+            // A newer track came while this one waited: do not read its cover
+            if (!artRequests.isCurrent(ticket)) return@execute
+            val art = TrackArt()
+            try {
+                readTrackArt(main, art, track, coverFile, isPodcast, podcastCoverFile)
+            } catch (ignored: Throwable) {}
+            main.runOnUiThread {
+                if (!artRequests.finish(ticket) || currentlyPlayingFilePath != ticket.path) return@runOnUiThread
+                if (MainActivity.instance !== main) return@runOnUiThread
+                try {
+                    show(art)
+                } catch (ignored: Throwable) {}
+            }
+        }
+    }
+
+    private fun readTrackArt(main: MainActivity, art: TrackArt, track: File, coverFile: File, isPodcast: Boolean, podcastCoverFile: File?) {
+        art.bytes = readTrackTags(track, includeArt = true).art
+        val bytes = art.bytes
+        if (bytes != null && bytes.isNotEmpty()) {
+            try {
+                val optsCenter = BitmapFactory.Options().apply { inSampleSize = 2 }
+                art.embedded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, optsCenter)
+            } catch (ignored: Throwable) {}
+            if (art.embedded != null) return
+        }
+
+        if (isPodcast && podcastCoverFile != null && podcastCoverFile.exists()) {
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
+
+            var scale = 1
+            while (opts.outWidth / scale > 500 || opts.outHeight / scale > 500) {
+                scale *= 2
+            }
+
+            opts.inJustDecodeBounds = false
+            opts.inSampleSize = scale
+            art.podcastCover = BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
+        } else if (coverFile.exists()) {
+            readCoverFile(art, coverFile)
+        } else {
+            art.folderCover = main.findFolderCover(track.parentFile)
+            art.folderCover?.let { if (it.exists()) readCoverFile(art, it) }
+        }
+    }
+
+    /** Art thread: a cover image file, as MainActivity.applyCachedCoverArt reads it. */
+    private fun readCoverFile(art: TrackArt, file: File) {
+        art.fileCover = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = 2 }) ?: return
+        art.fileBytes = try { file.readBytes() } catch (ignored: Exception) { null }
+    }
+
+    /** Main thread: a cover file that the art thread read, as MainActivity.applyCachedCoverArt shows it. */
+    private fun showCoverFile(main: MainActivity, art: TrackArt) {
+        val bmp = art.fileCover ?: return
+        main.ivAlbumArt.setImageBitmap(bmp)
+        main.lastAlbumArtBytes = art.fileBytes
+        main.refreshNowPlayingPreview()
+        main.sendBluetoothMetaToCar()
+    }
+
+    /** Changes when the play queue or its order changes (a shuffle), not when only the track changes. */
+    internal fun queueStamp(queue: List<File>, original: List<File>): List<Int> =
+        listOf(queue.size, queue.hashCode(), original.size, original.hashCode())
 
     private fun isAudiobookPath(filePath: String, main: MainActivity): Boolean =
         StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Audiobooks", ignoreCase = true) || main.isAudiobookLibraryMode
@@ -1650,6 +1755,9 @@ class AudioPlayerManager private constructor() {
         return tags
     }
 
+    // The queue that the play queue files hold (queueStamp), or null before the first write
+    private var savedQueueStamp: List<Int>? = null
+
     fun savePlaybackState(sync: Boolean = false) {
         val main = MainActivity.instance ?: return
         if (isRestoringPlaybackState) return
@@ -1659,24 +1767,29 @@ class AudioPlayerManager private constructor() {
         val dur = getDuration().toLong().coerceAtLeast(0L)
 
         try {
-            val playlistFile = File(main.filesDir, "last_playback_playlist.txt")
-            val origPlaylistFile = File(main.filesDir, "last_playback_original.txt")
+            // The play queue files change only with the queue: a track change does not write them again
+            val queueStamp = queueStamp(main.currentPlaylist, main.originalPlaylist)
+            if (queueStamp != savedQueueStamp) {
+                val playlistFile = File(main.filesDir, "last_playback_playlist.txt")
+                val origPlaylistFile = File(main.filesDir, "last_playback_original.txt")
 
-            val sb = java.lang.StringBuilder()
-            for (f in main.currentPlaylist) {
-                sb.append(f.absolutePath).append('\n')
-            }
-            val temp = File(main.filesDir, "last_playback_playlist.tmp")
-            temp.writeText(sb.toString())
-            temp.renameTo(playlistFile)
+                val sb = java.lang.StringBuilder()
+                for (f in main.currentPlaylist) {
+                    sb.append(f.absolutePath).append('\n')
+                }
+                val temp = File(main.filesDir, "last_playback_playlist.tmp")
+                temp.writeText(sb.toString())
+                temp.renameTo(playlistFile)
 
-            val sbOrig = java.lang.StringBuilder()
-            for (f in main.originalPlaylist) {
-                sbOrig.append(f.absolutePath).append('\n')
+                val sbOrig = java.lang.StringBuilder()
+                for (f in main.originalPlaylist) {
+                    sbOrig.append(f.absolutePath).append('\n')
+                }
+                val tempOrig = File(main.filesDir, "last_playback_original.tmp")
+                tempOrig.writeText(sbOrig.toString())
+                tempOrig.renameTo(origPlaylistFile)
+                savedQueueStamp = queueStamp
             }
-            val tempOrig = File(main.filesDir, "last_playback_original.tmp")
-            tempOrig.writeText(sbOrig.toString())
-            tempOrig.renameTo(origPlaylistFile)
 
             val editor = main.prefs.edit()
                 .putString("last_played_song_path", currentFile.absolutePath)
