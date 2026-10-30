@@ -461,5 +461,16 @@
   "Heart Purchased": "Corazón comprado",
   "Recently Played": "Reproducido recientemente",
   "Top 25 Most Played": "Las 25 más escuchadas",
-  "No Songs": "No hay canciones"
+  "No Songs": "No hay canciones",
+  "Battery": "Batería",
+  "Battery Icon": "Icono de batería",
+  "Screen Off": "Pantalla apagada",
+  "Last 24 Hours": "Últimas 24 horas",
+  "Last 10 Days": "Últimos 10 días",
+  "Battery Level": "Nivel de batería",
+  "Battery Used": "Batería usada",
+  "Screen On": "Pantalla activa",
+  "Last charged to": "Última carga al",
+  "Charging": "Cargando",
+  "No battery history yet": "Aún no hay historial de batería"
 }

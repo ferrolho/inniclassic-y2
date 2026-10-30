@@ -461,5 +461,16 @@
   "Heart Purchased": "하트 구매 완료",
   "Recently Played": "최근 재생된 음악",
   "Top 25 Most Played": "가장 많이 재생된 25곡",
-  "No Songs": "노래 없음"
+  "No Songs": "노래 없음",
+  "Battery": "배터리",
+  "Battery Icon": "배터리 아이콘",
+  "Screen Off": "화면 꺼짐",
+  "Last 24 Hours": "지난 24시간",
+  "Last 10 Days": "지난 10일",
+  "Battery Level": "배터리 수준",
+  "Battery Used": "사용한 배터리",
+  "Screen On": "화면 켜짐",
+  "Last charged to": "마지막 충전",
+  "Charging": "충전 중",
+  "No battery history yet": "배터리 기록이 아직 없습니다"
 }

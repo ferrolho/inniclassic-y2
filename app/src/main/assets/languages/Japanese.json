@@ -445,5 +445,16 @@
   "Heart Purchased": "ハート購入済み",
   "Recently Played": "最近再生した項目",
   "Top 25 Most Played": "再生回数トップ25",
-  "No Songs": "曲がありません"
+  "No Songs": "曲がありません",
+  "Battery": "バッテリー",
+  "Battery Icon": "バッテリーアイコン",
+  "Screen Off": "画面オフ",
+  "Last 24 Hours": "過去24時間",
+  "Last 10 Days": "過去10日間",
+  "Battery Level": "バッテリー残量",
+  "Battery Used": "使用したバッテリー",
+  "Screen On": "画面オン",
+  "Last charged to": "最後の充電",
+  "Charging": "充電中",
+  "No battery history yet": "バッテリーの履歴はまだありません"
 }
