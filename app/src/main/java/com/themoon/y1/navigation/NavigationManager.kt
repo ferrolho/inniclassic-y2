@@ -134,6 +134,15 @@ class NavigationManager private constructor() {
         return true
     }
 
+    /**
+     * Back over [entries] lists in one change (one slide): for example a list and the menu that opened it.
+     * The lists between are not shown again.
+     */
+    fun popBackStack(entries: Int): Boolean {
+        repeat(entries - 1) { if (backStack.isNotEmpty()) backStack.pop() }
+        return popBackStack()
+    }
+
     /** The state of the top back-stack entry (where Back goes), or null. */
     fun previousState(): ScreenState? = backStack.peek()?.state
 
