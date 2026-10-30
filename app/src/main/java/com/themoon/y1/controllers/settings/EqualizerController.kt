@@ -16,12 +16,16 @@ import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
+import com.themoon.y1.lists.Focus
+import com.themoon.y1.lists.ListScreen
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioEffectPlan
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.EqSliderView
-import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 
@@ -34,10 +38,8 @@ class EqualizerController(
     private val activity: Activity,
     override val rootView: ViewGroup,
     private val eqPresetNames: List<String>,
-    private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val createCategoryHeader: (title: String) -> Unit,
     private val createListButton: (icon: String, text: String) -> View,
-    private val createListButtonWithColor: (icon: String, text: String, color: Int) -> View,
     private val clickFeedback: () -> Unit,
     private val rebootAudioEngine: () -> Unit,
     private val onNavigateBack: () -> Unit,
@@ -46,6 +48,7 @@ class EqualizerController(
 
     private val containerSettingsItems: LinearLayout = rootView.findViewById(R.id.container_settings_items)
     private val prefs = activity.getSharedPreferences("AppPrefs", 0)
+    private val screen = ListScreen(containerSettingsItems, clickFeedback = clickFeedback)
 
     var isSoftwareEqEnabled: Boolean
         get() = Prefs.SOFTWARE_EQ.get(prefs)
@@ -81,38 +84,45 @@ class EqualizerController(
         isGraphicEqOpen = false
         isProfileSelectorOpen = false
         currentAdjustingBand = -1
+        screen.clear()
     }
 
     override fun onThemeChanged() {
-        // The graphic EQ and the profile list keep their colours until they close (no lost band state)
-        if (!isGraphicEqOpen && !isProfileSelectorOpen) buildEqualizerSettingsUI()
+        // The graphic EQ keeps its colours until it closes (no lost band state)
+        when {
+            isProfileSelectorOpen -> screen.update(profilesSpec())
+            !isGraphicEqOpen -> screen.update(settingsSpec())
+        }
     }
 
-    fun buildEqualizerSettingsUI() {
+    override fun title(): String? = if (isGraphicEqOpen) null else screen.title
+
+    /**
+     * The EQ settings. [back]: from the profile list or the Graphic Equalizer, so the row that opened it is
+     * selected again; else the first row.
+     */
+    fun buildEqualizerSettingsUI(back: Boolean = false) {
         isGraphicEqOpen = false
         isProfileSelectorOpen = false
         currentAdjustingBand = -1
         AudioEffectManager.getInstance().loadAndSyncExternalEqProfiles()
         AudioEffectManager.getInstance().ensureAudioEffectsReady()
-        containerSettingsItems.removeAllViews()
+        screen.show(settingsSpec(if (back) Focus.LAST else Focus.FIRST))
+    }
 
-        val btnSoftwareEq = createSettingRow(
-            "10-Band Software EQ",
-            onOff(isSoftwareEqEnabled, localize)
-        )
-        btnSoftwareEq.setOnClickListener {
-            clickFeedback()
+    private fun settingsSpec(focus: Focus = Focus.FIRST): ListSpec {
+        val rows = ArrayList<RowSpec>()
+        rows += RowSpec("10-Band Software EQ", RowLook.VALUE, value = onOff(isSoftwareEqEnabled, localize), onClick = {
             if (isSoftwareEqEnabled) {
                 isSoftwareEqEnabled = false
                 currentEqProfile = "preset_0"
                 rebootAudioEngine()
                 Notice.show(activity, localize("Switched to Hardware 5-Band EQ"))
-                buildEqualizerSettingsUI()
+                screen.update(settingsSpec())
             } else {
                 showSoftwareEqDialog()
             }
-        }
-        containerSettingsItems.addView(btnSoftwareEq)
+        })
 
         var activeName = "Normal"
         if (currentEqProfile.startsWith("preset_")) {
@@ -123,68 +133,40 @@ class EqualizerController(
         } else {
             activeName = currentEqProfile.removePrefix("custom_")
         }
-
-        val rowSelect = createSettingRow("EQ Profile / Preset", "$activeName 〉")
-        rowSelect.setOnClickListener {
-            clickFeedback()
-            buildProfileSelectorUI()
-        }
-        containerSettingsItems.addView(rowSelect)
+        rows += RowSpec("EQ Profile / Preset", RowLook.VALUE, value = "$activeName 〉", onClick = { buildProfileSelectorUI() })
 
         val steps = arrayOf("Off", "Weak", "Normal", "Strong")
-        val rowBass = createSettingRow("Bass Boost", localize(steps[currentBassBoostStep % 4]))
-        rowBass.setOnClickListener {
-            clickFeedback()
+        rows += RowSpec("Bass Boost", RowLook.VALUE, value = localize(steps[currentBassBoostStep % 4]), onClick = {
             currentBassBoostStep = (currentBassBoostStep + 1) % 4
-            (rowBass.getChildAt(1) as? TextView)?.text = localize(steps[currentBassBoostStep])
             AudioEffectManager.getInstance().applyAudioEffects()
-        }
-        containerSettingsItems.addView(rowBass)
-
-        val rowVirt = createSettingRow("Virtualizer", localize(steps[currentVirtualizerStep % 4]))
-        rowVirt.setOnClickListener {
-            clickFeedback()
+            screen.update(settingsSpec())
+        })
+        rows += RowSpec("Virtualizer", RowLook.VALUE, value = localize(steps[currentVirtualizerStep % 4]), onClick = {
             currentVirtualizerStep = (currentVirtualizerStep + 1) % 4
-            (rowVirt.getChildAt(1) as? TextView)?.text = localize(steps[currentVirtualizerStep])
             AudioEffectManager.getInstance().applyAudioEffects()
-        }
-        containerSettingsItems.addView(rowVirt)
-
-        val rowCrossfeed = createSettingRow("Crossfeed", localize(steps[currentCrossfeedStep % 4]))
-        rowCrossfeed.setOnClickListener {
-            clickFeedback()
+            screen.update(settingsSpec())
+        })
+        rows += RowSpec("Crossfeed", RowLook.VALUE, value = localize(steps[currentCrossfeedStep % 4]), onClick = {
             currentCrossfeedStep = (currentCrossfeedStep + 1) % 4
-            (rowCrossfeed.getChildAt(1) as? TextView)?.text = localize(steps[currentCrossfeedStep])
             AudioPlayerManager.getInstance().crossfeedProcessor.setIntensity(currentCrossfeedStep)
-        }
-        containerSettingsItems.addView(rowCrossfeed)
+            screen.update(settingsSpec())
+        })
 
-        createCategoryHeader("━ " + localize("PROFILE MANAGEMENT") + " ━")
-
+        rows += RowSpec(localize("PROFILE MANAGEMENT"), RowLook.HEADER)
         if (currentEqProfile.startsWith("custom_")) {
             val customName = currentEqProfile.removePrefix("custom_")
-            val btnSave = createListButton("\uE161", localize("Save Current Configuration"))
-            btnSave.setOnClickListener {
-                clickFeedback()
+            rows += RowSpec(localize("Save Current Configuration"), onClick = {
                 AudioEffectManager.getInstance().saveCustomEqProfile(customName)
                 Notice.show(activity, localize("Configuration Saved!"))
-            }
-            containerSettingsItems.addView(btnSave)
-
-            val btnDel = createListButtonWithColor("\uE872", localize("Delete Current Profile"), 0xFFFF4444.toInt())
-            btnDel.setOnClickListener {
-                clickFeedback()
+            })
+            rows += RowSpec(localize("Delete Current Profile"), color = 0xFFFF4444.toInt(), onClick = {
                 AudioEffectManager.getInstance().deleteCustomEqProfile(customName)
                 currentEqProfile = "preset_0"
                 AudioEffectManager.getInstance().applyEqProfile()
-                buildEqualizerSettingsUI()
-            }
-            containerSettingsItems.addView(btnDel)
+                screen.update(settingsSpec())
+            })
         }
-
-        val btnCreate = createListButton("\uE145", localize("Create New Profile"))
-        btnCreate.setOnClickListener {
-            clickFeedback()
+        rows += RowSpec(localize("Create New Profile"), onClick = {
             var listStr = Prefs.CUSTOM_EQ_LIST.get(prefs)
             var count = 1
             while (listStr.contains("User EQ $count")) {
@@ -199,28 +181,23 @@ class EqualizerController(
             AudioEffectManager.getInstance().resetCustomEqProfile(newName)
             AudioEffectManager.getInstance().applyEqProfile()
             buildGraphicEqualizerUI()
-        }
-        containerSettingsItems.addView(btnCreate)
+        })
 
-        createCategoryHeader("━ " + localize("GRAPHIC EQUALIZER") + " ━")
-        val btnGraphicEq = createSettingRow("Graphic Equalizer", localize("Open Editor") + " 〉")
-        btnGraphicEq.setOnClickListener {
-            clickFeedback()
+        rows += RowSpec(localize("GRAPHIC EQUALIZER"), RowLook.HEADER)
+        rows += RowSpec("Graphic Equalizer", RowLook.VALUE, value = localize("Open Editor") + " 〉", onClick = {
             if (currentEqProfile.startsWith("preset_")) {
                 Notice.show(activity, localize("Please create a Custom Profile to edit!"), long = true)
             } else {
                 buildGraphicEqualizerUI()
             }
-        }
-        containerSettingsItems.addView(btnGraphicEq)
-        // Focus goes to the first row that can take it (not to a category header).
-        containerSettingsItems.requestFocus()
+        })
+        return ListSpec(localize("Equalizer"), rows, focus = focus, id = "eq")
     }
 
     fun buildGraphicEqualizerUI() {
         isGraphicEqOpen = true
         currentAdjustingBand = -1
-        containerSettingsItems.removeAllViews()
+        screen.clear()
 
         createCategoryHeader("━ " + localize("GRAPHIC EQUALIZER") + " ━")
 
@@ -324,7 +301,7 @@ class EqualizerController(
         val btnBack = createListButton("\uE5C4", localize("Back to EQ Settings"))
         btnBack.setOnClickListener {
             clickFeedback()
-            buildEqualizerSettingsUI()
+            buildEqualizerSettingsUI(back = true)
         }
         containerSettingsItems.addView(btnBack)
 
@@ -335,52 +312,31 @@ class EqualizerController(
         }
     }
 
+    /** The presets, then the custom profiles; the profile in use has the tick and is selected. */
     private fun buildProfileSelectorUI() {
         isProfileSelectorOpen = true
-        containerSettingsItems.removeAllViews()
-        createCategoryHeader("━ " + localize("SELECT PRESET / PROFILE") + " ━")
-        var currentRow: View? = null
+        screen.show(profilesSpec())
+        screen.select(currentEqProfile)
+    }
 
-        for (i in eqPresetNames.indices) {
-            val presetId = "preset_$i"
-            val isCurrent = currentEqProfile == presetId
-            val row = ListItemViewFactory.createCheckListButton(activity, localize(eqPresetNames[i]), isCurrent)
-            row.setOnClickListener {
-                clickFeedback()
-                currentEqProfile = presetId
+    private fun profilesSpec(): ListSpec {
+        val rows = ArrayList<RowSpec>()
+        fun profile(id: String, name: String) {
+            rows += RowSpec(name, RowLook.CHOICE, checked = currentEqProfile == id, key = id, onClick = {
+                currentEqProfile = id
                 AudioEffectManager.getInstance().applyEqProfile()
-                buildEqualizerSettingsUI()
-            }
-            containerSettingsItems.addView(row)
-            if (isCurrent) currentRow = row
+                buildEqualizerSettingsUI(back = true)
+            })
         }
-
+        rows += RowSpec(localize("SELECT PRESET / PROFILE"), RowLook.HEADER)
+        for (i in eqPresetNames.indices) profile("preset_$i", localize(eqPresetNames[i]))
         val customList = Prefs.CUSTOM_EQ_LIST.get(prefs)
         if (customList.isNotEmpty()) {
-            createCategoryHeader("━ " + localize("CUSTOM PROFILES") + " ━")
-            for (name in customList.split(",")) {
-                if (name.isBlank()) continue
-                val profileId = "custom_$name"
-                val isCurrent = currentEqProfile == profileId
-                val row = ListItemViewFactory.createCheckListButton(activity, name, isCurrent)
-                row.setOnClickListener {
-                    clickFeedback()
-                    currentEqProfile = profileId
-                    AudioEffectManager.getInstance().applyEqProfile()
-                    buildEqualizerSettingsUI()
-                }
-                containerSettingsItems.addView(row)
-                if (isCurrent) currentRow = row
-            }
+            rows += RowSpec(localize("CUSTOM PROFILES"), RowLook.HEADER)
+            for (name in customList.split(",")) if (name.isNotBlank()) profile("custom_$name", name)
         }
-
-        val btnBack = createListButton("\uE5C4", localize("Back"))
-        btnBack.setOnClickListener {
-            clickFeedback()
-            buildEqualizerSettingsUI()
-        }
-        containerSettingsItems.addView(btnBack)
-        (currentRow ?: containerSettingsItems).requestFocus()
+        rows += RowSpec(localize("Back"), onClick = { buildEqualizerSettingsUI(back = true) })
+        return ListSpec(localize("Equalizer"), rows, id = "eq-profiles")
     }
 
     /** Asks before the 10-band EQ (it uses the CPU), on an action screen; Back cancels. */
@@ -394,13 +350,14 @@ class EqualizerController(
             currentEqProfile = "preset_0"
             rebootAudioEngine()
             Notice.show(activity, localize("Switched to Software 10-Band EQ"))
-            buildEqualizerSettingsUI()
+            screen.update(settingsSpec())
         })
     }
 
     // The band edit is a wheel step (onWheel), so a general wheel step of the router does not take it first
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
-        if (!isGraphicEqOpen || currentAdjustingBand < 0) return false
+        if (!isGraphicEqOpen) return screen.wheel(delta)
+        if (currentAdjustingBand < 0) return false
         val idx = currentAdjustingBand.toInt()
         if (idx in bandSliders.indices) {
             val name = currentEqProfile.removePrefix("custom_")
@@ -416,7 +373,7 @@ class EqualizerController(
 
     override fun onBackPressed(): Boolean {
         if (isGraphicEqOpen || isProfileSelectorOpen) {
-            buildEqualizerSettingsUI()
+            buildEqualizerSettingsUI(back = true)
             return true
         }
         onNavigateBack()

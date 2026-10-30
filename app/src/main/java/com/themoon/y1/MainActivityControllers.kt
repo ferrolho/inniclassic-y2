@@ -224,13 +224,11 @@ internal fun MainActivity.initControllers() {
         activity = this,
         rootView = layoutSettingsMode as ViewGroup,
         eqPresetNames = eqPresetNames,
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         createCategoryHeader = { title ->
             val container = findViewById<LinearLayout>(R.id.container_settings_items)
             if (container != null) ListItemViewFactory.createCategoryHeader(this, container, title)
         },
         createListButton = { icon, text -> createListButton(text, icon) },
-        createListButtonWithColor = { icon, text, color -> createListButton(text, icon, color) },
         clickFeedback = { clickFeedback() },
         rebootAudioEngine = { rebootAudioEngine() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
