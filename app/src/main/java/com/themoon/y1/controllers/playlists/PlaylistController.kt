@@ -20,7 +20,6 @@ import com.themoon.y1.managers.PlayHistoryManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
-import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.Notice
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -42,8 +41,6 @@ class PlaylistController(
     private val activity: Activity,
     override val rootView: ViewGroup,
     private val listVirtualSongs: ListView?,
-    private val hzIndexScroll: android.widget.HorizontalScrollView?,
-    private val layoutIndexContainer: LinearLayout?,
     private val musicRootFolder: File,
     private val isAudioFile: (File) -> Boolean,
     private val clickFeedback: () -> Unit,
@@ -52,16 +49,6 @@ class PlaylistController(
 ) : ScreenController {
 
     private val screen = ListScreen(rootView.findViewById(R.id.container_browser_items), listVirtualSongs, clickFeedback)
-
-    private val alphabetIndexBarHelper = if (hzIndexScroll != null && layoutIndexContainer != null) {
-        AlphabetIndexBar(
-            activity,
-            hzIndexScroll,
-            layoutIndexContainer,
-            listVirtualSongs,
-            clickFeedback
-        )
-    } else null
 
     var currentM3uFile: File? = null
 
@@ -136,7 +123,6 @@ class PlaylistController(
         }
         screen.show(ListSpec(localize("Playlist") + ": " + m3uFile.nameWithoutExtension, adapter = SongListAdapter(songs),
             empty = localize("No Songs")))
-        alphabetIndexBarHelper?.build(songs.map { it.title })
     }
 
     private fun smartPlaylistTitle(kind: PlayHistoryManager.Kind): String = when (kind) {
@@ -149,7 +135,6 @@ class PlaylistController(
      * Rows are "title — artist". Not alphabetical, so no index bar. A song plays the list from that song.
      */
     fun buildSmartPlaylistUI(state: ScreenState.SmartPlaylistSongs) {
-        hzIndexScroll?.visibility = View.GONE
         // Empty until the list comes from the worker thread (a few ms)
         screen.show(ListSpec(smartPlaylistTitle(state.kind)))
         PlayHistoryManager.getInstance(activity).loadSongs(state.kind) { files ->

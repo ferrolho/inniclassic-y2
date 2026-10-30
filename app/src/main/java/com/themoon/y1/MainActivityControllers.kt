@@ -7,7 +7,6 @@ import android.net.wifi.WifiManager
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
@@ -53,19 +52,8 @@ internal fun MainActivity.initControllers() {
     val containerBrowserItems = findViewById<LinearLayout>(R.id.container_browser_items)
     val tvBrowserPath = findViewById<TextView>(R.id.tv_browser_path)
 
-    val hzIndexScroll = HorizontalScrollView(this).apply {
-        isHorizontalScrollBarEnabled = false
-        visibility = View.GONE
-        setBackgroundColor(0x44000000.toInt())
-    }
-    val layoutIndexContainer = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        hzIndexScroll.addView(this)
-    }
-
     val listContainer = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        addView(hzIndexScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (40 * resources.displayMetrics.density).toInt()))
     }
 
     val listVirtualSongs = object : EdgeFadeListView(this) {
@@ -123,8 +111,6 @@ internal fun MainActivity.initControllers() {
         activity = this,
         rootView = layoutBrowserMode as ViewGroup,
         listVirtualSongs = listVirtualSongs,
-        hzIndexScroll = hzIndexScroll,
-        layoutIndexContainer = layoutIndexContainer,
         clickFeedback = { clickFeedback() },
         onNavigateToScreen = { state ->
             changeScreen(state)
@@ -167,8 +153,6 @@ internal fun MainActivity.initControllers() {
         activity = this,
         rootView = layoutBrowserMode as ViewGroup,
         listVirtualSongs = listVirtualSongs,
-        hzIndexScroll = hzIndexScroll,
-        layoutIndexContainer = layoutIndexContainer,
         musicRootFolder = rootFolder,
         isAudioFile = { MediaLibraryManager.getInstance().isAudioFile(it) },
         clickFeedback = { clickFeedback() },
