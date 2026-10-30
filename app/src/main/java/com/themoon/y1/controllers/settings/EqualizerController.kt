@@ -400,29 +400,20 @@ class EqualizerController(
         })
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (isGraphicEqOpen && currentAdjustingBand >= 0) {
-            val delta = when (keyCode) {
-                21 -> 100 // CCW / Up
-                22 -> -100 // CW / Down
-                else -> 0
-            }
-            if (delta != 0) {
-                val idx = currentAdjustingBand.toInt()
-                if (idx in bandSliders.indices) {
-                    val name = currentEqProfile.removePrefix("custom_")
-                    val level = AudioEffectPlan.stepBandLevel(prefs.getInt(AudioEffectPlan.bandLevelKey(name, idx), 0), delta)
-                    AudioEffectManager.getInstance().setCustomBandLevel(name, idx, level)
-                    // Update the slider in place: a rebuild would end the band edit and move the focus to the first band
-                    bandSliders[idx].setLevel(level)
-                }
-                clickFeedback()
-                return true
-            }
+    // The band edit is a wheel step (onWheel), so a general wheel step of the router does not take it first
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        if (!isGraphicEqOpen || currentAdjustingBand < 0) return false
+        val idx = currentAdjustingBand.toInt()
+        if (idx in bandSliders.indices) {
+            val name = currentEqProfile.removePrefix("custom_")
+            // CCW (up) raises the band, CW (down) lowers it
+            val level = AudioEffectPlan.stepBandLevel(prefs.getInt(AudioEffectPlan.bandLevelKey(name, idx), 0), -100 * delta)
+            AudioEffectManager.getInstance().setCustomBandLevel(name, idx, level)
+            // Update the slider in place: a rebuild would end the band edit and move the focus to the first band
+            bandSliders[idx].setLevel(level)
         }
-
-
-        return false
+        clickFeedback()
+        return true
     }
 
     override fun onBackPressed(): Boolean {
