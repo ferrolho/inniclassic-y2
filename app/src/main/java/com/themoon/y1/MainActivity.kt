@@ -302,6 +302,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun isBrowserControllerInitialized(): Boolean = ::browserController.isInitialized
     lateinit var playlistController: PlaylistController
     lateinit var coverFlowController: CoverFlowController
+    fun isCoverFlowControllerInitialized(): Boolean = ::coverFlowController.isInitialized
     lateinit var playerController: PlayerController
     lateinit var equalizerController: EqualizerController
     lateinit var fmRadioController: FmRadioController
@@ -990,7 +991,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_COVERFLOW -> {
                 val total = uniqueAlbumList.size
                 if (total > 0 && ::coverFlowController.isInitialized) {
-                    "${t("Cover Flow")} (${coverFlowController.currentCoverFlowIndex + 1}/$total)"
+                    com.themoon.y1.controllers.coverflow.CoverFlowTitle.format(t("Cover Flow"), coverFlowController.currentCoverFlowIndex + 1, total)
                 } else {
                     t("Cover Flow")
                 }
