@@ -22,6 +22,23 @@ class ListModelTest {
     }
 
     @Test
+    fun aValueListOpensAtTheChosenValue() {
+        val values = listOf("Off", "1", "2", "3")
+        assertEquals(2, ListModel.firstRow(values, Focus.CHECKED, null, checked = 2))
+        // No value is chosen (a value that is not in the list): the first row
+        assertEquals(0, ListModel.firstRow(values, Focus.CHECKED, null, checked = -1))
+        // The checked row counts only for Focus.CHECKED
+        assertEquals(0, ListModel.firstRow(values, Focus.FIRST, null, checked = 2))
+    }
+
+    @Test
+    fun aRowIsEnabledAndGivesTheFeedbackFirstByDefault() {
+        val row = RowSpec("Vibration Strength")
+        assertTrue(row.enabled)
+        assertFalse(row.feedbackAfter)
+    }
+
+    @Test
     fun anEmptyListSelectsNoRow() {
         assertEquals(-1, ListModel.firstRow(emptyList(), Focus.FIRST, null))
         assertEquals(-1, ListModel.keptRow(emptyList(), "a", 0))
@@ -67,11 +84,11 @@ class ListModelTest {
         // An action screen: two info rows, then the actions
         val rows = listOf("Info 1", "Info 2", "Delete", "Keep")
         val notInfo: (Int) -> Boolean = { it >= 2 }
-        assertEquals(2, ListModel.firstRow(rows, Focus.FIRST, null, notInfo))
+        assertEquals(2, ListModel.firstRow(rows, Focus.FIRST, null, selectable = notInfo))
         // A remembered row that cannot be selected now: the first row that can
-        assertEquals(2, ListModel.firstRow(rows, Focus.LAST, "Info 1", notInfo))
+        assertEquals(2, ListModel.firstRow(rows, Focus.LAST, "Info 1", selectable = notInfo))
         // Only info rows (a progress screen): no row
-        assertEquals(-1, ListModel.firstRow(rows, Focus.FIRST, null) { false })
+        assertEquals(-1, ListModel.firstRow(rows, Focus.FIRST, null, selectable = { false }))
     }
 
     @Test

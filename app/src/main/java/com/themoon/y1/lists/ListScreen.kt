@@ -59,10 +59,11 @@ class ListScreen(
             return
         }
         val last = lastKeys[spec.id]
-        val i = ListModel.firstRow(shown.map { it.key }, spec.focus, last, ::selectable)
+        val i = ListModel.firstRow(shown.map { it.key }, spec.focus, last, shown.indexOfFirst { it.checked }, ::selectable)
         if (i < 0) return
         val row = rows.getChildAt(i)
         focusNowAndAfter(row)
+        // A chosen value (Focus.CHECKED): the ScrollView brings the row into view (no centring)
         if (spec.focus == Focus.LAST && shown[i].key == last) centreAfterLayout(row)
     }
 
@@ -139,18 +140,25 @@ class ListScreen(
                 ListItemViewFactory.createListButtonWithIcon(context, "", row.label, color, onRowFocus)
             }
             RowLook.VALUE -> ListItemViewFactory.createSettingRow(context, row.label, row.value)
-            RowLook.CHOICE -> ListItemViewFactory.createChoiceRowWithRightIcons(context, row.label, row.checked, row.glyphs)
+            RowLook.CHOICE ->
+                if (row.glyphs.isEmpty()) ListItemViewFactory.createCheckListButton(context, row.label, row.checked)
+                else ListItemViewFactory.createChoiceRowWithRightIcons(context, row.label, row.checked, row.glyphs)
             RowLook.CUSTOM -> row.view!!.also { (it.parent as? ViewGroup)?.removeView(it) }
             RowLook.HEADER -> headerRow(row.label)
             RowLook.INFO -> infoRow(row.label)
         }
         if (row.id != View.NO_ID) view.id = row.id
+        if (!row.enabled) {
+            view.isFocusable = false
+            if (view is ViewGroup) for (i in 0 until view.childCount) view.getChildAt(i).alpha = DISABLED_ALPHA
+        }
         val click = row.onClick
         if (click != null) {
             view.setOnClickListener {
-                clickFeedback()
+                if (!row.feedbackAfter) clickFeedback()
                 lastKeys[spec.id] = row.key
                 click()
+                if (row.feedbackAfter) clickFeedback()
             }
         }
         val hold = row.onHold
@@ -205,6 +213,11 @@ class ListScreen(
                 sv.scrollTo(0, (row.top - (sv.height / 2 - row.height / 2)).coerceAtLeast(0))
             }
         })
+    }
+
+    companion object {
+        /** Alpha of the title and the value of a row that cannot be used now ([RowSpec.enabled] false). */
+        const val DISABLED_ALPHA = 0.4f
     }
 
     /** The value text of the row with [key] (for a value that changes in place, for example "Wait..."). */

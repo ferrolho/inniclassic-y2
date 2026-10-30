@@ -46,6 +46,10 @@ class RowSpec(
     val id: Int = View.NO_ID,
     val view: View? = null,
     val key: String = label,
+    /** False: the row is grey and the wheel skips it (a setting that cannot be used now). */
+    val enabled: Boolean = true,
+    /** True: the click feedback comes after [onClick] (a row that changes the click sound or vibration plays the new one). */
+    val feedbackAfter: Boolean = false,
     val onClick: (() -> Unit)? = null,
     val onHold: (() -> Unit)? = null
 )
@@ -62,7 +66,10 @@ enum class Focus {
      * No row: the list itself has the focus, and the first wheel step selects the first row. Then one centre push
      * cannot do a destructive action by accident (action screens).
      */
-    NONE
+    NONE,
+
+    /** The first row with [RowSpec.checked] (the chosen value of a value list), else the first row. */
+    CHECKED
 }
 
 /**
@@ -85,11 +92,15 @@ class ListSpec(
 object ListModel {
 
     /**
-     * The row to select when the list opens: the remembered row ([lastKey]) for [Focus.LAST], else the first row
-     * that can be selected ([selectable]: not a header or an info row). -1 = no row.
+     * The row to select when the list opens: the remembered row ([lastKey]) for [Focus.LAST], the [checked] row
+     * (index, -1 = none) for [Focus.CHECKED], else the first row that can be selected ([selectable]: not a header
+     * or an info row). -1 = no row.
      */
-    fun firstRow(keys: List<String>, focus: Focus, lastKey: String?, selectable: (Int) -> Boolean = { true }): Int {
+    fun firstRow(
+        keys: List<String>, focus: Focus, lastKey: String?, checked: Int = -1, selectable: (Int) -> Boolean = { true }
+    ): Int {
         if (focus == Focus.NONE) return -1
+        if (focus == Focus.CHECKED && checked in keys.indices && selectable(checked)) return checked
         if (focus == Focus.LAST && lastKey != null) {
             val i = keys.indexOf(lastKey)
             if (i >= 0 && selectable(i)) return i
