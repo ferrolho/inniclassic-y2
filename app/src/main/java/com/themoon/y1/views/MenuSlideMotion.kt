@@ -24,10 +24,11 @@ object MenuSlideMotion {
         SPLIT_TO_FULL,
 
         /**
-         * A is a split screen and B is Cover Flow: A's list pane goes out to the left, the art pane goes out to the
-         * right a little later, and Cover Flow shows between them. Back is the same motion in reverse.
+         * A is a split screen and B is a full screen that shows from behind it (Cover Flow, Now Playing): A's list
+         * pane goes out to the left, the art pane goes out to the right a little later, and B shows between them. Back is the
+         * same motion in reverse.
          */
-        COVER_FLOW
+        SPLIT_APART
     }
 
     /** Main menu → Music: decelerates, 1 − (1 − t)². iPod: ~7 frames. */
@@ -36,14 +37,14 @@ object MenuSlideMotion {
     /** Music → Albums: constant speed. iPod: 3.6 screen widths a second. */
     const val FULL_MS = 280L
 
-    /** Music → Cover Flow: accelerates, t². iPod: ~6 frames. */
-    const val COVER_FLOW_IN_MS = 200L
+    /** The split apart (iPod: Music → Cover Flow): accelerates, t². iPod: ~6 frames. */
+    const val SPLIT_APART_IN_MS = 200L
 
     /** The art pane starts this much after the list pane (iPod: about one frame). */
-    const val COVER_FLOW_ART_DELAY_MS = 33L
+    const val SPLIT_APART_ART_DELAY_MS = 33L
 
-    /** Cover Flow → Music (Back): the entry played in reverse, a little slower. iPod: ~8 frames. */
-    const val COVER_FLOW_OUT_MS = 270L
+    /** Back from the split apart (iPod: Cover Flow → Music): the entry in reverse, a little slower. iPod: ~8 frames. */
+    const val SPLIT_APART_OUT_MS = 270L
 
     fun decelerate(t: Float): Float {
         val c = t.coerceIn(0f, 1f)
@@ -58,14 +59,14 @@ object MenuSlideMotion {
     fun durationMs(kind: Kind, push: Boolean): Long = when (kind) {
         Kind.PANE -> PANE_MS
         Kind.FULL, Kind.SPLIT_TO_FULL -> FULL_MS
-        Kind.COVER_FLOW -> if (push) COVER_FLOW_IN_MS + COVER_FLOW_ART_DELAY_MS else COVER_FLOW_OUT_MS
+        Kind.SPLIT_APART -> if (push) SPLIT_APART_IN_MS + SPLIT_APART_ART_DELAY_MS else SPLIT_APART_OUT_MS
     }
 
     /**
      * How far B has come in at [elapsedMs] after the start: [out] gets the depth of the list part at 0 and of the
-     * art part at 1 (the same value except for [Kind.COVER_FLOW]). Push: 0 → 1; pop: 1 → 0. The pop of a list
-     * slide has the same deceleration as the push (the iPod Back was not measured); the Cover Flow exit is the
-     * entry in reverse, as on the iPod.
+     * art part at 1 (the same value except for [Kind.SPLIT_APART]). Push: 0 → 1; pop: 1 → 0. The pop of a list
+     * slide has the same deceleration as the push (the iPod Back was not measured); the Back of the split apart is
+     * its entry in reverse, as the Cover Flow exit on the iPod.
      */
     fun depth(kind: Kind, push: Boolean, elapsedMs: Long, out: FloatArray) {
         val d = durationMs(kind, push).toFloat()
@@ -81,12 +82,12 @@ object MenuSlideMotion {
                 out[0] = if (push) p else 1f - p
                 out[1] = out[0]
             }
-            Kind.COVER_FLOW -> {
-                val inTotal = (COVER_FLOW_IN_MS + COVER_FLOW_ART_DELAY_MS).toFloat()
+            Kind.SPLIT_APART -> {
+                val inTotal = (SPLIT_APART_IN_MS + SPLIT_APART_ART_DELAY_MS).toFloat()
                 // The time of the entry that shows now: forward for a push, backward (and slower) for Back.
                 val tau = if (push) t else inTotal * (1f - (t / d).coerceIn(0f, 1f))
-                out[0] = accelerate(tau / COVER_FLOW_IN_MS)
-                out[1] = accelerate((tau - COVER_FLOW_ART_DELAY_MS) / COVER_FLOW_IN_MS)
+                out[0] = accelerate(tau / SPLIT_APART_IN_MS)
+                out[1] = accelerate((tau - SPLIT_APART_ART_DELAY_MS) / SPLIT_APART_IN_MS)
             }
         }
     }
@@ -95,9 +96,9 @@ object MenuSlideMotion {
     fun running(kind: Kind, push: Boolean, elapsedMs: Long): Boolean = elapsedMs < durationMs(kind, push)
 
     /**
-     * The x offsets (px) at depth [listDepth] (and [artDepth] for Cover Flow) for a slide area [width] wide whose
+     * The x offsets (px) at depth [listDepth] (and [artDepth] for the split apart) for a slide area [width] wide whose
      * split screens have their list pane [pane] wide. [out]: 0 = A (for split screens: A's list pane),
-     * 1 = B, 2 = the art pane of the split screen (Cover Flow only; else 0). [artLeft] (Cover Flow only): the x of
+     * 1 = B, 2 = the art pane of the split screen (split apart only; else 0). [artLeft] (split apart only): the x of
      * the left edge of the art at art offset 0. The art layer also draws the art left of the pane edge, so the art
      * goes right until this edge is at [width]: all of the art leaves the screen, not only the pane.
      */
@@ -122,7 +123,7 @@ object MenuSlideMotion {
                 out[1] = b
                 out[2] = 0f
             }
-            Kind.COVER_FLOW -> {
+            Kind.SPLIT_APART -> {
                 out[0] = -pane * listDepth
                 out[1] = 0f
                 out[2] = (width - minOf(artLeft, pane)) * artDepth
@@ -139,13 +140,13 @@ object MenuSlideMotion {
     fun paneColumns(offset: Float, pane: Float): Float = (pane - offset).coerceIn(0f, pane)
 
     /**
-     * The Cover Flow slide's art layer for a slide area [width] wide whose art pane starts at [pane]: [out] gets
+     * The art layer of the split apart for a slide area [width] wide whose art pane starts at [pane]: [out] gets
      * 0 = the x of the layer, 1 = its width, 2 = the x of the art pane in the layer. The art pane stays [width] − [pane]
      * wide (the same CENTER_CROP, zoom and motion as the pane), but the layer also draws the art left of the pane
      * (the part that the list pane hides). The layer covers the full slide area at each art offset from 0 to
      * [width] − [pane], so the art shows up to its own left edge as the list goes out and as the art goes right.
      */
-    fun coverFlowArtLayer(width: Int, pane: Int, out: IntArray) {
+    fun splitApartArtLayer(width: Int, pane: Int, out: IntArray) {
         out[0] = pane - width
         out[1] = 2 * width - pane
         out[2] = width
@@ -153,11 +154,16 @@ object MenuSlideMotion {
 
     /**
      * The kind of slide between A and B. [paneA], [paneB]: the x of the art pane of each screen (its list pane
-     * width), or null when the screen has no art pane; [coverFlowB]: B is Cover Flow. Null: no slide (a cut).
+     * width), or null when the screen has no art pane. [coverFlowB], [nowPlayingB]: B is Cover Flow or Now Playing,
+     * which a split screen shows with the split apart. Else Cover Flow cuts, and Now Playing slides as a full-width
+     * screen. Null: no slide (a cut).
      */
-    fun kindOf(paneA: Int?, paneB: Int?, coverFlowA: Boolean, coverFlowB: Boolean): Kind? = when {
+    fun kindOf(
+        paneA: Int?, paneB: Int?, coverFlowA: Boolean, coverFlowB: Boolean, nowPlayingB: Boolean = false
+    ): Kind? = when {
         coverFlowA -> null
-        coverFlowB -> if (paneA != null) Kind.COVER_FLOW else null
+        (coverFlowB || nowPlayingB) && paneA != null -> Kind.SPLIT_APART
+        coverFlowB -> null
         paneA != null && paneB != null && kotlin.math.abs(paneA - paneB) <= 2 -> Kind.PANE
         paneA != null && paneB == null -> Kind.SPLIT_TO_FULL
         else -> Kind.FULL

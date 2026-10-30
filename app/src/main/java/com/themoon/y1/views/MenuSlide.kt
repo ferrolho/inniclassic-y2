@@ -18,17 +18,18 @@ import com.themoon.y1.views.MenuSlideMotion.Kind
 /**
  * The menu slides of the iPod classic: a list that opens comes in from the right and the old list goes out to the
  * left (Back: the reverse). Between two split screens only the list pane slides and the art stays; into Cover
- * Flow the list pane and the art pane go apart (timing and positions: [MenuSlideMotion]).
+ * Flow and into Now Playing the list pane and the art pane go apart, and the new screen shows from behind them (the
+ * split apart; from a full-width list, Now Playing slides in as a list). Timing and positions: [MenuSlideMotion].
  *
  * One layer over all screens, below nothing: the status bar area (full width, only its title changes) is not
  * covered. At each push or pop of the back stack ([NavigationManager.DirectionListener]) the layer draws the old
  * screen once into a bitmap (software draw, before the old screen exits), holds it while the new screen builds and
  * selects its row, draws the new screen once into a second bitmap, and then moves the two bitmaps. The frames
  * change only offsets: no allocation, no view layout, no copy. The bitmaps are kept for the next slide.
- * The Cover Flow slide also has a live art layer ([CoverArtView] with [CoverArtView.slideLayer]) that continues
+ * The split apart also has a live art layer ([CoverArtView] with [CoverArtView.slideLayer]) that continues
  * the Menu Cover Motion with the same zoom and offset, and also draws the art that the list pane hid (left of the
  * pane edge, up to the art's own left edge): the art shows from under the list as the list goes, and as the art
- * pane goes right ([MenuSlideMotion.coverFlowArtLayer]). The menu shadow moves with the list pane's right edge.
+ * pane goes right ([MenuSlideMotion.splitApartArtLayer]). The menu shadow moves with the list pane's right edge.
  *
  * The screens change at once (the controllers have the new state at the key press), so keys always act on the new
  * screen: a key during a slide ends the slide at once ([finishNow]), and the key then acts as normal (not lost,
@@ -54,6 +55,8 @@ class MenuSlide private constructor(
     private var paneOld: Int? = null
     private var coverFlowOld = false
     private var coverFlowNew = false
+    private var nowPlayingOld = false
+    private var nowPlayingNew = false
     private var artOld: Bitmap? = null
 
     private var bmpOld: Bitmap? = null
@@ -113,9 +116,11 @@ class MenuSlide private constructor(
         push = direction == NavigationManager.Direction.PUSH
         coverFlowOld = isCoverFlow(from)
         coverFlowNew = isCoverFlow(to)
+        nowPlayingOld = from is ScreenState.Player
+        nowPlayingNew = to is ScreenState.Player
         val shown = CoverPane.shownPane()
         paneOld = paneX(shown)
-        artOld = if (coverFlowNew) ((shown?.drawable as? BitmapDrawable)?.bitmap) else null
+        artOld = if (coverFlowNew || nowPlayingNew) ((shown?.drawable as? BitmapDrawable)?.bitmap) else null
 
         val t0 = SystemClock.elapsedRealtimeNanos()
         bmpOld = snapshot(bmpOld) ?: return
@@ -146,7 +151,8 @@ class MenuSlide private constructor(
         val k = MenuSlideMotion.kindOf(
             paneA, paneB,
             coverFlowA = if (push) coverFlowOld else coverFlowNew,
-            coverFlowB = if (push) coverFlowNew else coverFlowOld
+            coverFlowB = if (push) coverFlowNew else coverFlowOld,
+            nowPlayingB = if (push) nowPlayingNew else nowPlayingOld
         )
         if (k == null || (k != Kind.FULL && paneA == null)) {
             finishNow()
@@ -164,11 +170,11 @@ class MenuSlide private constructor(
         }
 
         var drawNow = true
-        if (kind == Kind.COVER_FLOW) {
+        if (kind == Kind.SPLIT_APART) {
             // The art of the split screen: the old screen's for the entry, the new screen's for Back.
             val bitmap = if (push) artOld else (CoverPane.shownPane()?.drawable as? BitmapDrawable)?.bitmap
             if (bitmap != null && !bitmap.isRecycled) {
-                MenuSlideMotion.coverFlowArtLayer(root.width, pane, artLayer)
+                MenuSlideMotion.splitApartArtLayer(root.width, pane, artLayer)
                 val lp = art.layoutParams as LayoutParams
                 lp.width = artLayer[1]
                 lp.height = root.height - top
@@ -222,7 +228,7 @@ class MenuSlide private constructor(
                 return
             }
             // One frame at the end positions first (depth clamps the time): the last frame before can be far from
-            // them (t² of Cover Flow), and what moves out must leave the screen, not go away at once.
+            // them (t² of the split apart), and what moves out must leave the screen, not go away at once.
             endDrawn = true
         }
         applyFrame(elapsed)
@@ -234,7 +240,7 @@ class MenuSlide private constructor(
         // The left edge of the art on the screen at art offset 0 (the art layer also draws the art left of the pane).
         val artLeft = if (art.visibility == View.VISIBLE) artLayer[0] + art.artEdge else pane.toFloat()
         MenuSlideMotion.offsets(kind, depth[0], depth[1], root.width.toFloat(), pane.toFloat(), off, artLeft)
-        if (kind == Kind.COVER_FLOW) art.translationX = off[2]
+        if (kind == Kind.SPLIT_APART) art.translationX = off[2]
         invalidate()
     }
 
@@ -295,12 +301,12 @@ class MenuSlide private constructor(
                 drawPart(canvas, a, off[0], 0, pane.toFloat())
                 drawPart(canvas, b, off[1], 0, w.toFloat())
             }
-            Kind.COVER_FLOW -> {
+            Kind.SPLIT_APART -> {
                 drawPart(canvas, b, 0f, 0, w.toFloat())
                 super.dispatchDraw(canvas)
                 drawPart(canvas, a, off[0], 0, pane.toFloat())
                 // The menu shadow is the list's drop shadow: it moves with the list's right edge, over the art and
-                // Cover Flow, and fades out in the last shadow width before the edge leaves the screen.
+                // the screen behind, and fades out in the last shadow width before the edge leaves the screen.
                 val edge = pane + off[0]
                 val density = resources.displayMetrics.density
                 val save = canvas.save()

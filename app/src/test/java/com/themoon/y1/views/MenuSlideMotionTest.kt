@@ -54,12 +54,12 @@ class MenuSlideMotionTest {
     }
 
     @Test
-    fun coverFlowArtFollowsTheListAndBackIsTheReverse() {
-        MenuSlideMotion.depth(Kind.COVER_FLOW, true, 100L, d)
+    fun splitApartArtFollowsTheListAndBackIsTheReverse() {
+        MenuSlideMotion.depth(Kind.SPLIT_APART, true, 100L, d)
         assertTrue(d[1] < d[0]) // the art pane starts later
         assertEquals(0.25f, d[0], 1e-6f) // accelerates
         // Back: the art pane comes in first
-        MenuSlideMotion.depth(Kind.COVER_FLOW, false, 100L, d)
+        MenuSlideMotion.depth(Kind.SPLIT_APART, false, 100L, d)
         assertTrue(d[1] < d[0])
     }
 
@@ -80,8 +80,8 @@ class MenuSlideMotionTest {
         MenuSlideMotion.offsets(Kind.FULL, 1f, 1f, 480f, 0f, o)
         assertEquals(-480f, o[0], 1e-4f)
         assertEquals(0f, o[1], 1e-4f)
-        // Cover Flow: the list pane goes left, the art pane right
-        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 0.5f, 480f, 240f, o)
+        // Split apart: the list pane goes left, the art pane right
+        MenuSlideMotion.offsets(Kind.SPLIT_APART, 1f, 0.5f, 480f, 240f, o)
         assertEquals(-240f, o[0], 1e-4f)
         assertEquals(120f, o[2], 1e-4f)
     }
@@ -105,9 +105,9 @@ class MenuSlideMotionTest {
     }
 
     @Test
-    fun coverFlowArtLayerShowsTheArtLeftOfThePane() {
+    fun splitApartArtLayerShowsTheArtLeftOfThePane() {
         val l = IntArray(3)
-        MenuSlideMotion.coverFlowArtLayer(480, 240, l)
+        MenuSlideMotion.splitApartArtLayer(480, 240, l)
         // The art pane in the layer is at the pane edge on the screen and has the pane width (same crop and zoom)
         assertEquals(240, l[0] + l[2])
         assertEquals(240, l[1] - l[2])
@@ -119,16 +119,16 @@ class MenuSlideMotionTest {
     }
 
     @Test
-    fun coverFlowArtLeavesTheScreen() {
+    fun splitApartArtLeavesTheScreen() {
         // The art layer draws 92 px of art left of the pane edge (zoom): at the end all of it is right of the screen
-        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o, 148f)
+        MenuSlideMotion.offsets(Kind.SPLIT_APART, 1f, 1f, 480f, 240f, o, 148f)
         assertEquals(480f, 148f + o[2], 1e-4f)
-        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 0f, 480f, 240f, o, 148f)
+        MenuSlideMotion.offsets(Kind.SPLIT_APART, 1f, 0f, 480f, 240f, o, 148f)
         assertEquals(0f, o[2], 1e-4f)
         // Without a value (or an art edge right of the pane), the pane edge goes to the right edge
-        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o)
+        MenuSlideMotion.offsets(Kind.SPLIT_APART, 1f, 1f, 480f, 240f, o)
         assertEquals(240f, o[2], 1e-4f)
-        MenuSlideMotion.offsets(Kind.COVER_FLOW, 1f, 1f, 480f, 240f, o, 300f)
+        MenuSlideMotion.offsets(Kind.SPLIT_APART, 1f, 1f, 480f, 240f, o, 300f)
         assertEquals(240f, o[2], 1e-4f)
     }
 
@@ -139,8 +139,18 @@ class MenuSlideMotionTest {
         assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, null, false, false))
         assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, 240, false, false))
         assertEquals(Kind.FULL, MenuSlideMotion.kindOf(240, 200, false, false))
-        assertEquals(Kind.COVER_FLOW, MenuSlideMotion.kindOf(240, null, false, true))
+        assertEquals(Kind.SPLIT_APART, MenuSlideMotion.kindOf(240, null, false, true))
         assertNull(MenuSlideMotion.kindOf(null, null, false, true))
         assertNull(MenuSlideMotion.kindOf(null, null, true, false))
+    }
+
+    @Test
+    fun nowPlayingSplitsApartOnlyFromASplitScreen() {
+        // Main menu (or Music) -> Now Playing, and Back: the same split apart as Cover Flow
+        assertEquals(Kind.SPLIT_APART, MenuSlideMotion.kindOf(240, null, false, false, nowPlayingB = true))
+        // A full-width list (Songs) -> Now Playing: the full-width slide, not a cut
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, null, false, false, nowPlayingB = true))
+        // A list that opens from Now Playing (A = Now Playing): the full-width slide
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, null, false, false))
     }
 }
