@@ -454,11 +454,6 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         eqPresetNames = eqPresetNames,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
-        createCategoryHeader = { title ->
-            val container = findViewById<LinearLayout>(R.id.container_settings_items)
-            if (container != null) ListItemViewFactory.createCategoryHeader(this, container, title)
-        },
-        createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
         createTablerListButton = { icon, text, normalColor, focusedColor ->
             // Settings makes rows with a tick or with no icon only for single-choice lists (Language, Theme...):
             // keep a tick column on each row, so the text does not move, and the normal colours (no green).
@@ -493,24 +488,15 @@ internal fun MainActivity.initControllers() {
         applyAlbumTiltSetting = {
             playerController.applyAlbumTiltSetting()
         },
-        toggleShuffleMode = {
-            val on = !isShuffleMode
+        setShuffle = { on ->
             Prefs.SHUFFLE.setAsync(prefs, on)
             AudioPlayerManager.getInstance().setShuffleMode(on)
             updatePlayerUI()
         },
-        cycleRepeatMode = {
-            val mode = (repeatMode + 1) % 3
+        setRepeatMode = { mode ->
             Prefs.REPEAT_MODE.setAsync(prefs, mode)
             AudioPlayerManager.getInstance().setRepeatMode(mode)
             updatePlayerUI()
-        },
-        getRepeatModeText = { mode ->
-            when (mode) {
-                1 -> t("One")
-                2 -> t("All")
-                else -> t("Off")
-            }
         },
         localize = { t(it) }
     )
