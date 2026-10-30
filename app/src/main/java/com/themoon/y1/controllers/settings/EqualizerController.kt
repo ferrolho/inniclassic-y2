@@ -1,6 +1,7 @@
 package com.themoon.y1.controllers.settings
 
 import android.app.Activity
+import com.themoon.y1.Prefs
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -47,11 +48,8 @@ class EqualizerController(
     private val prefs = activity.getSharedPreferences("AppPrefs", 0)
 
     var isSoftwareEqEnabled: Boolean
-        get() = prefs.getBoolean("software_eq_enabled", false)
-        set(value) {
-            prefs.edit().putBoolean("software_eq_enabled", value).apply()
-            (activity as? com.themoon.y1.MainActivity)?.isSoftwareEqEnabled = value
-        }
+        get() = Prefs.SOFTWARE_EQ.get(prefs)
+        set(value) = Prefs.SOFTWARE_EQ.setAsync(prefs, value)
 
     var currentEqProfile: String
         get() = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"

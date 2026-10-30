@@ -100,20 +100,8 @@ internal fun MainActivity.applyRootSystemSettings() {
 }
 
 internal fun MainActivity.loadPreferences() {
-    isShuffleMode = Prefs.SHUFFLE.get(prefs)
-    repeatMode = Prefs.REPEAT_MODE.get(prefs)
-    isSoundEffectEnabled = Prefs.BUTTON_SOUND.get(prefs)
-    isVibrationEnabled = Prefs.VIBRATE.get(prefs)
-    vibrationStrengthLevel = Prefs.VIBRATE_STRENGTH.get(prefs)
-    isScreenOffControlEnabled = Prefs.SCREEN_OFF_CONTROL.get(prefs)
-    is24HourFormat = Prefs.CLOCK_24_HOUR.get(prefs)
-    isTimeInTitleBar = Prefs.TIME_IN_TITLE.get(prefs)
-    isShowBatteryPercentage = Prefs.BATTERY_PERCENTAGE.get(prefs)
-    isSoundCheckEnabled = Prefs.SOUND_CHECK.get(prefs)
-    isAlbumTiltEnabled = Prefs.ALBUM_TILT.get(prefs)
+    // The settings fields of MainActivity read Prefs; only the album grouping keeps a copy (AlbumKey has no prefs).
     com.themoon.y1.models.AlbumKey.byArtist = Prefs.GROUP_ALBUMS_BY_ARTIST.get(prefs)
-    volumeLimitMax = Prefs.VOLUME_LIMIT.get(prefs)
-    isSoftwareEqEnabled = Prefs.SOFTWARE_EQ.get(prefs)
 
     eqPresetNames.clear()
     eqPresetNames.addAll(listOf("Off", "Acoustic", "Bass Booster", "Bass Reducer", "Classical", "Electronic", "Hip Hop", "Jazz", "Latin", "Loudness", "Pop", "R&B", "Rock", "Vocal Booster"))

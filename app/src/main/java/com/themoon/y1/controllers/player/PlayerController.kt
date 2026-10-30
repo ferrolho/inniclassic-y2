@@ -1,6 +1,7 @@
 package com.themoon.y1.controllers.player
 
 import android.app.Activity
+import com.themoon.y1.Prefs
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
@@ -497,19 +498,15 @@ class PlayerController(
     }
 
     private fun toggleShuffleMode() {
-        val prefs = playbackPrefs()
-        val isShuffle = !prefs.getBoolean("shuffle", false)
-        prefs.edit().putBoolean("shuffle", isShuffle).commit()
-        MainActivity.instance?.isShuffleMode = isShuffle
+        val isShuffle = Prefs.SHUFFLE.toggle(playbackPrefs())
         AudioPlayerManager.getInstance().setShuffleMode(isShuffle)
         updateShuffleRepeatStatusIcons()
     }
 
     private fun cycleRepeatMode() {
         val prefs = playbackPrefs()
-        val repeatMode = (prefs.getInt("repeat_mode", 0) + 1) % 3
-        prefs.edit().putInt("repeat_mode", repeatMode).commit()
-        MainActivity.instance?.repeatMode = repeatMode
+        val repeatMode = (Prefs.REPEAT_MODE.get(prefs) + 1) % 3
+        Prefs.REPEAT_MODE.set(prefs, repeatMode)
         AudioPlayerManager.getInstance().setRepeatMode(repeatMode)
         updateShuffleRepeatStatusIcons()
     }

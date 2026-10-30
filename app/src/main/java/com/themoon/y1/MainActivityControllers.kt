@@ -550,23 +550,21 @@ internal fun MainActivity.initControllers() {
         },
         resetBacklightTimer = { powerBacklightManager?.applyBacklightSetting() },
         applySoundSetting = {
-            isSoundEffectEnabled = prefs.getBoolean("sound", true)
             updateScreenOffFeedback(true)
         },
         applyAlbumTiltSetting = {
-            isAlbumTiltEnabled = com.themoon.y1.controllers.player.AlbumTiltSetting.isEnabled(prefs)
             playerController.applyAlbumTiltSetting()
         },
         toggleShuffleMode = {
-            isShuffleMode = !isShuffleMode
-            prefs.edit().putBoolean("shuffle", isShuffleMode).apply()
-            AudioPlayerManager.getInstance().setShuffleMode(isShuffleMode)
+            val on = !isShuffleMode
+            Prefs.SHUFFLE.setAsync(prefs, on)
+            AudioPlayerManager.getInstance().setShuffleMode(on)
             updatePlayerUI()
         },
         cycleRepeatMode = {
-            repeatMode = (repeatMode + 1) % 3
-            prefs.edit().putInt("repeat_mode", repeatMode).apply()
-            AudioPlayerManager.getInstance().setRepeatMode(repeatMode)
+            val mode = (repeatMode + 1) % 3
+            Prefs.REPEAT_MODE.setAsync(prefs, mode)
+            AudioPlayerManager.getInstance().setRepeatMode(mode)
             updatePlayerUI()
         },
         getRepeatModeText = { mode ->
@@ -631,8 +629,7 @@ internal fun MainActivity.shuffleAllSongs() {
         Notice.show(this, t("No playable audio files found."))
         return
     }
-    isShuffleMode = true
-    prefs.edit().putBoolean("shuffle", true).apply()
+    Prefs.SHUFFLE.setAsync(prefs, true)
     AudioPlayerManager.getInstance().playTrackList(tracks, tracks.indices.random())
     changeScreen(MainActivity.STATE_PLAYER)
 }

@@ -42,9 +42,6 @@ class AudioEffectManager private constructor() {
         val settings = readSettings(main.prefs)
         val plan = AudioEffectPlan.from(settings)
 
-        main.isSoftwareEqEnabled = settings.softwareEq
-        main.isSoundCheckEnabled = settings.soundCheck
-
         // Software DSP (ExoPlayer): with a neutral setting it only copies the buffer.
         if (plan.softwareEq) {
             for (i in 0 until AudioEffectPlan.SOFTWARE_EQ_BANDS) {

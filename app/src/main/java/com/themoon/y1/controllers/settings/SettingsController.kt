@@ -390,9 +390,7 @@ class SettingsController(
         )
         btnSoundCheck.setOnClickListener {
             clickFeedback()
-            isSoundCheckEnabled = !isSoundCheckEnabled
-            prefs.edit().putBoolean("sound_check_enabled", isSoundCheckEnabled).commit()
-            mainActivity?.isSoundCheckEnabled = isSoundCheckEnabled
+            isSoundCheckEnabled = Prefs.SOUND_CHECK.toggle(prefs)
             val tvStatus = btnSoundCheck.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isSoundCheckEnabled, localize)
             AudioEffectManager.getInstance().applySoundCheck()
@@ -554,14 +552,13 @@ class SettingsController(
             localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
         )
         btnVibration.setOnClickListener {
-            isVibrationEnabled = !isVibrationEnabled
-            mainActivity?.isVibrationEnabled = isVibrationEnabled
+            // Write first: the click vibration of this push uses the new value
+            isVibrationEnabled = Prefs.VIBRATE.toggle(prefs)
             clickFeedback()
             val tvStatus = btnVibration.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isVibrationEnabled, localize)
             StatusBarSettings.setRowEnabled(btnVibrationStrength, isVibrationEnabled)
             try {
-                prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit()
                 Settings.System.putInt(
                     activity.contentResolver,
                     Settings.System.HAPTIC_FEEDBACK_ENABLED,
@@ -571,14 +568,11 @@ class SettingsController(
         }
         btnVibrationStrength.setOnClickListener {
             vibrationStrengthLevel = (vibrationStrengthLevel + 1) % VIBE_STRENGTH_NAMES.size
-            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
+            Prefs.VIBRATE_STRENGTH.set(prefs, vibrationStrengthLevel)
             // The click vibration uses the new strength: a preview
             clickFeedback()
             val tvStatus = btnVibrationStrength.getChildAt(1) as? TextView
             tvStatus?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
-            try {
-                prefs.edit().putInt("vibrate_strength", vibrationStrengthLevel).commit()
-            } catch (_: Exception) {}
         }
         containerSettingsItems.addView(btnVibration)
         containerSettingsItems.addView(btnVibrationStrength)
@@ -591,9 +585,7 @@ class SettingsController(
         )
         btnScreenOffCtrl.setOnClickListener {
             clickFeedback()
-            isScreenOffControlEnabled = !isScreenOffControlEnabled
-            prefs.edit().putBoolean("screen_off_control", isScreenOffControlEnabled).commit()
-            mainActivity?.isScreenOffControlEnabled = isScreenOffControlEnabled
+            isScreenOffControlEnabled = Prefs.SCREEN_OFF_CONTROL.toggle(prefs)
             val tvStatus = btnScreenOffCtrl.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isScreenOffControlEnabled, localize)
         }
@@ -870,16 +862,14 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBrightMenu)
 
-        val isShowPct = mainActivity?.isShowBatteryPercentage ?: prefs.getBoolean("show_battery_percentage", false)
+        val isShowPct = Prefs.BATTERY_PERCENTAGE.get(prefs)
         val btnBatteryPct = createSettingRow(
             localize("Battery Percentage"),
             onOff(isShowPct, localize)
         )
         btnBatteryPct.setOnClickListener {
             clickFeedback()
-            val newPct = !(mainActivity?.isShowBatteryPercentage ?: prefs.getBoolean("show_battery_percentage", false))
-            mainActivity?.isShowBatteryPercentage = newPct
-            prefs.edit().putBoolean("show_battery_percentage", newPct).commit()
+            val newPct = Prefs.BATTERY_PERCENTAGE.toggle(prefs)
             val tvStatus = btnBatteryPct.getChildAt(1) as? TextView
             tvStatus?.text = onOff(newPct, localize)
             mainActivity?.batteryIconView?.setShowPercentage(newPct)
@@ -1117,9 +1107,7 @@ class SettingsController(
         val rowFormat = createSettingRow(localize("Time Format"), formatRightText)
         rowFormat.setOnClickListener {
             clickFeedback()
-            is24HourFormat = !is24HourFormat
-            mainActivity?.is24HourFormat = is24HourFormat
-            prefs.edit().putBoolean(ClockSettings.KEY_24_HOUR_FORMAT, is24HourFormat).commit()
+            is24HourFormat = Prefs.CLOCK_24_HOUR.toggle(prefs)
             mainActivity?.onClockSettingsChanged()
             buildDateTimeUI()
         }
@@ -1157,9 +1145,7 @@ class SettingsController(
         )
         rowTitleClock.setOnClickListener {
             clickFeedback()
-            isTimeInTitleBar = !isTimeInTitleBar
-            mainActivity?.isTimeInTitleBar = isTimeInTitleBar
-            prefs.edit().putBoolean(ClockSettings.KEY_TIME_IN_TITLE, isTimeInTitleBar).commit()
+            isTimeInTitleBar = Prefs.TIME_IN_TITLE.toggle(prefs)
             mainActivity?.onClockSettingsChanged()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
             tvStatus?.text = onOff(isTimeInTitleBar, localize)
@@ -1712,7 +1698,6 @@ class SettingsController(
             Prefs.resetAll(prefs)
         } catch (_: Exception) {}
 
-        mainActivity?.isSoundCheckEnabled = false
         AudioEffectManager.getInstance().applySoundCheck()
         ToggleStyle.reload(activity)
         AudioEffectManager.getInstance().applyEqProfile()
@@ -1723,13 +1708,8 @@ class SettingsController(
         applyAlbumGrouping()
 
         // The player keeps its own repeat mode: set it back to Off too.
-        mainActivity?.repeatMode = 0
         AudioPlayerManager.getInstance().setRepeatMode(0)
 
-        mainActivity?.isScreenOffControlEnabled = false
-        mainActivity?.isShowBatteryPercentage = false
-        mainActivity?.isTimeInTitleBar = ClockSettings.DEFAULT_TIME_IN_TITLE
-        mainActivity?.is24HourFormat = ClockSettings.DEFAULT_24_HOUR_FORMAT
         mainActivity?.onClockSettingsChanged()
         mainActivity?.batteryIconView?.setShowPercentage(false)
         mainActivity?.setVolumeLimit(-1)

@@ -162,26 +162,26 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var lastAlbumArtBytes: ByteArray? = null
 
     var isAudiobookLibraryMode: Boolean = false
-    var isShuffleMode: Boolean = false
-    var repeatMode: Int = 0
-    var isSoundEffectEnabled: Boolean = true
-    var isVibrationEnabled: Boolean = true
-    var vibrationStrengthLevel: Int = 1
-    var isScreenOffControlEnabled: Boolean = false
-    var isUsbPromptEnabled: Boolean
-        get() = if (::prefs.isInitialized) prefs.getBoolean("usb_storage_prompt", true) else true
-        set(value) {
-            if (::prefs.isInitialized) {
-                prefs.edit().putBoolean("usb_storage_prompt", value).apply()
-            }
-        }
-    var is24HourFormat: Boolean = ClockSettings.DEFAULT_24_HOUR_FORMAT
-    var isTimeInTitleBar: Boolean = ClockSettings.DEFAULT_TIME_IN_TITLE
-    var isShowBatteryPercentage: Boolean = false
-    var isSoundCheckEnabled: Boolean = false
-    var isAlbumTiltEnabled: Boolean = true
-    var volumeLimitMax: Int = -1
-    var isSoftwareEqEnabled: Boolean = false
+    // Settings: each one reads its key in AppPrefs ([Prefs]), so there is one value and a change has effect at once.
+    // To change one, write the pref.
+    val isShuffleMode: Boolean get() = setting(Prefs.SHUFFLE)
+    val repeatMode: Int get() = setting(Prefs.REPEAT_MODE)
+    val isSoundEffectEnabled: Boolean get() = setting(Prefs.BUTTON_SOUND)
+    val isVibrationEnabled: Boolean get() = setting(Prefs.VIBRATE)
+    val vibrationStrengthLevel: Int get() = setting(Prefs.VIBRATE_STRENGTH)
+    val isScreenOffControlEnabled: Boolean get() = setting(Prefs.SCREEN_OFF_CONTROL)
+    val isUsbPromptEnabled: Boolean get() = setting(Prefs.USB_PROMPT)
+    val is24HourFormat: Boolean get() = setting(Prefs.CLOCK_24_HOUR)
+    val isTimeInTitleBar: Boolean get() = setting(Prefs.TIME_IN_TITLE)
+    val isShowBatteryPercentage: Boolean get() = setting(Prefs.BATTERY_PERCENTAGE)
+    val isSoundCheckEnabled: Boolean get() = setting(Prefs.SOUND_CHECK)
+    val isAlbumTiltEnabled: Boolean get() = setting(Prefs.ALBUM_TILT)
+    /** The Volume Limit as a step; -1 = no limit. Write it with [setVolumeLimit]. */
+    val volumeLimitMax: Int get() = setting(Prefs.VOLUME_LIMIT)
+    val isSoftwareEqEnabled: Boolean get() = setting(Prefs.SOFTWARE_EQ)
+
+    /** The value of [pref]; its default before onCreate opens the preferences. */
+    private fun <T> setting(pref: Pref<T>): T = if (::prefs.isInitialized) pref.get(prefs) else pref.default
 
     var currentVirtualVolume: Int = -1
     var lastTargetVolume: Int = -1
@@ -709,7 +709,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val output = detectAudioOutput()
         if (!force && output == currentAudioOutput) return
         currentAudioOutput = output
-        volumeLimitMax = volumeMemory.limitStep()
         val step = volumeMemory.stepFor(output) { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) }
         applyVolumeStep(step, output, showOverlay = false)
     }
@@ -776,8 +775,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     /** Sets the Volume Limit (a step; -1 = off) and lowers the volume to it when necessary. */
     fun setVolumeLimit(limitStep: Int) {
-        volumeLimitMax = limitStep
-        prefs.edit().putInt(VolumeSteps.PREF_LIMIT, limitStep).apply()
+        Prefs.VOLUME_LIMIT.setAsync(prefs, limitStep)
         if (limitStep > 0 && currentVirtualVolume > limitStep) {
             setVolumeLevel(limitStep, showOverlay = false)
         }
