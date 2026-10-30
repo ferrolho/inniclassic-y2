@@ -18,8 +18,8 @@ import com.themoon.y1.views.MenuSlideMotion.Kind
 /**
  * The menu slides of the iPod classic: a list that opens comes in from the right and the old list goes out to the
  * left (Back: the reverse). Between two split screens only the list pane slides and the art stays; into Cover
- * Flow the list pane and the art pane go apart, and Cover Flow shows from behind them (the split apart). Timing and
- * positions: [MenuSlideMotion].
+ * Flow and into Now Playing the list pane and the art pane go apart, and the new screen shows from behind them (the
+ * split apart; from a full-width list, Now Playing slides in as a list). Timing and positions: [MenuSlideMotion].
  *
  * One layer over all screens, below nothing: the status bar area (full width, only its title changes) is not
  * covered. At each push or pop of the back stack ([NavigationManager.DirectionListener]) the layer draws the old
@@ -55,6 +55,8 @@ class MenuSlide private constructor(
     private var paneOld: Int? = null
     private var coverFlowOld = false
     private var coverFlowNew = false
+    private var nowPlayingOld = false
+    private var nowPlayingNew = false
     private var artOld: Bitmap? = null
 
     private var bmpOld: Bitmap? = null
@@ -114,9 +116,11 @@ class MenuSlide private constructor(
         push = direction == NavigationManager.Direction.PUSH
         coverFlowOld = isCoverFlow(from)
         coverFlowNew = isCoverFlow(to)
+        nowPlayingOld = from is ScreenState.Player
+        nowPlayingNew = to is ScreenState.Player
         val shown = CoverPane.shownPane()
         paneOld = paneX(shown)
-        artOld = if (coverFlowNew) ((shown?.drawable as? BitmapDrawable)?.bitmap) else null
+        artOld = if (coverFlowNew || nowPlayingNew) ((shown?.drawable as? BitmapDrawable)?.bitmap) else null
 
         val t0 = SystemClock.elapsedRealtimeNanos()
         bmpOld = snapshot(bmpOld) ?: return
@@ -147,7 +151,8 @@ class MenuSlide private constructor(
         val k = MenuSlideMotion.kindOf(
             paneA, paneB,
             coverFlowA = if (push) coverFlowOld else coverFlowNew,
-            coverFlowB = if (push) coverFlowNew else coverFlowOld
+            coverFlowB = if (push) coverFlowNew else coverFlowOld,
+            nowPlayingB = if (push) nowPlayingNew else nowPlayingOld
         )
         if (k == null || (k != Kind.FULL && paneA == null)) {
             finishNow()

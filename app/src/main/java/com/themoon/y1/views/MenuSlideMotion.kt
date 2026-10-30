@@ -24,8 +24,8 @@ object MenuSlideMotion {
         SPLIT_TO_FULL,
 
         /**
-         * A is a split screen and B is a full screen that shows from behind it (Cover Flow): A's list pane goes
-         * out to the left, the art pane goes out to the right a little later, and B shows between them. Back is the
+         * A is a split screen and B is a full screen that shows from behind it (Cover Flow, Now Playing): A's list
+         * pane goes out to the left, the art pane goes out to the right a little later, and B shows between them. Back is the
          * same motion in reverse.
          */
         SPLIT_APART
@@ -154,12 +154,16 @@ object MenuSlideMotion {
 
     /**
      * The kind of slide between A and B. [paneA], [paneB]: the x of the art pane of each screen (its list pane
-     * width), or null when the screen has no art pane; [coverFlowB]: B is Cover Flow (the split apart from a split
-     * screen, else a cut). Null: no slide (a cut).
+     * width), or null when the screen has no art pane. [coverFlowB], [nowPlayingB]: B is Cover Flow or Now Playing,
+     * which a split screen shows with the split apart. Else Cover Flow cuts, and Now Playing slides as a full-width
+     * screen. Null: no slide (a cut).
      */
-    fun kindOf(paneA: Int?, paneB: Int?, coverFlowA: Boolean, coverFlowB: Boolean): Kind? = when {
+    fun kindOf(
+        paneA: Int?, paneB: Int?, coverFlowA: Boolean, coverFlowB: Boolean, nowPlayingB: Boolean = false
+    ): Kind? = when {
         coverFlowA -> null
-        coverFlowB -> if (paneA != null) Kind.SPLIT_APART else null
+        (coverFlowB || nowPlayingB) && paneA != null -> Kind.SPLIT_APART
+        coverFlowB -> null
         paneA != null && paneB != null && kotlin.math.abs(paneA - paneB) <= 2 -> Kind.PANE
         paneA != null && paneB == null -> Kind.SPLIT_TO_FULL
         else -> Kind.FULL

@@ -143,4 +143,14 @@ class MenuSlideMotionTest {
         assertNull(MenuSlideMotion.kindOf(null, null, false, true))
         assertNull(MenuSlideMotion.kindOf(null, null, true, false))
     }
+
+    @Test
+    fun nowPlayingSplitsApartOnlyFromASplitScreen() {
+        // Main menu (or Music) -> Now Playing, and Back: the same split apart as Cover Flow
+        assertEquals(Kind.SPLIT_APART, MenuSlideMotion.kindOf(240, null, false, false, nowPlayingB = true))
+        // A full-width list (Songs) -> Now Playing: the full-width slide, not a cut
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, null, false, false, nowPlayingB = true))
+        // A list that opens from Now Playing (A = Now Playing): the full-width slide
+        assertEquals(Kind.FULL, MenuSlideMotion.kindOf(null, null, false, false))
+    }
 }
