@@ -240,13 +240,6 @@ internal fun MainActivity.initControllers() {
     fmRadioController = FmRadioController(
         activity = this,
         rootView = layoutSettingsMode as ViewGroup,
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
-        createCategoryHeader = { title ->
-            val container = findViewById<LinearLayout>(R.id.container_settings_items)
-            if (container != null) ListItemViewFactory.createCategoryHeader(this, container, title)
-        },
-        createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
-        createListButtonWithIcon = { icon, text -> createListButton(text, icon) },
         clickFeedback = { clickFeedback() },
         updateGlobalStatusPlayIcon = { updatePlayerUI() },
         onExitRadio = { NavigationManager.getInstance().popBackStack() },
