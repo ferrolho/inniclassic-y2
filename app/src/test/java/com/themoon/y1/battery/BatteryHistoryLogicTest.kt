@@ -87,18 +87,17 @@ class BatteryHistoryLogicTest {
     }
 
     @Test
-    fun dayViewHasNinetySixLevelBarsAndTheLevelIsTheLastInEachBar() {
-        val c = BatteryHistoryLogic.day(listOf(state(at(18), 80), state(at(18, 20), 79), state(at(18, 25), 78)), now, utc)
+    fun dayViewHasFortyEightLevelBarsAndTheLevelIsTheLastInEachBar() {
+        val c = BatteryHistoryLogic.day(listOf(state(at(18), 80), state(at(18, 20), 79), state(at(18, 25), 78), state(at(18, 40), 77)), now, utc)
         // The view ends at the next full hour (20:00) and starts 24 hours before it
         assertEquals(at(20) - DAY_MS, c.start)
-        assertEquals(96, c.levels.size)
-        val k18 = 88 // 18:00 is bar 88 of 96 (from 20:00 yesterday)
+        assertEquals(48, c.levels.size)
+        val k18 = 44 // 18:00 is bar 44 of 48 (from 20:00 yesterday)
         assertEquals(-1, c.levels[k18 - 1])
-        assertEquals(80, c.levels[k18])
-        assertEquals(78, c.levels[k18 + 1]) // 18:15..18:30: the last level
-        assertEquals(78, c.levels[k18 + 3]) // 18:45..19:00
-        assertEquals(78, c.levels[95 - 1]) // 19:30..19:45
-        assertEquals(78, c.levels[95]) // 19:45..20:00 has now (19:50)
+        assertEquals(78, c.levels[k18]) // 18:00..18:30: the last level
+        assertEquals(77, c.levels[k18 + 1]) // 18:30..19:00
+        assertEquals(77, c.levels[47 - 1]) // 19:00..19:30
+        assertEquals(77, c.levels[47]) // 19:30..20:00 has now (19:50)
         assertArrayEquals(IntArray(24) { (20 + it) % 24 }, c.hours)
     }
 
@@ -114,7 +113,7 @@ class BatteryHistoryLogicTest {
         assertEquals(-1, c.levels[slot(at(14, 45))])
         assertEquals(49, c.levels[slot(at(15))])
         assertEquals(49, c.levels[slot(at(16))])
-        assertEquals(-1, c.levels[slot(at(16, 15))]) // after now
+        assertEquals(-1, c.levels[slot(at(16, 30))]) // after now
         assertEquals(-1, c.screenMinutes[((at(14) - start) / HOUR_MS).toInt()]) // off all the hour
         assertEquals(0, c.screenMinutes[((at(15) - start) / HOUR_MS).toInt()]) // on, screen off
     }
@@ -133,14 +132,13 @@ class BatteryHistoryLogicTest {
         assertEquals(15, c.screenMinutes[h17 + 1])
         assertEquals(0, c.screenMinutes[h17 + 2])
         assertEquals(45, c.screenTotalMinutes)
-        val k = h17 * 4
-        assertFalse(c.charging[k + 2]) // 17:30..17:45
-        assertTrue(c.charging[k + 3]) // 17:45..18:00
-        assertTrue(c.charging[k + 4]) // 18:00..18:15
-        assertTrue(c.charging[k + 5]) // 18:15..18:30: until 18:25
-        assertFalse(c.charging[k + 6])
-        assertEquals(41, c.levels[k + 3])
-        assertEquals(48, c.levels[k + 5])
+        val k = h17 * 2
+        assertFalse(c.charging[k]) // 17:00..17:30
+        assertTrue(c.charging[k + 1]) // 17:30..18:00: from 17:50
+        assertTrue(c.charging[k + 2]) // 18:00..18:30: until 18:25
+        assertFalse(c.charging[k + 3])
+        assertEquals(41, c.levels[k + 1])
+        assertEquals(48, c.levels[k + 2])
     }
 
     @Test

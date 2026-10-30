@@ -48,13 +48,13 @@ data class BatterySpan(
     val playingScreenOff: Boolean get() = playing && !screenOn
 }
 
-/** The Last 24 Hours view: 96 battery bars of 15 min and 24 screen bars of 1 hour, the last one has now in it. */
+/** The Last 24 Hours view: 48 battery bars of 30 min and 24 screen bars of 1 hour, the last one has now in it. */
 class DayChart(
     /** Start of the first bar (a full hour, local time). */
     val start: Long,
-    /** Battery level of each 15-min bar (the last level in it), -1 = no bar (device off, no record, future). */
+    /** Battery level of each 30-min bar (the last level in it), -1 = no bar (device off, no record, future). */
     val levels: IntArray,
-    /** True when the charger was connected during the 15-min bar. */
+    /** True when the charger was connected during the 30-min bar. */
     val charging: BooleanArray,
     /** Screen-on minutes of each hour, -1 = no bar (device off all the hour, or future). */
     val screenMinutes: IntArray,
@@ -99,8 +99,10 @@ object BatteryHistoryLogic {
     const val MINUTE_MS = 60_000L
     const val HOUR_MS = 60 * MINUTE_MS
     const val DAY_MS = 24 * HOUR_MS
-    const val SLOT_MS = 15 * MINUTE_MS
-    const val DAY_SLOTS = 96
+    /** One battery bar: 30 min (iOS has 15 min; on the 480 px screen those bars were too thin, user 2026-10-31). */
+    const val SLOT_MS = 30 * MINUTE_MS
+    const val DAY_SLOTS = 48
+    const val SLOTS_PER_HOUR = (HOUR_MS / SLOT_MS).toInt()
     const val DAYS = 10
 
     /** The history keeps 11 days: 10 full days and today. */
