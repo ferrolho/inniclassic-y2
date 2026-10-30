@@ -61,4 +61,31 @@ class ListModelTest {
         assertEquals("Playlists", ListSpec("Playlists").id)
         assertEquals("", ListSpec(null).id)
     }
+
+    @Test
+    fun opensAtTheFirstRowThatCanBeSelected() {
+        // An action screen: two info rows, then the actions
+        val rows = listOf("Info 1", "Info 2", "Delete", "Keep")
+        val notInfo: (Int) -> Boolean = { it >= 2 }
+        assertEquals(2, ListModel.firstRow(rows, Focus.FIRST, null, notInfo))
+        // A remembered row that cannot be selected now: the first row that can
+        assertEquals(2, ListModel.firstRow(rows, Focus.LAST, "Info 1", notInfo))
+        // Only info rows (a progress screen): no row
+        assertEquals(-1, ListModel.firstRow(rows, Focus.FIRST, null) { false })
+    }
+
+    @Test
+    fun focusNoneSelectsNoRow() {
+        assertEquals(-1, ListModel.firstRow(keys, Focus.NONE, "Chinese Songs"))
+    }
+
+    @Test
+    fun theKeptRowIsARowThatCanBeSelected() {
+        // Bluetooth: the selected device is gone, and a header is now at its place: the next device
+        val rows = listOf("Power", "Scan", "Paired", "Speaker", "Available")
+        val notHeader: (Int) -> Boolean = { rows[it] != "Paired" && rows[it] != "Available" }
+        assertEquals(3, ListModel.keptRow(rows, "Car", 2, notHeader))
+        // At the end only a header: the row before it
+        assertEquals(3, ListModel.keptRow(rows, "Car", 4, notHeader))
+    }
 }

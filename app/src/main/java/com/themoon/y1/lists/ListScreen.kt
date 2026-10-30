@@ -1,5 +1,7 @@
 package com.themoon.y1.lists
 
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -49,22 +51,53 @@ class ListScreen(
             lv.post { if (lv.childCount > 0) lv.getChildAt(0).requestFocus() }
             return
         }
-        val i = ListModel.firstRow(shown.map { it.key }, spec.focus, lastKeys[spec.id])
+        (scroll as? ScrollView)?.scrollTo(0, 0)
+        if (spec.focus == Focus.NONE) {
+            // The list has the focus, not a row: the first wheel step selects the first row (RowFocus.step)
+            rows.isFocusable = true
+            focusNowAndAfter(rows)
+            return
+        }
+        val last = lastKeys[spec.id]
+        val i = ListModel.firstRow(shown.map { it.key }, spec.focus, last, ::selectable)
         if (i < 0) return
         val row = rows.getChildAt(i)
-        row.requestFocus()
-        if (i > 0) centreAfterLayout(row)
+        focusNowAndAfter(row)
+        if (spec.focus == Focus.LAST && shown[i].key == last) centreAfterLayout(row)
+    }
+
+    /**
+     * Focus [view] now (the slide draws the new screen with its row), and again after the posted steps of the screen
+     * before (a first-row post of the old screen can take the focus back) if the list then has no focus.
+     */
+    private fun focusNowAndAfter(view: View) {
+        view.requestFocus()
+        rows.post { if ((view === rows || view.parent === rows) && !rows.hasFocus()) view.requestFocus() }
+    }
+
+    /** Selects the row with [key] (for example the row that a screen opens at). False if there is no such row. */
+    fun select(key: String): Boolean {
+        val i = shown.indexOfFirst { it.key == key }
+        if (i < 0 || !selectable(i)) return false
+        return rows.getChildAt(i).requestFocus()
     }
 
     /** Makes the rows of [spec] again and keeps the selected row (by its key, else at the same place). */
     fun update(spec: ListSpec) {
         val focused = focusedIndex()
+        val listFocused = rows.isFocused
         val oldKey = shown.getOrNull(focused)?.key
         val scrollY = (scroll as? ScrollView)?.scrollY ?: 0
         build(spec)
         if (spec.isLong) return
-        val i = ListModel.keptRow(shown.map { it.key }, oldKey, focused)
-        if (i >= 0) rows.getChildAt(i).requestFocus()
+        val i = ListModel.keptRow(shown.map { it.key }, oldKey, focused, ::selectable)
+        if (i >= 0) {
+            rows.getChildAt(i).requestFocus()
+        } else if (listFocused) {
+            // Still no row selected (Focus.NONE): the list keeps the focus
+            rows.isFocusable = true
+            rows.requestFocus()
+        }
         (scroll as? ScrollView)?.scrollTo(0, scrollY)
     }
 
@@ -79,12 +112,14 @@ class ListScreen(
     /** Remove the rows (the screen exits). The custom views go back to no parent, for the next [show]. */
     fun clear() {
         rows.removeAllViews()
+        rows.isFocusable = false
         shown = emptyList()
     }
 
     private fun build(spec: ListSpec) {
         this.spec = spec
         rows.removeAllViews()
+        rows.isFocusable = false
         val long = spec.isLong
         scroll?.visibility = if (long) View.GONE else View.VISIBLE
         list?.visibility = if (long) View.VISIBLE else View.GONE
@@ -106,6 +141,8 @@ class ListScreen(
             RowLook.VALUE -> ListItemViewFactory.createSettingRow(context, row.label, row.value)
             RowLook.CHOICE -> ListItemViewFactory.createChoiceRowWithRightIcons(context, row.label, row.checked, row.glyphs)
             RowLook.CUSTOM -> row.view!!.also { (it.parent as? ViewGroup)?.removeView(it) }
+            RowLook.HEADER -> headerRow(row.label)
+            RowLook.INFO -> infoRow(row.label)
         }
         if (row.id != View.NO_ID) view.id = row.id
         val click = row.onClick
@@ -126,6 +163,33 @@ class ListScreen(
             }
         }
         return view
+    }
+
+    /** A row that the wheel can select: it shows and can take the focus (not a header, an info row or a hidden row). */
+    private fun selectable(i: Int): Boolean = RowFocus.isSelectable(rows.getChildAt(i))
+
+    private fun headerRow(text: String): TextView = TextView(context).apply {
+        val d = resources.displayMetrics.density
+        this.text = "━ $text ━"
+        setTextColor(ThemeManager.getTextColorSecondary())
+        textSize = 12f
+        gravity = Gravity.CENTER
+        setPadding(0, (8 * d).toInt(), 0, (4 * d).toInt())
+        isFocusable = false
+    }
+
+    private fun infoRow(text: String): TextView = TextView(context).apply {
+        val d = resources.displayMetrics.density
+        val classic = ThemeManager.isClassicTheme()
+        val padX = ((if (classic) 8 else 12) * d).toInt()
+        this.text = text
+        setTextColor(ThemeManager.getTextColorSecondary())
+        setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (classic) 19f else 14f) * d)
+        typeface = ThemeManager.getCustomFont()
+        setPadding(padX, (6 * d).toInt(), padX, (6 * d).toInt())
+        isFocusable = false
+        isClickable = false
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
     private fun focusedIndex(): Int = (0 until rows.childCount).firstOrNull { rows.getChildAt(it).hasFocus() } ?: -1

@@ -22,7 +22,13 @@ enum class RowLook {
     CHOICE,
 
     /** A view that the screen made itself ([RowSpec.view]); the renderer only places it and sets the actions. */
-    CUSTOM
+    CUSTOM,
+
+    /** A section title ("━ Paired Devices ━": small, grey, centred). The wheel skips it. */
+    HEADER,
+
+    /** Grey text, on more lines when it is long (a message, a hint, a progress line). The wheel skips it. */
+    INFO
 }
 
 /**
@@ -50,7 +56,13 @@ enum class Focus {
     FIRST,
 
     /** The row that the user last opened in this list ([ListSpec.id]), else the first row (Playlists, C-6). */
-    LAST
+    LAST,
+
+    /**
+     * No row: the list itself has the focus, and the first wheel step selects the first row. Then one centre push
+     * cannot do a destructive action by accident (action screens).
+     */
+    NONE
 }
 
 /**
@@ -72,27 +84,32 @@ class ListSpec(
 /** The pure rules of the renderer. */
 object ListModel {
 
-    /** The row to select when the list opens: the remembered row ([lastKey]) for [Focus.LAST], else the first row. */
-    fun firstRow(keys: List<String>, focus: Focus, lastKey: String?): Int {
-        if (keys.isEmpty()) return -1
+    /**
+     * The row to select when the list opens: the remembered row ([lastKey]) for [Focus.LAST], else the first row
+     * that can be selected ([selectable]: not a header or an info row). -1 = no row.
+     */
+    fun firstRow(keys: List<String>, focus: Focus, lastKey: String?, selectable: (Int) -> Boolean = { true }): Int {
+        if (focus == Focus.NONE) return -1
         if (focus == Focus.LAST && lastKey != null) {
             val i = keys.indexOf(lastKey)
-            if (i >= 0) return i
+            if (i >= 0 && selectable(i)) return i
         }
-        return 0
+        return keys.indices.firstOrNull(selectable) ?: -1
     }
 
     /**
      * The row to select after the rows changed: the row with the same key, else the row at the same place
      * (the last row if the list is now shorter), else none (-1).
      */
-    fun keptRow(keys: List<String>, oldKey: String?, oldIndex: Int): Int {
+    fun keptRow(keys: List<String>, oldKey: String?, oldIndex: Int, selectable: (Int) -> Boolean = { true }): Int {
         if (keys.isEmpty() || oldIndex < 0) return -1
         if (oldKey != null) {
             val i = keys.indexOf(oldKey)
-            if (i >= 0) return i
+            if (i >= 0 && selectable(i)) return i
         }
-        return oldIndex.coerceAtMost(keys.size - 1)
+        // The row at the same place, else the next row that can be selected, else the one before it
+        val place = oldIndex.coerceAtMost(keys.size - 1)
+        return (place until keys.size).firstOrNull(selectable) ?: (place - 1 downTo 0).firstOrNull(selectable) ?: -1
     }
 
     /** The rows that show: [ListSpec.rows], or the one [ListSpec.empty] row. */
