@@ -105,7 +105,7 @@ class FmRadioController(
     }
 
     /** The status bar title of the screen that shows. */
-    fun title(): String = localize(if (isRadioUIShowing && page == Page.SAVED) "Saved Channels" else "Radio")
+    override fun title(): String = localize(if (isRadioUIShowing && page == Page.SAVED) "Saved Channels" else "Radio")
 
     /** Shows the radio state again on the screen that shows; a list keeps its selected row. */
     fun refresh() {
