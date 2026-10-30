@@ -35,6 +35,7 @@ import android.view.MotionEvent
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.BatteryIconView
 import com.themoon.y1.views.ClassicMenuStyle
+import com.themoon.y1.views.IpodClassicLayout
 import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
@@ -441,6 +442,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         }, "y1-ums-init-check").start()
 
+        com.themoon.y1.views.LowBatteryWarningView.install(this)
         registerReceivers()
 
         try {
@@ -468,6 +470,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             val ba = BluetoothAdapter.getDefaultAdapter()
             if (ba != null && ba.isEnabled) {
                 ivStatusBluetooth?.visibility = View.VISIBLE
+                queryStatusBarBluetooth()
             }
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             if (wm != null && wm.isWifiEnabled) {
@@ -714,6 +717,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (::playerController.isInitialized) {
             playerController.updatePlayerUI()
         }
+        IpodClassicLayout.refreshPlayIcon(this)
         val am = AudioPlayerManager.getInstance()
         sendBluetoothMetaToCar()
         BluetoothAvrcpManager.getInstance(this).updatePlaybackState(am.isPlaying())
@@ -1107,6 +1111,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 }
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
                     val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    onStatusBarBluetoothAdapterState(state)
                     if (state == BluetoothAdapter.STATE_ON) {
                         ivStatusBluetooth?.visibility = View.VISIBLE
                         updateStatusBarBluetooth()
@@ -1163,6 +1168,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
                     val profileState = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1)
                     val currentDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    onStatusBarA2dpState(currentDevice, profileState)
                     if (profileState == BluetoothProfile.STATE_DISCONNECTED) {
                         bluetoothController.clearTargetDeviceForAudio()
                         Toast.makeText(this@MainActivity, t("Audio Disconnected"), Toast.LENGTH_SHORT).show()

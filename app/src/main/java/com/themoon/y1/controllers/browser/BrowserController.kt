@@ -957,35 +957,10 @@ class BrowserController(
             statusBar.background = ThemeManager.createStatusBarBackground()
         }
 
-        if (frame.findViewWithTag<View>("pane_shadow") == null) {
-            val shadow = View(activity).apply {
-                tag = "pane_shadow"
-                background = android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    intArrayOf(0x50000000, 0x00000000)
-                )
-            }
-            val shadowWidth = (10 * density).toInt()
-            val shadowLp = FrameLayout.LayoutParams(shadowWidth, FrameLayout.LayoutParams.MATCH_PARENT).apply {
-                gravity = Gravity.LEFT
-            }
-            frame.addView(shadow, shadowLp)
-        }
 
         if (!browserCoverPaneSetUp && ivBrowserCover != null) {
             browserCoverPaneSetUp = true
-            frame.post {
-                val contW = frame.width
-                val contH = frame.height
-                if (contW <= 0 || contH <= 0) return@post
-                val overW = (contW * 1.35f).toInt()
-                val overH = (contH * 1.35f).toInt()
-                ivBrowserCover.scaleType = ImageView.ScaleType.CENTER_CROP
-                val lp = FrameLayout.LayoutParams(overW, overH).apply {
-                    gravity = Gravity.CENTER
-                }
-                ivBrowserCover.layoutParams = lp
-            }
+            com.themoon.y1.views.CoverPane.attach(ivBrowserCover)
         }
         onRefreshCoverPane?.invoke()
     }
