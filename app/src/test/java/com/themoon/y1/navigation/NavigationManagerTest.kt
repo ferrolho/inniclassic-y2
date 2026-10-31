@@ -294,4 +294,23 @@ class NavigationManagerTest {
         assertEquals(fakeMainMenu, navManager.activeController)
         assertEquals(ScreenState.MainMenu, navManager.currentState)
     }
+
+    @Test
+    fun popOverTwoEntriesGoesToTheListUnderBothInOneChange() {
+        // Music → Playlists → (playlist): Back over two entries comes to Music; the Playlists list does not show again
+        navManager.navigateTo(ScreenState.MainMenu)
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Root))
+        navManager.navigateTo(ScreenState.Playlists)
+        val m3uFile = java.io.File("/storage/sdcard1/Playlists/Rock.m3u")
+        navManager.navigateTo(ScreenState.M3uPlaylistSongs(m3uFile))
+        val playlistEnters = fakePlaylist.enterCount
+
+        assertTrue(navManager.popBackStack(2))
+        assertEquals(ScreenState.Browser(BrowserMode.Root), navManager.currentState)
+        assertEquals(playlistEnters, fakePlaylist.enterCount)
+
+        // Back from there: the main menu
+        assertTrue(navManager.popBackStack())
+        assertEquals(ScreenState.MainMenu, navManager.currentState)
+    }
 }
