@@ -525,7 +525,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             return
         }
         if (isVibrationEnabled) {
-            vibrator.vibrate(com.themoon.y1.managers.ButtonVibration.lengthMs(vibrationStrengthLevel))
+            com.themoon.y1.managers.ButtonVibration.vibrate(vibrator, vibrationStrengthLevel)
         }
         if (isSoundEffectEnabled) {
             // Settings → Click Volume: a level of its own, not the music volume (see ClickVolume).
