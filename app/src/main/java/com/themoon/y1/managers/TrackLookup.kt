@@ -98,3 +98,66 @@ internal class TrackArtRequests {
         return true
     }
 }
+
+/**
+ * The covers of the tracks around the current one in the play order, by file path, so that a skip shows
+ * the cover with the title. At most [maxEntries]; the oldest goes first. Any thread.
+ */
+internal class NeighbourCovers<V : Any>(private val maxEntries: Int) {
+    private val map = LinkedHashMap<String, V>()
+
+    @Synchronized
+    fun get(path: String): V? = map[path]
+
+    @Synchronized
+    fun contains(path: String): Boolean = map.containsKey(path)
+
+    @Synchronized
+    fun put(path: String, value: V) {
+        map.remove(path)
+        map[path] = value
+        while (map.size > maxEntries) {
+            val oldest = map.keys.iterator()
+            oldest.next()
+            oldest.remove()
+        }
+    }
+
+    /** Removes the covers of the tracks that are not in [paths]. */
+    @Synchronized
+    fun keepOnly(paths: Collection<String>) {
+        val keep = HashSet(paths)
+        map.keys.retainAll(keep)
+    }
+
+    @Synchronized
+    fun size(): Int = map.size
+
+    companion object {
+        /** The tracks after and before the current one whose covers the cache keeps. */
+        const val RADIUS = 2
+
+        /** The window (current track and 2 × [RADIUS]) and one more, for the track that a skip leaves. */
+        const val SIZE = 2 * RADIUS + 2
+
+        /** The prefetch starts this long after the last track change, so it does not slow down the new track. */
+        const val PREFETCH_DELAY_MS = 1000L
+
+        /**
+         * The queue positions of the track at [index] and of the [radius] tracks after and before it, nearest
+         * first (next, previous, ...). The queue wraps at both ends, as Next and Previous do.
+         */
+        fun window(index: Int, size: Int, radius: Int): List<Int> {
+            if (size <= 0 || index !in 0 until size) return emptyList()
+            val out = ArrayList<Int>()
+            out.add(index)
+            for (d in 1..radius) {
+                for (i in intArrayOf(index + d, index - d)) {
+                    val wrapped = ((i % size) + size) % size
+                    if (wrapped !in out) out.add(wrapped)
+                }
+            }
+            return out
+        }
+    }
+}

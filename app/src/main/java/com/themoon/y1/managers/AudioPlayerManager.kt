@@ -73,6 +73,18 @@ class AudioPlayerManager private constructor() {
     private val artRequests = TrackArtRequests()
     private val artExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "y1-track-art") }
 
+    // The covers of the current track and of the 2 tracks after and before it in the queue: a skip shows the
+    // cover with the title. Read one at a time on a low-priority thread, from 1 s after the last track change.
+    private val neighbourCovers = NeighbourCovers<TrackArt>(NeighbourCovers.SIZE)
+    private val coverPrefetch = Executors.newSingleThreadExecutor { r ->
+        Thread({
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_LOWEST)
+            r.run()
+        }, "y1-cover-prefetch")
+    }
+    private val coverPrefetchHandler = Handler(Looper.getMainLooper())
+    @Volatile private var coverPrefetchRun = 0
+
     @Volatile var isPlayingActive: Boolean = false
     @Volatile var currentlyPlayingFilePath: String? = null
 
@@ -874,7 +886,7 @@ class AudioPlayerManager private constructor() {
         } catch (ignored: Throwable) {}
 
         // The cover is read and decoded on the art thread, and shows here if the track is still the same
-        loadTrackArt(main, artRequests.start(track.absolutePath), track, coverFile, isPodcast, podcastCoverFile) { art ->
+        loadTrackArt(main, artRequests.start(track.absolutePath), track) { art, later ->
             main.lastAlbumArtBytes = art.bytes
             var artApplied = false
             if (main.lastAlbumArtBytes != null && (main.lastAlbumArtBytes?.size ?: 0) > 0) {
@@ -955,7 +967,8 @@ class AudioPlayerManager private constructor() {
                 }
             }
             // The art reflection, and the cover in the AVRCP track data
-            if (artApplied) main.updatePlayerUI()
+            // (A cover from the cache shows before the caller updates the player UI)
+            if (artApplied && later) main.updatePlayerUI()
         }
 
         try {
@@ -1145,34 +1158,70 @@ class AudioPlayerManager private constructor() {
         var folderCover: File? = null
         var fileCover: Bitmap? = null
         var fileBytes: ByteArray? = null
+
+        /** A cover to show; without one the cache keeps nothing (a cover file can come later). */
+        val isFound: Boolean get() = embedded != null || podcastCover != null || fileCover != null
     }
 
     /**
-     * Reads and decodes the cover of [track] on the art thread, then calls [show] on the main thread if
-     * the track is still the same. Until then Now Playing shows the default cover.
+     * Shows the cover of [track]: at once from the cache of the neighbour tracks, else read and decoded on the
+     * art thread and shown on the main thread if the track is still the same ([show] gets later = true).
+     * Until then Now Playing shows the default cover.
      */
-    private fun loadTrackArt(
-        main: MainActivity, ticket: TrackArtRequests.Ticket, track: File, coverFile: File,
-        isPodcast: Boolean, podcastCoverFile: File?, show: (TrackArt) -> Unit
-    ) {
+    private fun loadTrackArt(main: MainActivity, ticket: TrackArtRequests.Ticket, track: File, show: (TrackArt, Boolean) -> Unit) {
+        scheduleCoverPrefetch()
+        val cached = neighbourCovers.get(ticket.path)
+        if (cached != null) {
+            artRequests.finish(ticket)
+            show(cached, false)
+            return
+        }
         artExecutor.execute {
             // A newer track came while this one waited: do not read its cover
             if (!artRequests.isCurrent(ticket)) return@execute
             val art = TrackArt()
             try {
-                readTrackArt(main, art, track, coverFile, isPodcast, podcastCoverFile)
+                readTrackArt(main, art, track)
             } catch (ignored: Throwable) {}
+            if (art.isFound) neighbourCovers.put(ticket.path, art)
             main.runOnUiThread {
                 if (!artRequests.finish(ticket) || currentlyPlayingFilePath != ticket.path) return@runOnUiThread
                 if (MainActivity.instance !== main) return@runOnUiThread
                 try {
-                    show(art)
+                    show(art, true)
                 } catch (ignored: Throwable) {}
             }
         }
     }
 
-    private fun readTrackArt(main: MainActivity, art: TrackArt, track: File, coverFile: File, isPodcast: Boolean, podcastCoverFile: File?) {
+    /** Reads the covers of the neighbour tracks 1 s after the last track change (a fast run of skips waits). */
+    private fun scheduleCoverPrefetch() {
+        val run = ++coverPrefetchRun
+        coverPrefetchHandler.removeCallbacksAndMessages(null)
+        coverPrefetchHandler.postDelayed({ prefetchNeighbourCovers(run) }, NeighbourCovers.PREFETCH_DELAY_MS)
+    }
+
+    private fun prefetchNeighbourCovers(run: Int) {
+        val main = MainActivity.instance ?: return
+        val queue = main.currentPlaylist
+        val window = NeighbourCovers.window(main.currentIndex, queue.size, NeighbourCovers.RADIUS).map { queue[it] }
+        neighbourCovers.keepOnly(window.map { it.absolutePath })
+        for (track in window) {
+            if (neighbourCovers.contains(track.absolutePath)) continue
+            coverPrefetch.execute {
+                // A track change came: its own prefetch reads the covers of its neighbours
+                if (run != coverPrefetchRun) return@execute
+                val art = TrackArt()
+                try {
+                    readTrackArt(main, art, track)
+                } catch (ignored: Throwable) {}
+                if (art.isFound && run == coverPrefetchRun) neighbourCovers.put(track.absolutePath, art)
+            }
+        }
+    }
+
+    /** Any thread: the cover of [track], in the order that prepareMusicTrack shows it. */
+    private fun readTrackArt(main: MainActivity, art: TrackArt, track: File) {
         art.bytes = readTrackTags(track, includeArt = true).art
         val bytes = art.bytes
         if (bytes != null && bytes.isNotEmpty()) {
@@ -1183,7 +1232,13 @@ class AudioPlayerManager private constructor() {
             if (art.embedded != null) return
         }
 
-        if (isPodcast && podcastCoverFile != null && podcastCoverFile.exists()) {
+        var safeFileName = track.name
+        val safeFileNameDot = safeFileName.lastIndexOf(".")
+        if (safeFileNameDot > 0) safeFileName = safeFileName.substring(0, safeFileNameDot)
+        val coverFile = File(StoragePaths.getCoversDir(), "$safeFileName.jpg")
+        val podcastCoverFile = if (track.absolutePath.contains("/Podcasts/")) File(track.parentFile, "cover.jpg") else null
+
+        if (podcastCoverFile != null && podcastCoverFile.exists()) {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
 

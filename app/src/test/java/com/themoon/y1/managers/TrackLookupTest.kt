@@ -113,4 +113,37 @@ class TrackLookupTest {
         assertFalse(stamp == apm.queueStamp(arrayListOf(queue[0], queue[1], java.io.File("/d.mp3")), original))
         assertFalse(stamp == apm.queueStamp(queue.subList(0, 2), original))
     }
+
+    @Test
+    fun theCoverWindowFollowsTheQueueOrderAndWraps() {
+        assertEquals(listOf(5, 6, 4, 7, 3), NeighbourCovers.window(5, 10, 2))
+        // Next after the last track is the first one, Previous before the first is the last
+        assertEquals(listOf(0, 1, 9, 2, 8), NeighbourCovers.window(0, 10, 2))
+        assertEquals(listOf(9, 0, 8, 1, 7), NeighbourCovers.window(9, 10, 2))
+        // A short queue has each track once
+        assertEquals(listOf(1, 2, 0), NeighbourCovers.window(1, 3, 2))
+        assertEquals(listOf(0), NeighbourCovers.window(0, 1, 2))
+        assertTrue(NeighbourCovers.window(0, 0, 2).isEmpty())
+        assertTrue(NeighbourCovers.window(4, 3, 2).isEmpty())
+    }
+
+    @Test
+    fun theCoverCacheKeepsTheWindowAndDropsTheOldest() {
+        val cache = NeighbourCovers<String>(3)
+        cache.put("/a", "A")
+        cache.put("/b", "B")
+        cache.put("/c", "C")
+        cache.put("/d", "D")
+        assertNull(cache.get("/a"))
+        assertEquals("D", cache.get("/d"))
+        // A put again makes an entry the newest
+        cache.put("/b", "B2")
+        cache.put("/e", "E")
+        assertNull(cache.get("/c"))
+        assertEquals("B2", cache.get("/b"))
+        cache.keepOnly(listOf("/e", "/x"))
+        assertEquals(1, cache.size())
+        assertTrue(cache.contains("/e"))
+        assertFalse(cache.contains("/b"))
+    }
 }
