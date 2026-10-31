@@ -70,17 +70,6 @@ internal fun MainActivity.applyCachedCoverArtInternal(imagePath: String) {
         val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
         val bmp = BitmapFactory.decodeFile(imagePath, opts) ?: return
         ivAlbumArt.setImageBitmap(bmp)
-        currentAlbumColor = try {
-            bmp.getPixel(bmp.width / 2, (bmp.height * 0.8).toInt()) or 0xFF000000.toInt()
-        } catch (_: Exception) {
-            ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-        }
-
-        val optsBg = BitmapFactory.Options().apply { inSampleSize = 4 }
-        val sourceBg = BitmapFactory.decodeFile(imagePath, optsBg)
-        val blurred = applyGaussianBlur(sourceBg)
-        ivPlayerBgBlur.setImageBitmap(blurred)
-        if (sourceBg != blurred) sourceBg?.recycle()
 
         val file = File(imagePath)
         val bytes = ByteArray(file.length().toInt())
