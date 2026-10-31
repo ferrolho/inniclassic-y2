@@ -1126,7 +1126,7 @@ class AudioPlayerManager private constructor() {
         }
     }
 
-    /** Reads the covers of the neighbour tracks 1 s after the last track change (a fast run of skips waits). */
+    /** Reads the covers of the neighbour tracks 0.6 s after the last track change (a fast run of skips waits). */
     private fun scheduleCoverPrefetch() {
         val run = ++coverPrefetchRun
         coverPrefetchHandler.removeCallbacksAndMessages(null)
