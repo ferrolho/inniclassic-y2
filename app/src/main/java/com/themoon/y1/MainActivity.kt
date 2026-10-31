@@ -512,7 +512,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             return
         }
         if (isVibrationEnabled) {
-            vibrator.vibrate(com.themoon.y1.managers.ButtonVibration.lengthMs(vibrationStrengthLevel))
+            com.themoon.y1.managers.ButtonVibration.vibrate(vibrator, vibrationStrengthLevel)
         }
         if (isSoundEffectEnabled) {
             audioManager.playSoundEffect(AudioManager.FX_KEY_CLICK)
