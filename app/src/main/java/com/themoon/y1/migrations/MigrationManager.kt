@@ -38,6 +38,7 @@ open class MigrationManager {
         registerMigration(Migration004MoveMisplacedPrefs())
         registerMigration(Migration005MergeAudiobookBookmarks())
         registerMigration(Migration100RemoveBackgroundPath())
+        registerMigration(Migration101PlayOnMenuItem())
     }
 
     /**
