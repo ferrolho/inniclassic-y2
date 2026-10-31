@@ -168,6 +168,7 @@
   "Folders": "Папки",
   "Artists": "Исполнители",
   "Albums": "Альбомы",
+  "Compilations": "Сборники",
   "All Songs": "Все песни",
   "Playlists": "Плейлисты",
   "Switch to Audiobooks": "Перейти на аудиокниги",
@@ -231,6 +232,8 @@
   "HIDDEN": "СКРЫТ",
   "SHOW": "ПОКАЗАТЬ",
   "Shuffle Mode": "Режим перемешивания",
+  "Shuffle Songs": "Перемешать песни",
+  "No playable audio files found.": "Воспроизводимые аудиофайлы не найдены.",
   "Shuffle": "Перемешать",
   "Song": "песня",
   "Songs": "песен",
@@ -329,6 +332,9 @@
   "Keyboard Layout": "Раскладка клавиатуры",
   "Original": "Оригинальная",
   "QWERTY": "QWERTY",
+  "Group Albums": "Группировка альбомов",
+  "By Title": "По названию",
+  "By Title and Artist": "По названию и исполнителю",
   "Next": "Далее",
   "Login": "Войти",
   "Add to Favorites": "Добавить в избранное",
@@ -450,8 +456,6 @@
   "Buy 1 Heart ($1,500)": "Купить 1 сердце ($1 500)",
   "Heart Purchased": "Сердце куплено",
   "Recently Played": "Недавно воспроизведенные",
-  "No recently played albums yet.": "Нет недавно воспроизведенных альбомов.",
-  "Clear Recently Played": "Очистить недавно воспроизведенные",
-  "Are you sure you want to clear your recently played history?": "Вы уверены, что хотите очистить историю недавно воспроизведенных?",
-  "Recently played cleared.": "История воспроизведения очищена."
+  "Top 25 Most Played": "25 самых популярных",
+  "No Songs": "Нет песен"
 }
