@@ -18,6 +18,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 
 /**
@@ -132,7 +133,7 @@ class WifiController(
                     val tvRight = btnToggle.getChildAt(1) as? TextView
                     tvRight?.text = localize("Wait...")
                     if (!btnToggle.hasFocus()) {
-                        tvRight?.setTextColor(0xFFFFFF00.toInt())
+                        tvRight?.setTextColor(ThemeManager.getTextColorPrimary())
                     }
                 }
             }
@@ -171,39 +172,42 @@ class WifiController(
             if (wifiInfo != null && wifiInfo.ssid != null) {
                 connectedSSID = wifiInfo.ssid.replace("\"", "")
             }
+            val networks = results.filterNot { WifiScanFilter.isDriverWarning(it.BSSID, it.SSID) }
 
             // 1. Current connected Wi-Fi at the top
-            for (result in results) {
+            for (result in networks) {
                 val ssid = result.SSID
                 if (!ssid.isNullOrEmpty() && !foundWifiNetworks.contains(ssid)) {
                     if (ssid == connectedSSID) {
                         foundWifiNetworks.add(ssid)
-                        addWifiItemToUI(ssid, result.capabilities, true)
+                        addWifiItemToUI(ssid, result.capabilities, true, strongestRssi(results, ssid))
                     }
                 }
             }
 
             // 2. Remaining available Wi-Fi networks
-            for (result in results) {
+            for (result in networks) {
                 val ssid = result.SSID
                 if (!ssid.isNullOrEmpty() && !foundWifiNetworks.contains(ssid)) {
                     foundWifiNetworks.add(ssid)
-                    addWifiItemToUI(ssid, result.capabilities, false)
+                    addWifiItemToUI(ssid, result.capabilities, false, strongestRssi(results, ssid))
                 }
             }
         }
     }
 
-    private fun addWifiItemToUI(ssid: String, capabilities: String, isConnected: Boolean) {
-        val isOpen = !capabilities.contains("WPA") && !capabilities.contains("WEP")
-        val leftIcon = if (isConnected) TablerIcons.CHECK else TablerIcons.WIFI
-        val rightIcon = if (isOpen) null else TablerIcons.LOCK
+    // A network can have more than one access point (scan result): show the strongest signal.
+    private fun strongestRssi(results: List<ScanResult>, ssid: String): Int =
+        results.filter { it.SSID == ssid }.maxOf { it.level }
 
-        val btnWifi = if (isConnected) {
-            createTablerListButton(leftIcon, ssid, rightIcon, 0xFF00FF00.toInt(), 0xFF00FF00.toInt())
-        } else {
-            createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
-        }
+    private fun addWifiItemToUI(ssid: String, capabilities: String, isConnected: Boolean, rssi: Int) {
+        val isOpen = !capabilities.contains("WPA") && !capabilities.contains("WEP")
+        val signalLevel = WifiSignal.level(rssi)
+
+        // Like macOS: the tick column on the left (tick on the connected network only), then the name,
+        // then the lock (secured networks) and the signal strength on the right.
+        val btnWifi = ListItemViewFactory.createChoiceRowWithRightIcons(activity, ssid, isConnected,
+            RowGlyphs.wifiSlots(!isOpen, signalLevel))
 
         btnWifi.setOnClickListener {
             clickFeedback()
