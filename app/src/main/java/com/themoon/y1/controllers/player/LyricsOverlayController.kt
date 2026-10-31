@@ -2,6 +2,8 @@ package com.themoon.y1.controllers.player
 
 import android.content.Context
 import android.graphics.drawable.ColorDrawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.text.Spannable
 import android.text.SpannableStringBuilder
@@ -26,6 +28,7 @@ import java.io.RandomAccessFile
 import java.util.ArrayList
 import java.util.Collections
 import java.util.TreeMap
+import java.util.concurrent.Executors
 import java.util.regex.Pattern
 
 /**
@@ -216,7 +219,45 @@ class LyricsOverlayController(
 
     fun isShowing(): Boolean = lyricScrollView.visibility == View.VISIBLE
 
-    fun loadLyrics(audioFile: File?) {
+    /** The lyrics of one track, read on the lyrics thread: synced lines by time (LRC, M4B chapters), or plain text. */
+    private class LyricsData {
+        val synced = TreeMap<Int, String>()
+        var timestamps: List<Int> = emptyList()
+        var plain: String? = null
+    }
+
+    // Each track change gets a number, so lyrics that the lyrics thread reads late for an older track do not show
+    @Volatile
+    private var loadSeq = 0
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Clears the lyrics at once, reads those of [audioFile] on the lyrics thread (a file read and parse that took
+     * the main thread on each track change), and calls [onLoaded] on the main thread when they are in place.
+     * A newer call drops the result of an older one.
+     */
+    fun loadLyrics(audioFile: File?, onLoaded: () -> Unit = {}) {
+        val seq = ++loadSeq
+        clearLyrics()
+        lyricsThread.execute {
+            if (seq != loadSeq) return@execute
+            val data = try {
+                readLyrics(audioFile)
+            } catch (ignored: Throwable) {
+                LyricsData()
+            }
+            mainHandler.post {
+                if (seq != loadSeq) return@post
+                currentLyrics.putAll(data.synced)
+                lyricTimestamps = ArrayList(data.timestamps)
+                plainLyrics = data.plain
+                data.plain?.let { tvLyrics.text = it }
+                onLoaded()
+            }
+        }
+    }
+
+    private fun clearLyrics() {
         currentLyrics.clear()
         lyricTimestamps.clear()
         lastLyricIndex = -1
@@ -224,17 +265,21 @@ class LyricsOverlayController(
         manualLyricIndex = -1
         plainLyrics = null
         tvLyrics.text = ""
+    }
 
-        if (audioFile == null || !audioFile.exists()) return
+    /** Lyrics thread: the lyrics of [audioFile] (M4B chapters, a .lrc file, or the embedded tag). */
+    private fun readLyrics(audioFile: File?): LyricsData {
+        val data = LyricsData()
+        if (audioFile == null || !audioFile.exists()) return data
         val path = audioFile.absolutePath
 
         // 1. M4B audiobooks: extract chapter timestamps
         if (path.endsWith(".m4b", ignoreCase = true)) {
             val chResult = M4bChapterParser.extractChapters(audioFile)
             if (chResult.chaptersMap.isNotEmpty()) {
-                currentLyrics.putAll(chResult.chaptersMap)
-                lyricTimestamps.addAll(chResult.timestamps)
-                return
+                data.synced.putAll(chResult.chaptersMap)
+                data.timestamps = ArrayList(chResult.timestamps)
+                return data
             }
         }
 
@@ -259,42 +304,42 @@ class LyricsOverlayController(
                             val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
                             val text = m.group(4)?.trim() ?: ""
                             if (LyricsText.isVisible(text)) {
-                                currentLyrics[totalMs] = text
+                                data.synced[totalMs] = text
                             }
                         }
                     }
                     br.close()
-                    lyricTimestamps = ArrayList(currentLyrics.keys)
-                    return
+                    data.timestamps = ArrayList(data.synced.keys)
+                    return data
                 } catch (ignored: Exception) {}
             }
         }
 
-        // 3. Embedded tags: ALAC / FLAC / MP3 ID3 USLT
+        // 3. Embedded tags: ALAC / FLAC / MP3 ID3 USLT (without the cover, which the lyrics do not need)
+        var plain: String? = null
         val lower = path.lowercase()
         if (lower.endsWith(".m4a") || lower.endsWith(".alac")) {
-            val alacTags = AudioPlayerManager.getInstance().extractAlacMetadata(audioFile)
+            val alacTags = AudioPlayerManager.getInstance().extractAlacMetadata(audioFile, false)
             if (alacTags.size > 7 && alacTags[7] != null) {
-                plainLyrics = alacTags[7] as? String
+                plain = alacTags[7] as? String
             }
         } else if (lower.endsWith(".flac")) {
-            val flacTags = AudioPlayerManager.getInstance().extractFlacMetadata(audioFile)
+            val flacTags = AudioPlayerManager.getInstance().extractFlacMetadata(audioFile, false)
             if (flacTags.size > 7 && flacTags[7] != null) {
-                plainLyrics = flacTags[7] as? String
+                plain = flacTags[7] as? String
             }
         } else {
-            plainLyrics = extractEmbeddedLyrics(audioFile)
+            plain = extractEmbeddedLyrics(audioFile)
         }
 
         // A tag with no visible text (an empty ID3 USLT frame has only a NUL) is no lyrics: no blank lyrics view
-        plainLyrics = LyricsText.plain(plainLyrics)
+        plain = LyricsText.plain(plain)
 
         // 4. Test if plain lyrics string contains embedded LRC timestamps
-        val candidate = plainLyrics
-        if (!candidate.isNullOrEmpty()) {
+        if (!plain.isNullOrEmpty()) {
             val pattern = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\](.*)")
             var isSyncedLrc = false
-            val lines = candidate.split("\\r?\\n".toRegex())
+            val lines = plain.split("\\r?\\n".toRegex())
 
             for (l in lines) {
                 val m = pattern.matcher(l)
@@ -308,19 +353,19 @@ class LyricsOverlayController(
                     val totalMs = (min * 60 * 1000) + (sec * 1000) + ms
                     val text = m.group(4)?.trim() ?: ""
                     if (LyricsText.isVisible(text)) {
-                        currentLyrics[totalMs] = text
+                        data.synced[totalMs] = text
                     }
                 }
             }
 
             if (isSyncedLrc) {
-                lyricTimestamps = ArrayList(currentLyrics.keys)
-                plainLyrics = null
-                return
+                data.timestamps = ArrayList(data.synced.keys)
+                return data
             }
 
-            tvLyrics.text = candidate
+            data.plain = plain
         }
+        return data
     }
 
     private fun extractEmbeddedLyrics(file: File): String? {
@@ -523,6 +568,9 @@ class LyricsOverlayController(
     private fun clampScroll(y: Float): Float = Math.max(0f, Math.min(maxScroll().toFloat(), y))
 
     private companion object {
+        /** Reads the lyrics of a new track, one track at a time. */
+        private val lyricsThread = Executors.newSingleThreadExecutor { r -> Thread(r, "y1-lyrics") }
+
         /** Full-width lyrics: about the size of the iPod list text, so a line reads from arm's length. */
         const val TEXT_SIZE_SP = 22f
         const val SIDE_PADDING = 24
