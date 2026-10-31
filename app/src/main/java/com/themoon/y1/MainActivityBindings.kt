@@ -33,7 +33,6 @@ internal fun MainActivity.initViewBindings() {
         rootContent.addView(this, lp)
     }
 
-    ivMainBg = findViewById(R.id.iv_main_bg)
     ivAlbumArt = findViewById(R.id.iv_album_art)
     ivAlbumReflection = findViewById(R.id.iv_album_reflection)
     ivPauseOverlay = findViewById(R.id.iv_pause_overlay)

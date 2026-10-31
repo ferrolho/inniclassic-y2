@@ -548,17 +548,6 @@ internal fun MainActivity.initControllers() {
             MainActivity.customLibrary.clear()
             startMediaLibraryScan()
         },
-        onApplyThemeBackground = {
-            prefs.edit().putString("bg_path", "THEME_DEFAULT").apply()
-            updateMainMenuBackground()
-        },
-        onClearCustomBackground = {
-            prefs.edit().remove("bg_path").apply()
-            updateMainMenuBackground()
-        },
-        onPickBackgroundFromStorage = {
-            changeScreen(ScreenState.Browser(BrowserMode.Folder(StoragePaths.getPrimaryRoot(), pickImage = true)))
-        },
         resetBacklightTimer = { powerBacklightManager?.applyBacklightSetting() },
         applySoundSetting = {
             isSoundEffectEnabled = prefs.getBoolean("sound", true)
