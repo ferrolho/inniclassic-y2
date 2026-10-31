@@ -74,7 +74,9 @@ import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.managers.OtaUpdateManager
+import com.themoon.y1.managers.BacklightTimer
 import com.themoon.y1.managers.PowerBacklightManager
+import com.themoon.y1.managers.PowerMenuInterceptor
 import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
 import com.themoon.y1.managers.VirtualVolumeManager
@@ -184,7 +186,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var backTargetForUtility: Int = STATE_SETTINGS
     var isPendingUpdateCheckAfterWifi: Boolean = false
     var lastSettingsFocusIndex: Int = 0
-    var currentTimeoutIndex: Int = 1
     var currentEqPresetIndex: Int = 0
     var currentEqProfile: String = "preset_0"
     var currentBassBoostStep: Int = 0
@@ -302,6 +303,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var webServerController: WebServerController
     var otaUpdateManager: OtaUpdateManager? = null
     var externalSdMountMonitor: ExternalSdMountMonitor? = null
+    private var powerMenuInterceptor: PowerMenuInterceptor? = null
     var powerBacklightManager: PowerBacklightManager? = null
 
     internal val usbStorageManager by lazy {
@@ -359,10 +361,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         })
 
-        val savedBacklightIdx = prefs.getInt("backlight_timer_index", 3)
+        val savedBacklightIdx = prefs.getInt(BacklightTimer.PREF_INDEX, BacklightTimer.DEFAULT_INDEX)
         powerBacklightManager = PowerBacklightManager.getInstance(this).apply {
             backlightTimerIndex = savedBacklightIdx
+            appHoldsScreenOn = { isServerRunning }
             setTimeoutAction { turnOffScreen() }
+            applyBacklightSetting()
         }
 
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
@@ -418,6 +422,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         com.themoon.y1.views.LowBatteryWarningView.install(this)
         registerReceivers()
         if (BuildConfig.TEST_HOOKS) com.themoon.y1.testhooks.TestHooks.register(this)
+        // A long press of the Power button shows our Power screen, not Android's power menu
+        powerMenuInterceptor = PowerMenuInterceptor(this) { showPowerMenu() }.also { it.register() }
 
         try {
             val initBattery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -577,6 +583,14 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     fun getActiveScreenController(): ScreenController? = NavigationManager.getInstance().activeController
+
+    /** The Power screen (Restart, Power Off). Back goes to the screen that was open before. */
+    fun showPowerMenu() {
+        wakeFromFakeScreenOff()
+        // From Settings, Back comes back into the open group (SettingsController.onEnter)
+        if (NavigationManager.getInstance().currentState is ScreenState.Settings) backTargetForUtility = STATE_SETTINGS
+        changeScreen(ScreenState.Settings(SettingsSubMode.Power))
+    }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         return InputRouter.getInstance().dispatchKeyEvent(
@@ -850,19 +864,14 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         podcastController.showActionDialog(title, audioUrl, imageUrl, channelTitle)
     }
 
-    fun fetchTrackInfoFromInternet(track: File, originalQuery: String, hasValidTags: Boolean, title: String?, artist: String?) {
-        // Tag lookups handled via MediaLibraryManager
-    }
-
     fun turnOffScreen() {
         if (isScreenSleeping) return
         isScreenSleeping = true
         updateScreenOffFeedback(false)
         powerBacklightManager?.cancelTimer()
-        val am = AudioPlayerManager.getInstance()
-        val fm = FmRadioManager.getInstance(this)
-        val isAudioActive = am.isPlaying() || fm.isPowerUp || isServerRunning
-        if (isAudioActive) {
+        // A real screen off also while music or FM radio plays: both hold a wake lock and continue.
+        // Only the web server holds the screen on (FLAG_KEEP_SCREEN_ON), so the screen is blanked for it.
+        if (BacklightTimer.useFakeScreenOff(isServerRunning)) {
             isFakeScreenOff = true
             pbLoadingProgress?.visibility = View.GONE
             tvLoadingProgress?.text = ""
@@ -1286,6 +1295,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             unregisterReceiver(systemStatusReceiver)
         } catch (_: Exception) {}
         com.themoon.y1.testhooks.TestHooks.unregister(this)
+        powerMenuInterceptor?.unregister()
         externalSdMountMonitor?.stop()
         audioVisualizer?.release()
         audioVisualizer = null
