@@ -1731,7 +1731,6 @@ class SettingsController(
                 .remove("screen_off_control")
                 .remove("double_click_favorite")
                 .remove("repeat_mode")
-                .remove("repeat")
                 .remove("loop_scroll_on")
                 .remove("eq_preset")
                 .remove("eq_profile_id")
@@ -1748,6 +1747,10 @@ class SettingsController(
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
         applyAlbumGrouping()
+
+        // The player keeps its own repeat mode: set it back to Off too.
+        mainActivity?.repeatMode = 0
+        AudioPlayerManager.getInstance().setRepeatMode(0)
 
         mainActivity?.isScreenOffControlEnabled = false
         mainActivity?.isShowBatteryPercentage = false

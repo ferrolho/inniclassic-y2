@@ -828,8 +828,8 @@ class CoverFlowController(
         // After a library load: the start-up work and the main menu first
         private const val PREPARE_DELAY_MS = 3000L
         private const val COVER_VIEW_ID = 1001
-        private const val TITLE_VIEW_ID = 1002
-        private const val ARTIST_VIEW_ID = 1003
+        private val TITLE_VIEW_ID = R.id.coverflow_title
+        private val ARTIST_VIEW_ID = R.id.coverflow_artist
         private const val REFLECTION_VIEW_ID = 1004
 
         // Scale, angle and perspective of the side covers (see CoverFlowGeometry)
