@@ -141,7 +141,8 @@ object BatteryGuard {
         if (wantFast != fast) {
             fast = wantFast
             val shown = logic.shown
-            logic = if (fast) BatteryGuardLogic(curve, windowMs = 20_000, holdMs = 10_000, stepMs = 1_000, settleMs = 0, shutdownHoldMs = 10_000)
+            logic = if (fast) BatteryGuardLogic(curve, windowMs = 20_000, holdMs = 10_000, stepMs = 1_000, settleMs = 0, shutdownHoldMs = 10_000,
+                loadSettleMs = 5_000)
             else BatteryGuardLogic(curve)
             logic.restore(shown)
         }

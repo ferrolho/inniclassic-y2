@@ -109,6 +109,57 @@ class BatteryGuardLogicTest {
     }
 
     @Test
+    fun theFirstStartOfTheAppStepsDownFromTheGauge() {
+        val g = BatteryGuardLogic()
+        g.onSample(0, 3700, 96, false, screen)
+        assertEquals(96, g.shown)
+        var prev = 96
+        var t = 30_000L
+        while (t < 60 * min) {
+            g.onSample(t, 3700, 96, false, screen)
+            assertTrue("jump at ${t / 1000} s", prev - g.shown <= 1)
+            prev = g.shown
+            t += 30_000L
+        }
+        assertEquals(Math.round(BatteryGuardLogic.percentAt(3700f)), g.shown)
+    }
+
+    /**
+     * 2 hours at a steady drain (3.90 → 3.80 V at the load of the curve), the screen on for 8 min and off (music) for
+     * 12 min, again and again. The kernel's voltage moves to the voltage of the new load in 5 min. The level must fall
+     * smoothly and as much as the curve: not more because of the screen changes.
+     */
+    @Test
+    fun screenOnOffChangesDoNotPushTheLevelDown() {
+        val on = Load(screenOn = true, cpuPct = 25, wifi = true)
+        val off = Load(screenOn = false, playing = true, cpuPct = 10, wifi = true)
+        // At a steady load the equivalent voltage is the voltage of the curve's load.
+        val offRise = BatteryGuardLogic.REFERENCE_SAG_MV - BatteryGuardLogic.sagMv(off)
+        fun ref(t: Long) = 3900f - 100f * t / (120 * min)
+        val g = BatteryGuardLogic()
+        val start = Math.round(BatteryGuardLogic.percentAt(ref(0)))
+        g.restore(start)
+        var offset = 0f
+        var prev = start
+        var t = 0L
+        while (t <= 120 * min) {
+            val screenOn = (t / min) % 20 < 8
+            val target = if (screenOn) 0f else offRise.toFloat()
+            // The kernel's mean: 1/10 of the way each 30 s step, so ~5 min to the new value.
+            val step = offRise / 10f
+            offset = if (offset < target) minOf(target, offset + step) else maxOf(target, offset - step)
+            g.onSample(t, Math.round(ref(t) + offset), 90, false, if (screenOn) on else off)
+            assertTrue("went up at ${t / min} min", g.shown <= prev)
+            assertTrue("jump at ${t / min} min", prev - g.shown <= 1)
+            prev = g.shown
+            t += 30_000L
+        }
+        val modelFall = BatteryGuardLogic.percentAt(ref(0)) - BatteryGuardLogic.percentAt(ref(120 * min))
+        val fall = start - g.shown
+        assertTrue("fall $fall, model $modelFall", Math.abs(fall - modelFall) <= 2f)
+    }
+
+    @Test
     fun aLowVoltageForTheHoldTimeShutsDownOneTime() {
         val g = BatteryGuardLogic()
         g.restore(5)
