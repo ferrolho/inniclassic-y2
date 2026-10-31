@@ -11,6 +11,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.hardware.input.InputManager
 import android.os.Bundle
 import android.os.Handler
@@ -20,6 +22,7 @@ import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
+import android.view.Choreographer
 import android.view.InputDevice
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
@@ -27,6 +30,7 @@ import com.google.android.exoplayer2.ExoPlaybackException
 import com.google.android.exoplayer2.Player
 import com.themoon.y1.BuildConfig
 import com.themoon.y1.MainActivity
+import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
@@ -56,6 +60,8 @@ object EventLog {
     private const val MAX_PENDING = 2000
     private const val PREF_MIN_INTERVAL_MS = 2000L
     private const val PREFS = "AppPrefs"
+    private const val SOUND_POLL_MS = 10L
+    private const val SOUND_WATCH_MS = 5000L
 
     @Volatile
     var enabled = false
@@ -437,7 +443,82 @@ object EventLog {
             if (seekMs > 0) f.put("seek", seekMs)
             if (onMain()) attachPlayer()
             emit("play", f)
+            if (onMain()) watchLoad(index)
         } catch (_: Throwable) {}
+    }
+
+    // The last track load (main thread): a newer load stops the watch of an older one
+    private var loadSeq = 0
+
+    /**
+     * After a load: `shown` when Now Playing has drawn the new title (the frame after the main-thread task
+     * that loads the track), `cover` when it has drawn the cover (`hit` = in the same frame as the title),
+     * and `sound` at the first change of the play position. `ms` = time since the load.
+     */
+    private fun watchLoad(index: Int) {
+        val h = mainHandler ?: return
+        val seq = ++loadSeq
+        val start = SystemClock.uptimeMillis()
+        fun line(a: String) = JSONObject().put("a", a).put("idx", index).put("ms", SystemClock.uptimeMillis() - start)
+        h.post {
+            if (seq != loadSeq) return@post
+            val coverNow = isCoverShown()
+            afterNextFrame(h) {
+                if (seq == loadSeq) {
+                    val title = try { MainActivity.instance?.let { it.tvPlayerTitle.text.toString() }.orEmpty() } catch (_: Throwable) { "" }
+                    emit("play", line("shown").put("title", EventLogLogic.cut(title, 60)))
+                    if (coverNow) emit("play", line("cover").put("hit", true))
+                }
+            }
+            if (!coverNow) {
+                h.postDelayed(object : Runnable {
+                    override fun run() {
+                        if (seq != loadSeq || SystemClock.uptimeMillis() - start > SOUND_WATCH_MS) return
+                        if (!isCoverShown()) {
+                            h.postDelayed(this, SOUND_POLL_MS)
+                            return
+                        }
+                        afterNextFrame(h) { if (seq == loadSeq) emit("play", line("cover").put("hit", false)) }
+                    }
+                }, SOUND_POLL_MS)
+            }
+        }
+        h.postDelayed(object : Runnable {
+            var firstPos = -1
+            override fun run() {
+                if (seq != loadSeq || MainActivity.instance?.isPausedByHand != false) return
+                if (SystemClock.uptimeMillis() - start > SOUND_WATCH_MS) return
+                val pos = AudioPlayerManager.getInstance().getCurrentPosition()
+                if (firstPos < 0) firstPos = pos
+                else if (pos != firstPos) {
+                    emit("play", line("sound").put("pos", pos))
+                    return
+                }
+                h.postDelayed(this, SOUND_POLL_MS)
+            }
+        }, SOUND_POLL_MS)
+    }
+
+    // A frame callback runs before the frame draws; a post from it runs after the draw
+    private fun afterNextFrame(h: Handler, block: () -> Unit) {
+        Choreographer.getInstance().postFrameCallback { h.post(block) }
+    }
+
+    private var defaultCover: Bitmap? = null
+
+    /** Now Playing shows a cover, not the default image (a track change shows the default until the cover is read). */
+    private fun isCoverShown(): Boolean = try {
+        val main = MainActivity.instance
+        val shown = main?.let { (it.ivAlbumArt.drawable as? BitmapDrawable)?.bitmap }
+        if (main == null || shown == null) {
+            false
+        } else {
+            val default = defaultCover
+                ?: (main.resources.getDrawable(R.drawable.default_album) as? BitmapDrawable)?.bitmap.also { defaultCover = it }
+            shown !== default
+        }
+    } catch (_: Throwable) {
+        false
     }
 
     fun podcast(title: String, channel: String) {
