@@ -421,6 +421,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
         com.themoon.y1.views.LowBatteryWarningView.install(this)
         registerReceivers()
+        com.themoon.y1.battery.BatteryGuard.addListener(batteryGuardListener)
         if (BuildConfig.TEST_HOOKS) com.themoon.y1.testhooks.TestHooks.register(this)
         // A long press of the Power button shows our Power screen, not Android's power menu
         powerMenuInterceptor = PowerMenuInterceptor(this) { showPowerMenu() }.also { it.register() }
@@ -436,7 +437,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                         || initStatus == BatteryManager.BATTERY_STATUS_FULL
                         || initPlugged > 0)
                 if (initL >= 0 && initS > 0) {
-                    val pct = ((initL / initS.toFloat()) * 100).toInt()
+                    val pct = com.themoon.y1.battery.BatteryGuard.percent(initBattery)
                     tvStatusBattery?.text = "$pct%"
                     batteryIconView?.setBatteryLevel(pct, initCharging)
                 }
@@ -1221,8 +1222,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     if (Intent.ACTION_POWER_DISCONNECTED == action) {
                         isCharging = false
                     }
+                    if (batteryIntent != null && !com.themoon.y1.battery.BatteryGuard.isCharging(batteryIntent)) {
+                        isCharging = false
+                    }
                     if (level != -1 && scale > 0) {
-                        val pct = ((level / scale.toFloat()) * 100).toInt()
+                        // The voltage model while discharging (the gauge can stay high while the battery empties)
+                        val pct = com.themoon.y1.battery.BatteryGuard.percent(batteryIntent)
                         tvStatusBattery?.text = "$pct%"
                         batteryIconView?.setBatteryLevel(pct, isCharging)
                     }
@@ -1432,7 +1437,15 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         pairingAgent = BluetoothPairingAgent(this, ::t).also { it.register() }
     }
 
+    /** A new level of the voltage model (it can come without a battery broadcast): show it in the status bar. */
+    private val batteryGuardListener = object : com.themoon.y1.battery.BatteryGuard.Listener {
+        override fun onLevelChanged() {
+            registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { systemStatusReceiver.onReceive(this@MainActivity, it) }
+        }
+    }
+
     override fun onDestroy() {
+        com.themoon.y1.battery.BatteryGuard.removeListener(batteryGuardListener)
         menuSlide?.let { NavigationManager.getInstance().removeDirectionListener(it) }
         updateScreenOffFeedback(true)
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)

@@ -73,9 +73,7 @@ object PowerMenu {
 
     /** Pauses the music, saves the playback state (as at a shutdown), then restarts or powers off. */
     fun run(context: Context, action: Action, onFailed: () -> Unit) {
-        val player = AudioPlayerManager.getInstance()
-        if (player.isPlaying()) player.playOrPauseMusic()
-        player.savePlaybackState(sync = true)
+        pauseAndSave()
 
         val dryRun = isDryRun()
         Log.w(TAG, "${action.label}: su -c '${action.commands.first()}'${if (dryRun) " (dry run: not run)" else ""}")
@@ -87,6 +85,13 @@ object PowerMenu {
                 Handler(Looper.getMainLooper()).post(onFailed)
             }
         }, "y1-power").start()
+    }
+
+    /** Pauses the music and saves the playback state and the queue (as at a shutdown). */
+    fun pauseAndSave() {
+        val player = AudioPlayerManager.getInstance()
+        if (player.isPlaying()) player.playOrPauseMusic()
+        player.savePlaybackState(sync = true)
     }
 
     private fun runAsRoot(command: String): Boolean = try {
