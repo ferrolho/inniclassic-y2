@@ -27,12 +27,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
 import android.os.Vibrator
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.MotionEvent
-import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.BatteryIconView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.TablerIcons
@@ -84,6 +82,7 @@ import com.themoon.y1.models.TvSeries
 import com.themoon.y1.models.VideoItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.InputRouter
+import com.themoon.y1.navigation.LetterJump
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
@@ -278,9 +277,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var playerProgress: ProgressBar
 
     var tvFastScrollLetter: TextView? = null
-    var lastFastScrollLetter: String? = null
-    var classicWheelStreak: Int = 0
-    var lastClassicWheelTime: Long = 0L
     var tvStatusBarTitle: TextView? = null
     var ivStatusWifi: ImageView? = null
     var ivStatusBluetooth: ImageView? = null
@@ -302,6 +298,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun isBrowserControllerInitialized(): Boolean = ::browserController.isInitialized
     lateinit var playlistController: PlaylistController
     lateinit var coverFlowController: CoverFlowController
+    fun isCoverFlowControllerInitialized(): Boolean = ::coverFlowController.isInitialized
     lateinit var playerController: PlayerController
     lateinit var equalizerController: EqualizerController
     lateinit var fmRadioController: FmRadioController
@@ -341,12 +338,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     private val volumeHandler = Handler(Looper.getMainLooper())
     private val hideVolumeTask = Runnable {
         layoutVolumeOverlay.visibility = View.GONE
-    }
-
-    private val fastScrollHandler = Handler(Looper.getMainLooper())
-    private val hideFastScrollTask = Runnable {
-        tvFastScrollLetter?.visibility = View.GONE
-        lastFastScrollLetter = null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -588,8 +579,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin
             else -> state
         }
-        classicWheelStreak = 0
-        lastFastScrollLetter = null
+        if (::browserController.isInitialized) browserController.endLetterJump()
+        tvFastScrollLetter?.animate()?.cancel()
         tvFastScrollLetter?.visibility = View.GONE
         syncCurrentScreenState(targetState)
         NavigationManager.getInstance().navigateTo(targetState)
@@ -600,12 +591,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun getActiveScreenController(): ScreenController? = NavigationManager.getInstance().activeController
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val keyCode = event.keyCode
-        if (event.action == KeyEvent.ACTION_DOWN && (keyCode == 21 || keyCode == 22)) {
-            val now = SystemClock.uptimeMillis()
-            classicWheelStreak = if (now - lastClassicWheelTime < 200) classicWheelStreak + 1 else 1
-            lastClassicWheelTime = now
-        }
         return InputRouter.getInstance().dispatchKeyEvent(
             event = event,
             context = this,
@@ -775,50 +760,43 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }, "y1-migrations").start()
     }
 
+    /**
+     * Shows the letter box in the middle of the screen with the letter of letter mode (BrowserController.jumpLetter).
+     * Rows call this when they get focus; when the wheel steps row by row there is no jump letter, and nothing shows.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun showFastScrollLetter(rawText: String) {
-        val navState = NavigationManager.getInstance().currentState
-        val bcMode = if (::browserController.isInitialized) browserController.currentBrowserMode else BrowserMode.Root
-        val isRootMenu = bcMode is BrowserMode.Root || bcMode is BrowserMode.Audiobooks ||
-                (navState is ScreenState.Browser && (navState.mode is BrowserMode.Root || navState.mode is BrowserMode.Audiobooks))
-        val isBrowserList = currentScreenState == STATE_BROWSER && !isRootMenu
-        if (!isBrowserList) return
+        if (currentScreenState != STATE_BROWSER || !::browserController.isInitialized) return
+        val letter = browserController.jumpLetter ?: return
+        showJumpLetter(letter)
+    }
 
+    /**
+     * Shows [letter] in the letter box. It stays until [hideFastScrollLetter]: the screen hides it at the end of
+     * letter mode ([LetterJump.Mode]). The box gets its theme colours when it comes on; after that, only a new
+     * letter changes it.
+     */
+    fun showJumpLetter(letter: String) {
         val tv = tvFastScrollLetter ?: return
-        val clean = rawText.replace("📁 ", "").replace("👤 ", "")
-            .replace("💿 ", "").replace("🎵 ", "")
-            .replace("📦 [INSTALL] ", "").trim()
-        if (clean.isEmpty()) return
-
-        val firstChar = AlphabetIndexBar.getInitialChar(clean).toString()
-        val isLetterChange = (lastFastScrollLetter != null && lastFastScrollLetter != firstChar)
-        val shouldShow = isLetterChange || classicWheelStreak >= 3 || tv.visibility == View.VISIBLE
-        lastFastScrollLetter = firstChar
-
-        if (!shouldShow) return
-
-        if (tv.visibility == View.VISIBLE && tv.text.toString() == firstChar) {
-            fastScrollHandler.removeCallbacks(hideFastScrollTask)
-            fastScrollHandler.postDelayed(hideFastScrollTask, 800)
-            return
+        if (tv.visibility != View.VISIBLE) {
+            tv.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+            tv.typeface = ThemeManager.getCustomFontBold()
+            tv.background = GradientDrawable().apply {
+                setColor(ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt())
+                cornerRadius = 15f * resources.displayMetrics.density
+            }
         }
-
-        tv.text = firstChar
-
-        val bgColor = ThemeManager.getListButtonFocusedBg()
-        val textColor = ThemeManager.getListButtonFocusedTextColor()
-
-        tv.setTextColor(textColor)
-        tv.typeface = ThemeManager.getCustomFontBold()
-
-        val letterBg = GradientDrawable().apply {
-            setColor(bgColor or 0xDD000000.toInt())
-            cornerRadius = 15f * resources.displayMetrics.density
-        }
-        tv.background = letterBg
+        if (tv.text?.contentEquals(letter) != true) tv.text = letter
+        tv.animate().cancel()
+        tv.alpha = 1f
         tv.visibility = View.VISIBLE
+    }
 
-        fastScrollHandler.removeCallbacks(hideFastScrollTask)
-        fastScrollHandler.postDelayed(hideFastScrollTask, 800)
+    /** Fades out the letter box (the end of letter mode). */
+    fun hideFastScrollLetter() {
+        val tv = tvFastScrollLetter ?: return
+        if (tv.visibility != View.VISIBLE) return
+        tv.animate().alpha(0f).setDuration(200).withEndAction { tv.visibility = View.GONE }
     }
 
     fun updateAudioQualityInfo(audioFile: File) {}
@@ -990,7 +968,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_COVERFLOW -> {
                 val total = uniqueAlbumList.size
                 if (total > 0 && ::coverFlowController.isInitialized) {
-                    "${t("Cover Flow")} (${coverFlowController.currentCoverFlowIndex + 1}/$total)"
+                    com.themoon.y1.controllers.coverflow.CoverFlowTitle.format(t("Cover Flow"), coverFlowController.currentCoverFlowIndex + 1, total)
                 } else {
                     t("Cover Flow")
                 }
