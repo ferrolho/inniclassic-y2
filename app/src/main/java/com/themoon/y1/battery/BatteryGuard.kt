@@ -12,10 +12,11 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import com.themoon.y1.BuildConfig
+import com.themoon.y1.managers.PowerMenu
 import java.io.File
 
 /**
- * The battery level that the app shows ([BatteryGuardLogic]).
+ * The battery level that the app shows, and the shutdown before the battery is empty ([BatteryGuardLogic]).
  *
  * Samples: each battery broadcast, and a 30 s timer on the main thread. The timer has no wake lock, so it runs only
  * while the CPU is awake and never wakes the Y2. Use [percent] wherever the app shows the battery level, and
@@ -25,10 +26,13 @@ import java.io.File
  * - `debug.bat.mv`: a fake voltage in mV in place of the kernel's.
  * - `debug.bat.unplugged` 1: discharging also on USB (adb).
  * - `debug.bat.fast` 1: short times (hold 10 s, 1 % each 1 s), so a test does not take an hour.
+ * While a fake value is set, the shutdown is only logged (as with `debug.y1.power_dry_run` 1).
  */
 object BatteryGuard {
     private const val TAG = "BatteryGuard"
     private const val TICK_MS = 30_000L
+    /** The "Battery empty" notice shows this long before the shutdown; a charger in this time stops it. */
+    private const val NOTICE_MS = 5_000L
     private const val PREFS = "battery_guard"
 
     const val PROP_MV = "debug.bat.mv"
@@ -36,9 +40,10 @@ object BatteryGuard {
     const val PROP_FAST = "debug.bat.fast"
 
     interface Listener {
-
         /** The shown level changed. */
         fun onLevelChanged() {}
+        /** The battery is empty: the Y2 turns off in [NOTICE_MS] unless a charger comes. */
+        fun onEmpty() {}
     }
 
     private val main = Handler(Looper.getMainLooper())
@@ -48,6 +53,7 @@ object BatteryGuard {
     private var fast = false
     private var lastIntent: Intent? = null
     private var cpuLast: LongArray? = null
+    private var shutdownStarted = false
 
     fun start(context: Context) {
         if (app != null) return
@@ -140,11 +146,13 @@ object BatteryGuard {
         val screenOn = (c.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isScreenOn != false
         val load = BatteryGuardLogic.Load(screenOn, BatteryHistory.isPlaying, cpuPercent(), wifiConnected(c))
         val changed = logic.onSample(SystemClock.elapsedRealtime(), voltage(intent), gaugePercent(intent), charging, load)
+        if (charging) shutdownStarted = false
         if (changed) {
             if (BuildConfig.TEST_HOOKS) Log.i(TAG, describe())
             save(c)
             for (l in ArrayList(listeners)) l.onLevelChanged()
         }
+        if (logic.shutdownDue && !shutdownStarted && !charging) startShutdown(c)
     }
 
     private fun voltage(intent: Intent): Int {
@@ -172,6 +180,38 @@ object BatteryGuard {
             ?.getNetworkInfo(ConnectivityManager.TYPE_WIFI)?.isConnected == true
     } catch (_: Throwable) {
         false
+    }
+
+    /**
+     * The battery is empty: the "Battery empty" notice (it turns the screen on), then after [NOTICE_MS] the music
+     * pauses, the playback state and the queue are saved, and Android shuts down (the Power Off of the Power screen).
+     */
+    private fun startShutdown(c: Context) {
+        shutdownStarted = true
+        Log.w(TAG, "Battery empty (${describe()}): shutdown in ${NOTICE_MS / 1000} s")
+        try {
+            @Suppress("DEPRECATION")
+            (c.getSystemService(Context.POWER_SERVICE) as? PowerManager)
+                ?.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "y1:battery-empty")
+                ?.acquire(NOTICE_MS + 5_000L)
+        } catch (t: Throwable) {
+            Log.w(TAG, "No wake lock: $t")
+        }
+        for (l in ArrayList(listeners)) l.onEmpty()
+        main.postDelayed({
+            val intent = c.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (intent != null && isCharging(intent)) {
+                Log.w(TAG, "Charger connected: no shutdown")
+                return@postDelayed
+            }
+            val fake = BuildConfig.TEST_HOOKS && (prop(PROP_MV).isNotEmpty() || prop(PROP_UNPLUGGED) == "1")
+            if (fake) {
+                Log.w(TAG, "Power Off (dry run: a test property is set)")
+                PowerMenu.pauseAndSave()
+                return@postDelayed
+            }
+            PowerMenu.run(c, PowerMenu.Action.POWER_OFF) { Log.w(TAG, "Power Off failed") }
+        }, NOTICE_MS)
     }
 
     private fun save(c: Context) {

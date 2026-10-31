@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
@@ -21,6 +20,8 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import com.themoon.y1.MainActivity
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.battery.BatteryGuard
+import com.themoon.y1.battery.BatteryGuardLogic
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LowBatteryWarnings
 import com.themoon.y1.managers.LowBatteryWarnings.Warning
@@ -50,15 +51,46 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> render()
-                Intent.ACTION_BATTERY_CHANGED -> {
-                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                    val pct = if (level >= 0 && scale > 0) level * 100 / scale else -1
-                    if (state.onBattery(pct, isCharging(intent))) render()
-                }
+                Intent.ACTION_BATTERY_CHANGED -> onBattery(intent)
                 // A charger (or USB) that comes or goes starts or ends a discharge at once.
-                Intent.ACTION_POWER_CONNECTED -> if (state.onBattery(-1, true)) render()
+                Intent.ACTION_POWER_CONNECTED -> {
+                    if (empty) {
+                        empty = false
+                        hideAll()
+                    }
+                    if (state.onBattery(-1, true)) render()
+                }
             }
+        }
+    }
+
+    /** The level of the voltage model while discharging (BatteryGuard), the gauge while charging. */
+    private fun onBattery(intent: Intent) {
+        val charging = BatteryGuard.isCharging(intent)
+        if (!charging && empty) return
+        if (charging && empty) {
+            empty = false
+            hideAll()
+        }
+        if (state.onBattery(BatteryGuard.percent(intent), charging)) render()
+    }
+
+    /** True from the "Battery empty" notice until a charger comes. */
+    private var empty = false
+
+    private val guardListener = object : BatteryGuard.Listener {
+        override fun onLevelChanged() {
+            main.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { onBattery(it) }
+        }
+
+        override fun onEmpty() {
+            empty = true
+            hideAll()
+            screen.setText(t("Battery empty"))
+            screen.visibility = VISIBLE
+            screen.invalidate()
+            shown = Warning.SCREEN
+            shownLevel = 0
         }
     }
 
@@ -79,6 +111,7 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
         }
         // ACTION_BATTERY_CHANGED is sticky: the receiver gets the current level at once.
         main.registerReceiver(receiver, filter)
+        BatteryGuard.addListener(guardListener)
         val window = main.window
         val g = KeyGate(window.callback, this)
         window.callback = g
@@ -89,6 +122,7 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
         try {
             main.unregisterReceiver(receiver)
         } catch (_: Exception) {}
+        BatteryGuard.removeListener(guardListener)
         gate?.let { if (main.window.callback === it) main.window.callback = it.inner }
         gate = null
         removeCallbacks(hideBanner)
@@ -121,6 +155,7 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
 
     /** Shows [LowBatteryWarnings.warning] (when the screen is on), or removes the warning that shows. */
     private fun render() {
+        if (empty) return
         val want = state.warning
         if (want != Warning.NONE && !isScreenVisible()) {
             // Wait for the screen; remove an old warning now.
@@ -192,7 +227,7 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
 
     companion object {
         /** One state for the life of the app, so a new activity does not show a warning again in the same discharge. */
-        private val state = LowBatteryWarnings()
+        private val state = LowBatteryWarnings(screenLevel = BatteryGuardLogic.LAST_LEVEL)
 
         /** Adds the warnings to the activity, under the loading / screen-off overlay. Call after the view bindings. */
         fun install(main: MainActivity) {
@@ -203,13 +238,6 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
             content.addView(view, index, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
 
-        /** Charging as the status bar battery shows it: charging or full, or on a charger. */
-        internal fun isCharging(intent: Intent): Boolean {
-            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-            val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-            return status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL || plugged > 0
-        }
     }
 }
 
