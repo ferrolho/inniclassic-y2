@@ -152,6 +152,7 @@
   "Folders": "フォルダ",
   "Artists": "アーティスト",
   "Albums": "アルバム",
+  "Compilations": "コンピレーション",
   "All Songs": "すべての曲",
   "Playlists": "プレイリスト",
   "Switch to Audiobooks": "オーディオブックへ切り替え",
@@ -215,6 +216,8 @@
   "HIDDEN": "非表示",
   "SHOW": "表示",
   "Shuffle Mode": "シャッフルモード",
+  "Shuffle Songs": "曲をシャッフル",
+  "No playable audio files found.": "再生可能なオーディオファイルが見つかりません。",
   "Shuffle": "シャッフル",
   "Song": "曲",
   "Songs": "曲",
@@ -313,6 +316,9 @@
   "Keyboard Layout": "キーボード配列",
   "Original": "オリジナル",
   "QWERTY": "QWERTY",
+  "Group Albums": "アルバムのまとめ方",
+  "By Title": "タイトル別",
+  "By Title and Artist": "タイトルとアーティスト別",
   "Next": "次へ",
   "Login": "ログイン",
   "Add to Favorites": "お気に入りに追加",
@@ -434,8 +440,6 @@
   "Buy 1 Heart ($1,500)": "ハートを1つ購入 ($1,500)",
   "Heart Purchased": "ハート購入済み",
   "Recently Played": "最近再生した項目",
-  "No recently played albums yet.": "最近再生したアルバムはありません。",
-  "Clear Recently Played": "最近再生した項目を消去",
-  "Are you sure you want to clear your recently played history?": "最近再生した履歴を消去してもよろしいですか？",
-  "Recently played cleared.": "最近再生した項目を消去しました。"
+  "Top 25 Most Played": "再生回数トップ25",
+  "No Songs": "曲がありません"
 }

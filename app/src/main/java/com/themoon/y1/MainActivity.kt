@@ -210,6 +210,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     val eqPresetNames: ArrayList<String> = ArrayList()
 
     var isCustomScanning: Boolean = false
+    var mediaLibraryScanCount: Int = 0
+    var isLibraryCacheLoading: Boolean = false
+    val libraryCacheLoadCallbacks: ArrayList<(Boolean) -> Unit> = ArrayList()
     var isPendingRestorePlayback: Boolean = false
     var isServerRunning: Boolean = false
     val blacklist: MutableSet<String> = HashSet()
@@ -396,8 +399,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
         } else {
             runMigrationsAsync()
-            loadLibraryCache()
-            playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
+            loadLibraryCache {
+                if (!playbackRestored) {
+                    playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
+                }
+            }
         }
 
         externalSdMountMonitor = ExternalSdMountMonitor(this).apply {
@@ -407,15 +413,19 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     runMigrationsAsync()
                     scanVideos()
                     runOnUiThread {
+                        val onLibraryReady = {
+                            if (customLibrary.isEmpty() && !isCustomScanning) {
+                                startMediaLibraryScan()
+                            }
+                            if (!playbackRestored || isPendingRestorePlayback || currentPlaylist.isEmpty()) {
+                                isPendingRestorePlayback = false
+                                playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this@MainActivity)
+                            }
+                        }
                         if (customLibrary.isEmpty()) {
-                            loadLibraryCache()
-                        }
-                        if (customLibrary.isEmpty() && !isCustomScanning) {
-                            startMediaLibraryScan()
-                        }
-                        if (!playbackRestored || isPendingRestorePlayback || currentPlaylist.isEmpty()) {
-                            isPendingRestorePlayback = false
-                            playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this@MainActivity)
+                            loadLibraryCache { onLibraryReady() }
+                        } else {
+                            onLibraryReady()
                         }
                     }
                 }
@@ -546,7 +556,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     else -> STATE_BROWSER
                 }
             }
-            is ScreenState.Playlists, is ScreenState.M3uPlaylistSongs -> STATE_BROWSER
+            is ScreenState.Playlists, is ScreenState.M3uPlaylistSongs, is ScreenState.SmartPlaylistSongs -> STATE_BROWSER
             is ScreenState.Podcasts, is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> STATE_BROWSER
             is ScreenState.Equalizer -> STATE_EQUALIZER
             is ScreenState.FmRadio -> STATE_FM_RADIO
@@ -743,7 +753,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun setupVisualizer() = setupVisualizerInternal()
     fun toggleVisualizer() = toggleVisualizerInternal()
     fun rebootAudioEngine() = rebootAudioEngineInternal()
-    fun loadLibraryCache() = loadLibraryCacheInternal()
+    fun loadLibraryCache(onLoaded: ((Boolean) -> Unit)? = null) = loadLibraryCacheInternal(onLoaded)
     fun startMediaLibraryScan() = startMediaLibraryScanInternal()
     fun rebuildUniqueAlbumList() = rebuildUniqueAlbumListInternal()
     fun scanVideos() = scanVideosInternal()
