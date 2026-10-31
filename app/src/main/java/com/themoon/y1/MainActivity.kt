@@ -225,7 +225,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var displayedPlayerPath: String? = null
     var nowPlayingBottomState: Int = 0
     var pendingSeekChanged: Boolean = false
-    var isVisualizerShowing: Boolean = false
+    /** Spectrum in place of the album art on Now Playing (Settings → Spectrum), kept in AppPrefs. */
+    var isVisualizerShowing: Boolean
+        get() = ::prefs.isInitialized && prefs.getBoolean(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF, false)
+        set(value) {
+            prefs.edit().putBoolean(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF, value).apply()
+        }
     var audioVisualizer: Visualizer? = null
     var equalizer: Equalizer? = null
     var bassBoost: BassBoost? = null
@@ -706,7 +711,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun sendBluetoothMetaToCar() {
         if (currentPlaylist.isNotEmpty() && currentIndex in currentPlaylist.indices) {
             val file = currentPlaylist[currentIndex]
-            val song = customLibrary.firstOrNull { it.file.absolutePath == file.absolutePath }
+            val song = com.themoon.y1.managers.LibrarySongs.songByPath(file.absolutePath)
             val title = song?.title ?: file.nameWithoutExtension
             val artist = song?.artist ?: t("Unknown Artist")
             val album = song?.album ?: t("Unknown Album")
