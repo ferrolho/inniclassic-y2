@@ -48,6 +48,9 @@ object BatteryHistory : BatterySampleSource {
     @Volatile private var screenOn = true
     @Volatile private var playSources = 0
 
+    /** True while the music or the radio plays. */
+    val isPlaying: Boolean get() = playSources != 0
+
     /** A source of sound for [setPlaying]. */
     const val MUSIC = 1
     const val RADIO = 2
@@ -89,15 +92,25 @@ object BatteryHistory : BatterySampleSource {
         }
         // ACTION_BATTERY_CHANGED is sticky: the receiver gets the level now at once
         app.registerReceiver(receiver, filter)
+        // A new level of the voltage model can come without a battery broadcast
+        BatteryGuard.addListener(object : BatteryGuard.Listener {
+            override fun onLevelChanged() {
+                val shown = BatteryGuard.percent(app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
+                if (shown >= 0 && shown != level) {
+                    level = shown
+                    recordNow()
+                }
+            }
+        })
     }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_BATTERY_CHANGED -> {
-                    val raw = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-                    if (raw >= 0 && scale > 0) level = (raw * 100 / scale).coerceIn(0, 100)
+                    // The level that the app shows (the voltage model while discharging, BatteryGuard)
+                    val shown = BatteryGuard.percent(intent)
+                    if (shown >= 0) level = shown
                     plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) > 0
                 }
                 Intent.ACTION_POWER_CONNECTED -> plugged = true
