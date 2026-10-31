@@ -50,6 +50,7 @@ class NavigationManager private constructor() {
             backStack.push(previous)
         }
 
+        com.themoon.y1.eventlog.EventLog.screen(previous, newState, backStack.size)
         activeController?.onExit()
 
         previousScreen = previous
