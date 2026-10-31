@@ -245,7 +245,6 @@ class SettingsController(
     /** Back: the list of the top back-stack entry (NavigationManager builds it again and selects its row). */
     override fun onBackPressed(): Boolean {
         if (isActionScreen) {
-            clickFeedback()
             ActionScreens.cancel((actionPage as? SettingsSubMode.Action)?.let { ActionScreens.spec(it.key) }) { onNavigateBack() }
             return true
         }
@@ -1003,7 +1002,12 @@ class SettingsController(
         for (line in spec.info) containerSettingsItems.addView(ActionScreens.infoRow(activity, line))
         var firstAction: View? = null
         for (action in spec.actions) {
-            val row = createSettingRow(action.label, "")
+            val row = if (action.checked == null) createSettingRow(action.label, if (action.opensList) "〉" else "") else createTablerListButton(
+                if (action.checked) TablerIcons.CHECK else null,
+                action.label,
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
+            )
             row.setOnClickListener {
                 clickFeedback()
                 ActionScreens.choose(action) { onNavigateBack() }

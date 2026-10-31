@@ -21,7 +21,20 @@ import com.themoon.y1.navigation.SettingsSubMode
  */
 object ActionScreens {
 
-    class Action(val label: String, val run: () -> Unit)
+    /**
+     * [checked] not null: a choice row, with the check mark when true (as the Language list).
+     * [opensList]: the row opens a deeper list over this screen; it has a chevron, and the screen stays under the
+     * list, so Back comes back to it.
+     * [closes] false: the row does not close the screen before its action, because the action goes to another
+     * screen itself.
+     */
+    class Action(
+        val label: String,
+        val checked: Boolean? = null,
+        val opensList: Boolean = false,
+        val closes: Boolean = !opensList,
+        val run: () -> Unit
+    )
 
     /**
      * [selectAction] false: no row is selected when the screen opens, and the first wheel step selects the first
@@ -67,14 +80,17 @@ object ActionScreens {
         specs.remove(key)
     }
 
-    /** Back closes the screen, then runs [Spec.onCancel]. A row closes the screen, then runs its action. */
+    /**
+     * Back closes the screen, then runs [Spec.onCancel]. A row closes the screen, then runs its action (not a row
+     * with [Action.closes] false).
+     */
     fun cancel(spec: Spec?, close: () -> Unit) {
         close()
         spec?.onCancel?.invoke()
     }
 
     fun choose(action: Action, close: () -> Unit) {
-        close()
+        if (action.closes) close()
         action.run()
     }
 
@@ -93,6 +109,19 @@ object ActionScreens {
             main.changeScreen(route(key))
         }
         return key
+    }
+
+    /** Replaces all of screen [key] (for example the rows of a list that a search changes) and shows it now if it shows. */
+    fun replace(key: Int, spec: Spec) {
+        synchronized(this) {
+            if (!specs.containsKey(key)) return
+            specs[key] = spec
+        }
+        val main = MainActivity.instance ?: return
+        main.runOnUiThread {
+            val nav = NavigationManager.getInstance()
+            if (nav.currentState == route(key)) nav.activeController?.onRefreshUI()
+        }
     }
 
     /** Shows the new info rows of screen [key] now if it is the screen that shows. */
@@ -143,6 +172,6 @@ fun confirmScreen(
 ): ActionScreens.Spec = ActionScreens.Spec(
     title = title,
     info = if (info.isEmpty()) emptyList() else listOf(info),
-    actions = listOf(ActionScreens.Action(actionLabel, onConfirm)),
+    actions = listOf(ActionScreens.Action(actionLabel, run = onConfirm)),
     selectAction = selectAction
 )

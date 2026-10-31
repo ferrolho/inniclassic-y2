@@ -37,6 +37,7 @@ object TestHookLogic {
         "Upload" to listOf("upload", "webserver"),
         "Bluetooth" to listOf("bluetooth", "bt"),
         "Wifi" to listOf("wifi"),
+        "PlayOn" to listOf("playon", "cast"),
         "Themes" to listOf("themes", "theme"),
         "Equalizer" to listOf("equalizer", "eq"),
         "Brightness" to listOf("brightness")
