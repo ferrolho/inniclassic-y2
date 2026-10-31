@@ -14,6 +14,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.controllers.player.PlayerController
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.AudioSources
 import java.lang.ref.WeakReference
 
 /**
@@ -166,7 +167,7 @@ class InputRouter private constructor() {
                         }
                     } else if (action == KeyEvent.ACTION_UP) {
                         if (isScreenOffPlayPauseDown && !isScreenOffStopDone && !event.isCanceled) {
-                            com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
+                            AudioSources.app.playPauseKey()
                         }
                         isScreenOffPlayPauseDown = false
                         isScreenOffStopDone = false
@@ -318,7 +319,7 @@ class InputRouter private constructor() {
                 return true
             }
             if (!event.isCanceled) {
-                AudioPlayerManager.getInstance().playOrPauseMusic()
+                AudioSources.app.playPauseKey()
             }
             return true
         }
@@ -436,9 +437,9 @@ class InputRouter private constructor() {
             return false
         }
         if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-            AudioPlayerManager.getInstance().nextTrack()
+            AudioSources.app.skipKey(true)
         } else {
-            AudioPlayerManager.getInstance().prevTrack()
+            AudioSources.app.skipKey(false)
         }
         MainActivity.instance?.clickFeedback()
         return true
