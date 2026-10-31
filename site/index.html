@@ -161,13 +161,13 @@ ul.points li::before { content: ""; position: absolute; left: 4px; top: .55em; w
 
 /* Screens: native size (480 x 360 CSS px) at most, never larger */
 .shot { margin: 0; min-width: 0; }
-.shot .frame { position: relative; width: 100%; max-width: var(--cap); aspect-ratio: 4 / 3; background: #000; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); }
+.shot .frame { position: relative; width: 100%; max-width: var(--cap); margin-inline: auto; aspect-ratio: 4 / 3; background: #000; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); }
 .shot .frame > img, .shot .frame > video { width: 100%; height: 100%; object-fit: cover; }
 .shot figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: var(--cap); }
 .shots { display: grid; gap: 32px 28px; }
 .shots { grid-template-columns: repeat(3, minmax(0, var(--cap))); gap: 28px 22px; }
 .shots.three { margin-top: 36px; }
-@media (max-width: 900px) { .shots { grid-template-columns: repeat(2, minmax(0, var(--cap))); } }
+@media (max-width: 900px) { .shots { grid-template-columns: repeat(2, minmax(0, var(--cap))); justify-content: center; } }
 @media (max-width: 560px) { .shots { grid-template-columns: minmax(0, var(--cap)); } }
 @media (min-resolution: 1.5dppx) { :root { --cap: 400px; --dev: 420px; } }
 @media (min-resolution: 2dppx) { :root { --cap: 300px; --dev: 320px; } }
