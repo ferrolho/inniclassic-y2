@@ -146,7 +146,7 @@ internal class NeighbourCovers<V : Any>(private val maxEntries: Int) {
         const val SIZE = 2 * RADIUS + 2
 
         /** The prefetch starts this long after the last track change, so it does not slow down the new track. */
-        const val PREFETCH_DELAY_MS = 600L
+        const val PREFETCH_DELAY_MS = 1000L
 
         /**
          * The queue positions of the track at [index] and of the [radius] tracks after and before it, nearest
