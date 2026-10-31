@@ -40,7 +40,6 @@ class CoverFlowController(
     private val uniqueAlbumList: List<SongItem>,
     private val clickFeedback: () -> Unit,
     private val onAlbumSelected: (albumItem: SongItem) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val onRebuildUniqueAlbumList: (() -> Unit)? = null,
     private val localize: (String) -> String
 ) : ScreenController {
@@ -815,6 +814,14 @@ class CoverFlowController(
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            // Open the album on release (onKeyUp); on press, the release went to the album list and played a song
+            return true
+        }
+        return false
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (currentCoverFlowIndex in uniqueAlbumList.indices) {
                 clickFeedback()
                 val chosen = uniqueAlbumList[currentCoverFlowIndex]
@@ -823,11 +830,6 @@ class CoverFlowController(
             return true
         }
         return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 
     /** Views of a card and whether its text is shown (kept in card.tag). */
