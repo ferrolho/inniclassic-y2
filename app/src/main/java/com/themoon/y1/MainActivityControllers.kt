@@ -199,6 +199,11 @@ internal fun MainActivity.initControllers() {
         },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onRebuildUniqueAlbumList = { rebuildUniqueAlbumListInternal() },
+        nowPlayingSong = {
+            // While the FM radio is on, the radio plays, not the song of the queue.
+            if (com.themoon.y1.managers.FmRadioManager.getInstance()?.isPowerUp == true) null
+            else currentPlaylist.getOrNull(currentIndex)?.let { file -> MainActivity.customLibrary.firstOrNull { it.file == file } }
+        },
         localize = { t(it) }
     )
 
@@ -570,7 +575,8 @@ internal fun MainActivity.initControllers() {
             updateScreenOffFeedback(true)
         },
         applyAlbumTiltSetting = {
-            isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
+            isAlbumTiltEnabled = com.themoon.y1.controllers.player.AlbumTiltSetting.isEnabled(prefs)
+            playerController.applyAlbumTiltSetting()
         },
         toggleShuffleMode = {
             isShuffleMode = !isShuffleMode
