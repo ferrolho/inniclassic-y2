@@ -593,7 +593,8 @@ class PlayerController(
     private fun spectrumColor(): Int {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             val art = (ivAlbumArt.drawable as? BitmapDrawable)?.bitmap
-            if (art !== spectrumArt) {
+            // While the cover of a new track loads, the default cover shows: keep the last colour until the cover shows
+            if (art !== spectrumArt && !AudioPlayerManager.getInstance().isArtLoading()) {
                 spectrumArt = art
                 if (art != null && !art.isRecycled) pickCoverColor(art)
             }
