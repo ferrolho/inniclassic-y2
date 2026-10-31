@@ -33,7 +33,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.AudiobookManager
-import com.themoon.y1.managers.RecentlyPlayedManager
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
@@ -65,6 +65,7 @@ class BrowserController(
     private val onNavigateBackToMenu: () -> Unit,
     private val onCoverFlowRequested: () -> Unit,
     private val onPlaylistsRequested: () -> Unit,
+    private val onShuffleSongsRequested: () -> Unit,
     private val onSearchRequested: () -> Unit,
     private val onStartMediaLibraryScan: () -> Unit,
     private val showLoadingPopup: () -> Unit,
@@ -97,6 +98,8 @@ class BrowserController(
     var currentFolder: File = StoragePaths.getPrimaryRoot()
     var virtualQueryType: String = "ALL"
     var virtualQueryValue: String = ""
+    /** Album artist of the album that virtualQueryValue names; empty matches any artist. */
+    var virtualQueryAlbumArtist: String = ""
     var categoryArtistFilter: String = ""
     var categoryArtistFilterIsTrackArtist: Boolean = false
     var categoryGenreFilter: String = ""
@@ -110,7 +113,6 @@ class BrowserController(
     companion object {
         private const val FOLDER_ROW_CHUNK_SIZE = 25
         const val ALL_SONGS_SENTINEL = "__ALL_SONGS__"
-        const val CLEAR_RECENTLY_PLAYED_SENTINEL = "__CLEAR_RECENTLY_PLAYED__"
     }
 
     override fun onEnter(state: ScreenState) {
@@ -141,6 +143,12 @@ class BrowserController(
                     virtualQueryValue = ""
                     categoryArtistFilter = mode.artistFilter ?: ""
                     categoryArtistFilterIsTrackArtist = mode.byTrackArtist
+                    buildVirtualCategories("ALBUM")
+                }
+                is BrowserMode.Compilations -> {
+                    virtualQueryValue = ""
+                    categoryArtistFilter = ""
+                    categoryArtistFilterIsTrackArtist = false
                     buildVirtualCategories("ALBUM")
                 }
                 is BrowserMode.Genres -> {
@@ -175,10 +183,6 @@ class BrowserController(
                     virtualQueryType = "RECENT"
                     buildVirtualSongs()
                 }
-                is BrowserMode.RecentlyPlayed -> {
-                    isAudiobookLibraryMode = false
-                    buildRecentlyPlayedAlbums()
-                }
                 is BrowserMode.Audiobooks -> {
                     isAudiobookLibraryMode = true
                     buildFileBrowserUI()
@@ -197,13 +201,17 @@ class BrowserController(
         isAudiobookLibraryMode = false
     }
 
+    override fun onLibraryLoaded() {
+        // The Music menu itself does not change; rebuilding it would move the selection to the top
+        if (currentBrowserMode !is BrowserMode.Root) onRefreshUI()
+    }
+
     override fun onRefreshUI() {
         when (currentBrowserMode) {
             is BrowserMode.Root, is BrowserMode.Audiobooks -> buildFileBrowserUI()
             is BrowserMode.Folder -> buildFolderBrowserUI()
             is BrowserMode.VirtualSongs -> buildVirtualSongs()
             is BrowserMode.Favorites -> buildVirtualSongsForFavorites()
-            is BrowserMode.RecentlyPlayed -> buildRecentlyPlayedAlbums()
             else -> {}
         }
     }
@@ -225,173 +233,16 @@ class BrowserController(
             updateHeaderTitle(localize("Music"))
             showBrowserCoverPane()
 
-            if (!isMusicMenuItemHidden("coverflow")) {
-                val btnCoverFlow = createListButtonWithIcon("\uE3B6", localize("Cover Flow"), null)
-                btnCoverFlow.setOnClickListener {
+            for (item in MusicMenuItems.ITEMS) {
+                if (isMusicMenuItemHidden(item.id)) continue
+                val label = localize(item.label)
+                val btn = createListButtonWithIcon(item.icon, label, null)
+                btn.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Cover Flow")
-                    onCoverFlowRequested()
+                    lastBrowserFocusText = label
+                    openMusicMenuItem(item.id)
                 }
-                containerBrowserItems.addView(btnCoverFlow)
-            }
-
-            if (!isMusicMenuItemHidden("recently_played")) {
-                val btnRecentlyPlayed = createListButtonWithIcon("\uE8B6", localize("Recently Played"), null)
-                btnRecentlyPlayed.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Recently Played")
-                    currentBrowserMode = BrowserMode.RecentlyPlayed
-                    buildRecentlyPlayedAlbums()
-                }
-                containerBrowserItems.addView(btnRecentlyPlayed)
-            }
-
-            if (!isMusicMenuItemHidden("playlists")) {
-                val btnM3u = createListButtonWithIcon("\uE05F", localize("Playlists"), null)
-                btnM3u.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Playlists")
-                    onPlaylistsRequested()
-                }
-                containerBrowserItems.addView(btnM3u)
-            }
-
-            if (!isMusicMenuItemHidden("track_artists")) {
-                val btnTrackArtist = createListButtonWithIcon("\uE7FD", localize("Artists"), null)
-                btnTrackArtist.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Artists")
-                    currentBrowserMode = BrowserMode.TrackArtists
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("TRACK_ARTIST")
-                }
-                containerBrowserItems.addView(btnTrackArtist)
-            }
-
-            if (!isMusicMenuItemHidden("artists")) {
-                val btnArtist = createListButtonWithIcon("\uE7FD", localize("Album Artists"), null)
-                btnArtist.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Album Artists")
-                    currentBrowserMode = BrowserMode.Artists
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ARTIST")
-                }
-                containerBrowserItems.addView(btnArtist)
-            }
-
-            if (!isMusicMenuItemHidden("albums")) {
-                val btnAlbum = createListButtonWithIcon("\uE019", localize("Albums"), null)
-                btnAlbum.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Albums")
-                    currentBrowserMode = BrowserMode.Albums()
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ALBUM")
-                }
-                containerBrowserItems.addView(btnAlbum)
-            }
-
-            if (!isMusicMenuItemHidden("songs")) {
-                val btnAll = createListButtonWithIcon("\uE03D", localize("Songs"), null)
-                btnAll.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Songs")
-                    currentBrowserMode = BrowserMode.VirtualSongs
-                    virtualQueryType = "ALL"
-                    buildVirtualSongs()
-                }
-                containerBrowserItems.addView(btnAll)
-            }
-
-            if (!isMusicMenuItemHidden("genres")) {
-                val btnGenre = createListButtonWithIcon("\uE030", localize("Genres"), null)
-                btnGenre.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Genres")
-                    currentBrowserMode = BrowserMode.Genres
-                    virtualQueryValue = ""
-                    categoryGenreFilter = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("GENRE")
-                }
-                containerBrowserItems.addView(btnGenre)
-            }
-
-            if (!isMusicMenuItemHidden("composers")) {
-                val btnComposer = createListButtonWithIcon("\uE7FD", localize("Composers"), null)
-                btnComposer.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Composers")
-                    currentBrowserMode = BrowserMode.Composers
-                    virtualQueryValue = ""
-                    buildVirtualCategories("COMPOSER")
-                }
-                containerBrowserItems.addView(btnComposer)
-            }
-
-            if (!isMusicMenuItemHidden("years")) {
-                val btnYears = createListButtonWithIcon("\uE8B6", localize("Years"), null)
-                btnYears.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Years")
-                    currentBrowserMode = BrowserMode.Years
-                    virtualQueryValue = ""
-                    buildVirtualCategories("YEAR")
-                }
-                containerBrowserItems.addView(btnYears)
-            }
-
-            if (!isMusicMenuItemHidden("recently_added")) {
-                val btnRecent = createListButtonWithIcon("\uE8B6", localize("Recently Added"), null)
-                btnRecent.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Recently Added")
-                    currentBrowserMode = BrowserMode.RecentlyAdded
-                    virtualQueryType = "RECENT"
-                    buildVirtualSongs()
-                }
-                containerBrowserItems.addView(btnRecent)
-            }
-
-            if (!isMusicMenuItemHidden("favorites")) {
-                val btnFav = createListButtonWithIcon("\uE8B6", localize("My Favorites"), null)
-                btnFav.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("My Favorites")
-                    currentBrowserMode = BrowserMode.Favorites
-                    buildVirtualSongsForFavorites()
-                }
-                containerBrowserItems.addView(btnFav)
-            }
-
-            if (!isMusicMenuItemHidden("folders")) {
-                val btnFolders = createListButtonWithIcon("\uE8B6", localize("Folders"), null)
-                btnFolders.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Folders")
-                    currentBrowserMode = BrowserMode.Folder(StoragePaths.getPrimaryRoot())
-                    currentFolder = StoragePaths.getPrimaryRoot()
-                    buildFileBrowserUI()
-                }
-                containerBrowserItems.addView(btnFolders)
-            }
-
-            if (!isMusicMenuItemHidden("search")) {
-                val btnSearch = createListButtonWithIcon("\uE8B6", localize("Search"), null)
-                btnSearch.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Search")
-                    onSearchRequested()
-                }
-                containerBrowserItems.addView(btnSearch)
+                containerBrowserItems.addView(btn)
             }
         } else {
             updateHeaderTitle(localize("Audiobooks"))
@@ -512,6 +363,7 @@ class BrowserController(
         listVirtualSongs?.visibility = View.VISIBLE
 
         val catTitle = when {
+            type == "ALBUM" && currentBrowserMode is BrowserMode.Compilations -> localize("Compilations")
             type == "ALBUM" && categoryArtistFilter.isNotEmpty() -> categoryArtistFilter
             type == "GENRE_ALBUM" && categoryArtistFilter.isNotEmpty() -> categoryArtistFilter
             type == "GENRE_ARTIST" && categoryGenreFilter.isNotEmpty() -> categoryGenreFilter
@@ -524,10 +376,19 @@ class BrowserController(
         }
         updateHeaderTitle(catTitle)
 
+        // Compilations lists only compilation albums. Artists (and the albums of an artist in it) then
+        // leaves out their tracks. SongItem.isCompilation is set when the library loads.
+        val compilationsOnly = type == "ALBUM" && currentBrowserMode is BrowserMode.Compilations
+        val hideCompilationTracks = (type == "TRACK_ARTIST" ||
+            (type == "ALBUM" && categoryArtistFilterIsTrackArtist && categoryArtistFilter.isNotEmpty())) &&
+            artistsHideCompilations()
         val activeLibrary = if (isAudiobookLibraryMode) MainActivity.audiobookLibrary else MainActivity.customLibrary
         val uniqueCategories = HashSet<String>()
+        val albumSongs = ArrayList<SongItem>()
 
         for (song in activeLibrary) {
+            if (compilationsOnly && !song.isCompilation) continue
+            if (com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)) continue
             if (type == "ALBUM" && categoryArtistFilter.isNotEmpty()) {
                 val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
                 if (categoryArtistFilter != matchField) continue
@@ -541,10 +402,13 @@ class BrowserController(
                 }
             }
 
+            if (type == "ALBUM" || type == "GENRE_ALBUM") {
+                albumSongs.add(song)
+                continue
+            }
             val v = when (type) {
                 "ARTIST" -> song.albumArtist
                 "TRACK_ARTIST", "GENRE_ARTIST" -> song.artist
-                "ALBUM", "GENRE_ALBUM" -> song.album
                 "YEAR" -> song.year
                 "GENRE" -> song.genre
                 "COMPOSER" -> song.composer
@@ -555,18 +419,32 @@ class BrowserController(
 
         val categories = ArrayList(uniqueCategories)
         Collections.sort(categories, java.lang.String.CASE_INSENSITIVE_ORDER)
+        // One row per album as Group Albums tells (AlbumKey): title, or title + album artist.
+        var albumArtists: ArrayList<String>? = null
+        if (type == "ALBUM" || type == "GENRE_ALBUM") {
+            val albums = AlbumKey.firstSongPerAlbum(albumSongs).sortedWith(
+                compareBy<SongItem, String>(java.lang.String.CASE_INSENSITIVE_ORDER) { it.album }
+                    .thenBy(java.lang.String.CASE_INSENSITIVE_ORDER) { AlbumKey.artistOf(it) }
+            )
+            albums.mapTo(categories) { it.album }
+            albumArtists = albums.mapTo(ArrayList()) { AlbumKey.artistOf(it) }
+        }
 
         if (!isAudiobookLibraryMode && ((type == "ALBUM" && categoryArtistFilter.isNotEmpty()) || type == "GENRE_ARTIST" || type == "GENRE_ALBUM")) {
             categories.add(0, ALL_SONGS_SENTINEL)
+            albumArtists?.add(0, "")
         }
 
         currentScrollIndexList.clear()
         currentScrollIndexList.addAll(categories)
 
-        val adapter = CategoryListAdapter(categories, type, isAudiobookLibraryMode)
+        val adapter = CategoryListAdapter(categories, type, isAudiobookLibraryMode, albumArtists = albumArtists)
         listVirtualSongs?.adapter = adapter
 
-        val targetIndex = categories.indexOf(virtualQueryValue)
+        val albumIndex = categories.indices.firstOrNull {
+            categories[it] == virtualQueryValue && albumArtists?.get(it).equals(virtualQueryAlbumArtist, ignoreCase = true)
+        }
+        val targetIndex = albumIndex ?: categories.indexOf(virtualQueryValue)
         virtualListSelectedIndex = if (targetIndex >= 0) targetIndex else 0
         listVirtualSongs?.post {
             navigateVirtualListTo(virtualListSelectedIndex)
@@ -603,6 +481,7 @@ class BrowserController(
         currentScrollIndexList.clear()
         val targetSongs = ArrayList<SongItem>()
         val activeLibrary = if (isAudiobookLibraryMode) MainActivity.audiobookLibrary else MainActivity.customLibrary
+        val hideCompilationTracks = categoryArtistFilterIsTrackArtist && artistsHideCompilations()
 
         for (song in activeLibrary) {
             var isPathMatched = false
@@ -635,17 +514,19 @@ class BrowserController(
                 var isMatch = false
                 when {
                     virtualQueryType == "ALL" || virtualQueryType == "RECENT" -> isMatch = true
-                    virtualQueryType == "ARTIST" && song.artist == virtualQueryValue -> isMatch = true
+                    virtualQueryType == "ARTIST" && song.artist == virtualQueryValue ->
+                        isMatch = !com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)
                     virtualQueryType == "ARTIST_ALL_ALBUMS" && song.albumArtist == virtualQueryValue -> isMatch = true
-                    (virtualQueryType == "ALBUM" || virtualQueryType == "RECENTLY_PLAYED_ALBUM") && song.album == virtualQueryValue -> {
+                    virtualQueryType == "ALBUM" && AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) -> {
                         if (categoryArtistFilter.isNotEmpty()) {
                             val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
-                            isMatch = categoryArtistFilter.equals(matchField, ignoreCase = true) || categoryArtistFilter.equals(song.artist, ignoreCase = true)
+                            isMatch = (categoryArtistFilter.equals(matchField, ignoreCase = true) || categoryArtistFilter.equals(song.artist, ignoreCase = true)) &&
+                                !com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)
                         } else {
                             isMatch = true
                         }
                     }
-                    virtualQueryType == "COVER_FLOW_ALBUM" && song.album == virtualQueryValue -> isMatch = true
+                    virtualQueryType == "COVER_FLOW_ALBUM" && AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) -> isMatch = true
                     virtualQueryType == "YEAR" && song.year == virtualQueryValue -> isMatch = true
                     virtualQueryType == "GENRE" && song.genre.equals(virtualQueryValue, ignoreCase = true) -> isMatch = true
                     virtualQueryType == "GENRE_ARTIST_SONGS" -> {
@@ -655,11 +536,13 @@ class BrowserController(
                     }
                     virtualQueryType == "GENRE_ALBUM_SONGS" -> {
                         val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
-                        isMatch = song.album.equals(virtualQueryValue, ignoreCase = true) &&
+                        isMatch = AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) &&
                             song.genre.equals(categoryGenreFilter, ignoreCase = true) &&
                             (categoryArtistFilter.isEmpty() || categoryArtistFilter.equals(matchField, ignoreCase = true))
                     }
                     virtualQueryType == "COMPOSER" && song.composer == virtualQueryValue -> isMatch = true
+                    virtualQueryType == "COMPILATION_ALBUM" && song.isCompilation &&
+                        song.album.trim().equals(virtualQueryValue.trim(), ignoreCase = true) -> isMatch = true
                     isSearchMatch -> isMatch = true
                 }
 
@@ -670,7 +553,8 @@ class BrowserController(
         }
 
         Collections.sort(targetSongs) { s1, s2 ->
-            if ("ALBUM" == virtualQueryType || "COVER_FLOW_ALBUM" == virtualQueryType || "GENRE_ALBUM_SONGS" == virtualQueryType || "RECENTLY_PLAYED_ALBUM" == virtualQueryType) {
+            if ("ALBUM" == virtualQueryType || "COVER_FLOW_ALBUM" == virtualQueryType || "GENRE_ALBUM_SONGS" == virtualQueryType ||
+                "COMPILATION_ALBUM" == virtualQueryType) {
                 val t1 = MainActivity.trackNumberMap[s1.file.absolutePath] ?: 0
                 val t2 = MainActivity.trackNumberMap[s2.file.absolutePath] ?: 0
                 if (t1 != t2) {
@@ -765,49 +649,6 @@ class BrowserController(
             } else if (listVirtualSongs.childCount > 0) {
                 listVirtualSongs.getChildAt(0)?.requestFocus()
             }
-        }
-    }
-
-    fun buildRecentlyPlayedAlbums() {
-        hideBrowserCoverPane()
-        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
-        statusBar?.background = ThemeManager.createStatusBarBackground()
-
-        if (MainActivity.instance?.isCustomScanning == true) {
-            showLoadingPopup()
-            currentBrowserMode = BrowserMode.Root
-            buildFileBrowserUI()
-            return
-        }
-
-        scrollViewBrowser?.visibility = View.GONE
-        listVirtualSongs?.visibility = View.VISIBLE
-        hzIndexScroll?.visibility = View.GONE
-
-        updateHeaderTitle(localize("Recently Played"))
-
-        val activeLibrary = if (isAudiobookLibraryMode) MainActivity.audiobookLibrary else MainActivity.customLibrary
-        val recentEntries = RecentlyPlayedManager.getInstance(activity).getRecentAlbums(activeLibrary)
-
-        val items = ArrayList<String>()
-        if (recentEntries.isEmpty()) {
-            Toast.makeText(activity, localize("No recently played albums yet."), Toast.LENGTH_SHORT).show()
-        } else {
-            for (entry in recentEntries) {
-                items.add(entry.albumName)
-            }
-            items.add(CLEAR_RECENTLY_PLAYED_SENTINEL)
-        }
-
-        currentScrollIndexList.clear()
-        currentScrollIndexList.addAll(items)
-
-        val adapter = CategoryListAdapter(items, "RECENTLY_PLAYED_ALBUMS", isAudiobookLibraryMode, recentEntries)
-        listVirtualSongs?.adapter = adapter
-
-        virtualListSelectedIndex = 0
-        listVirtualSongs?.post {
-            navigateVirtualListTo(virtualListSelectedIndex)
         }
     }
 
@@ -1238,10 +1079,69 @@ class BrowserController(
         }
     }
 
-    private fun isMusicMenuItemHidden(id: String): Boolean {
-        return activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
-            .getBoolean("hide_music_btn_$id", false)
+    /** The action of a Music menu item (MusicMenuItems.ITEMS). */
+    private fun openMusicMenuItem(id: String) {
+        when (id) {
+            "coverflow" -> onCoverFlowRequested()
+            "playlists" -> onPlaylistsRequested()
+            "track_artists" -> openMusicCategory(BrowserMode.TrackArtists, "TRACK_ARTIST")
+            "artists" -> openMusicCategory(BrowserMode.Artists, "ARTIST")
+            "albums" -> openMusicCategory(BrowserMode.Albums(), "ALBUM")
+            "compilations" -> openMusicCategory(BrowserMode.Compilations, "ALBUM")
+            "songs" -> {
+                currentBrowserMode = BrowserMode.VirtualSongs
+                virtualQueryType = "ALL"
+                buildVirtualSongs()
+            }
+            "shuffle_songs" -> onShuffleSongsRequested()
+            "genres" -> {
+                categoryGenreFilter = ""
+                openMusicCategory(BrowserMode.Genres, "GENRE")
+            }
+            "composers" -> {
+                currentBrowserMode = BrowserMode.Composers
+                virtualQueryValue = ""
+                buildVirtualCategories("COMPOSER")
+            }
+            "years" -> {
+                currentBrowserMode = BrowserMode.Years
+                virtualQueryValue = ""
+                buildVirtualCategories("YEAR")
+            }
+            "recently_added" -> {
+                currentBrowserMode = BrowserMode.RecentlyAdded
+                virtualQueryType = "RECENT"
+                buildVirtualSongs()
+            }
+            "favorites" -> {
+                currentBrowserMode = BrowserMode.Favorites
+                buildVirtualSongsForFavorites()
+            }
+            "folders" -> {
+                currentBrowserMode = BrowserMode.Folder(StoragePaths.getPrimaryRoot())
+                currentFolder = StoragePaths.getPrimaryRoot()
+                buildFileBrowserUI()
+            }
+            "search" -> onSearchRequested()
+        }
     }
+
+    /** A category list of the Music menu, with no artist filter from an earlier list. */
+    private fun openMusicCategory(mode: BrowserMode, type: String) {
+        currentBrowserMode = mode
+        virtualQueryValue = ""
+        categoryArtistFilter = ""
+        categoryArtistFilterIsTrackArtist = false
+        buildVirtualCategories(type)
+    }
+
+    private fun isMusicMenuItemHidden(id: String): Boolean {
+        // Settings > Music Menu Items writes these keys to AppPrefs.
+        return MusicMenuItems.isHidden(activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE), id)
+    }
+
+    /** True when Compilations is in the Music menu: then Artists does not show the compilation tracks (as on the iPod). */
+    fun artistsHideCompilations(): Boolean = !isAudiobookLibraryMode && !isMusicMenuItemHidden("compilations")
 
     private fun isAudioFile(f: File?): Boolean {
         if (f == null || !f.isFile) return false
@@ -1302,10 +1202,6 @@ class BrowserController(
             is BrowserMode.VirtualSongs -> {
                 when (virtualQueryType) {
                     "COVER_FLOW_ALBUM" -> onNavigateBackToMenu()
-                    "RECENTLY_PLAYED_ALBUM" -> {
-                        currentBrowserMode = BrowserMode.RecentlyPlayed
-                        buildRecentlyPlayedAlbums()
-                    }
                     "GENRE_ALBUM_SONGS" -> {
                         currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter, categoryArtistFilter)
                         buildVirtualCategories("GENRE_ALBUM")
@@ -1339,6 +1235,12 @@ class BrowserController(
                     "ALBUM" -> {
                         val exitedAlbum = virtualQueryValue
                         currentBrowserMode = BrowserMode.Albums(categoryArtistFilter, categoryArtistFilterIsTrackArtist)
+                        virtualQueryValue = exitedAlbum
+                        buildVirtualCategories("ALBUM")
+                    }
+                    "COMPILATION_ALBUM" -> {
+                        val exitedAlbum = virtualQueryValue
+                        currentBrowserMode = BrowserMode.Compilations
                         virtualQueryValue = exitedAlbum
                         buildVirtualCategories("ALBUM")
                     }
@@ -1400,6 +1302,12 @@ class BrowserController(
                 }
                 return true
             }
+            is BrowserMode.Compilations -> {
+                currentBrowserMode = BrowserMode.Root
+                lastBrowserFocusText = localize("Compilations")
+                buildFileBrowserUI()
+                return true
+            }
             is BrowserMode.GenreAlbums -> {
                 currentBrowserMode = BrowserMode.GenreArtists(categoryGenreFilter)
                 val exitedArtist = categoryArtistFilter
@@ -1439,12 +1347,6 @@ class BrowserController(
             is BrowserMode.RecentlyAdded -> {
                 currentBrowserMode = BrowserMode.Root
                 lastBrowserFocusText = localize("Recently Added")
-                buildFileBrowserUI()
-                return true
-            }
-            is BrowserMode.RecentlyPlayed -> {
-                currentBrowserMode = BrowserMode.Root
-                lastBrowserFocusText = localize("Recently Played")
                 buildFileBrowserUI()
                 return true
             }
