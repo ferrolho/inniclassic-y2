@@ -1,5 +1,7 @@
 package com.themoon.y1.controllers.settings
 
+import com.themoon.y1.lists.Focus
+import com.themoon.y1.lists.RowLook
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
 import org.junit.Assert.assertEquals
@@ -86,5 +88,38 @@ class ActionScreenTest {
         assertSame(action, ActionScreens.spec(key)?.actions?.single())
         ActionScreens.forget(key)
         assertFalse(ActionScreens.setInfo(key, listOf("100 %")))
+    }
+
+    @Test
+    fun aSpecIsAListOfInfoRowsThenActionRows() {
+        val steps = mutableListOf<String>()
+        val spec = ActionScreens.Spec(
+            "Play On",
+            info = listOf("Searching…"),
+            actions = listOf(
+                ActionScreens.Action("This Y2", checked = true) { steps.add("y2") },
+                ActionScreens.Action("Kitchen", checked = false) { steps.add("kitchen") },
+                ActionScreens.Action("More", opensList = true) { steps.add("more") },
+                ActionScreens.Action("Search Again") { steps.add("search") }
+            )
+        )
+        val list = ActionScreens.list(spec) { steps.add("close") }
+        assertEquals("Play On", list.title)
+        assertEquals(listOf(RowLook.INFO, RowLook.CHOICE, RowLook.CHOICE, RowLook.VALUE, RowLook.VALUE), list.rows.map { it.look })
+        assertEquals(listOf(true, false), list.rows.subList(1, 3).map { it.checked })
+        // A chevron only on the row that opens a list
+        assertEquals(listOf("〉", ""), list.rows.subList(3, 5).map { it.value })
+        assertEquals(Focus.FIRST, list.focus)
+        list.rows[4].onClick!!()
+        list.rows[3].onClick!!()
+        assertEquals(listOf("close", "search", "more"), steps)
+    }
+
+    @Test
+    fun aScreenThatSelectsNoActionIsAListWithNoFirstRow() {
+        val spec = confirmScreen("Reset All Settings", "All settings go back to their defaults.", "Reset", selectAction = false) {}
+        assertEquals(Focus.NONE, ActionScreens.list(spec) {}.focus)
+        // A message: info rows only
+        assertTrue(ActionScreens.list(ActionScreens.Spec("Bluetooth Pairing", listOf("Code", "123456"))) {}.rows.all { it.look == RowLook.INFO })
     }
 }

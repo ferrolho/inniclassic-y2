@@ -1,5 +1,6 @@
 package com.themoon.y1.testhooks
 
+import com.themoon.y1.Prefs
 import com.themoon.y1.eventlog.EventLogLogic
 import com.themoon.y1.models.SongItem
 import org.json.JSONArray
@@ -132,29 +133,20 @@ object TestHookLogic {
         return JSONObject().put("name", typeName(value)).put("detail", value.toString())
     }
 
-    private val SETTING_KEYS = listOf(
-        "sound", "vibrate", "vibrate_strength", "double_click_favorite", "time_in_title_bar", "is_24h_format",
-        "screen_off_control", "loop_scroll_on", "list_edges_fade", "app_theme_name", "current_theme_name",
-        "album_tilt_enabled", "shuffle", "repeat_mode", "backlight_timer_index", "volume_limit_max",
-        "app_language", "auto_theme_enabled"
-    )
-
-    private val BULK_PREFIXES = listOf("rating_", "book_pos_")
-
-    /** The key settings from AppPrefs (only keys that are set). */
+    /** The settings from AppPrefs (the setting keys of [Prefs], only keys that are set). */
     fun keySettings(all: Map<String, *>): JSONObject {
         val out = JSONObject()
         for (key in all.keys.sorted()) {
-            if (key in SETTING_KEYS) putScalar(out, key, all[key])
+            if (Prefs.isSetting(key)) putScalar(out, key, all[key])
         }
         return out
     }
 
-    /** All scalar AppPrefs entries, without secrets and without per-song bulk keys (ratings, positions). */
+    /** All scalar AppPrefs entries, without secrets and without per-song keys (ratings, positions, cached tags). */
     fun allSettings(all: Map<String, *>): JSONObject {
         val out = JSONObject()
         for (key in all.keys.sorted()) {
-            if (EventLogLogic.isSecretKey(key) || BULK_PREFIXES.any { key.startsWith(it) }) continue
+            if (EventLogLogic.isSecretKey(key) || Prefs.isPerSong(key)) continue
             putScalar(out, key, all[key])
         }
         return out
