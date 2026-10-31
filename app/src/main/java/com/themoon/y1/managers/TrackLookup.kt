@@ -65,6 +65,11 @@ object LibrarySongs {
 
     fun byPath(path: String): SongItem? =
         index.find(path, listOf(MainActivity.customLibrary, MainActivity.audiobookLibrary))
+
+    private val musicIndex = LibraryPathIndex<SongItem> { it.file.absolutePath }
+
+    /** Only the songs (not the audiobooks), as the Bluetooth track data searched them before. */
+    fun songByPath(path: String): SongItem? = musicIndex.find(path, listOf(MainActivity.customLibrary))
 }
 
 /**
