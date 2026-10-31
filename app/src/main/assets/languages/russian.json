@@ -461,5 +461,16 @@
   "Heart Purchased": "Сердце куплено",
   "Recently Played": "Недавно воспроизведенные",
   "Top 25 Most Played": "25 самых популярных",
-  "No Songs": "Нет песен"
+  "No Songs": "Нет песен",
+  "Battery": "Аккумулятор",
+  "Battery Icon": "Значок аккумулятора",
+  "Screen Off": "Экран выключен",
+  "Last 24 Hours": "Последние 24 часа",
+  "Last 10 Days": "Последние 10 дней",
+  "Battery Level": "Уровень заряда",
+  "Battery Used": "Израсходовано",
+  "Screen On": "Экран включён",
+  "Last charged to": "Последняя зарядка до",
+  "Charging": "Зарядка",
+  "No battery history yet": "Истории аккумулятора пока нет"
 }

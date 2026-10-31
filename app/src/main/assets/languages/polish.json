@@ -645,5 +645,16 @@
   "Heart Purchased": "Kupiono serce",
   "Recently Played": "Ostatnio odtwarzane",
   "Top 25 Most Played": "Top 25 najczęściej odtwarzanych",
-  "No Songs": "Brak utworów"
+  "No Songs": "Brak utworów",
+  "Battery": "Bateria",
+  "Battery Icon": "Ikona baterii",
+  "Screen Off": "Ekran wyłączony",
+  "Last 24 Hours": "Ostatnie 24 godziny",
+  "Last 10 Days": "Ostatnie 10 dni",
+  "Battery Level": "Poziom baterii",
+  "Battery Used": "Zużycie baterii",
+  "Screen On": "Ekran włączony",
+  "Last charged to": "Ostatnio naładowano do",
+  "Charging": "Ładowanie",
+  "No battery history yet": "Brak historii baterii"
 }

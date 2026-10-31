@@ -547,7 +547,18 @@ polish_dict = {
   "Failed: Root access required.": "Błąd: Wymagany dostęp Root.",
   "No valid tracks found in this playlist.": "Brak prawidłowych utworów na tej liście odtwarzania.",
   "Failed to clear cache.": "Nie udało się wyczyścić pamięci podręcznej.",
-  "Audio error: ": "Błąd dźwięku: "
+  "Audio error: ": "Błąd dźwięku: ",
+  "Battery": "Bateria",
+  "Battery Icon": "Ikona baterii",
+  "Screen Off": "Ekran wyłączony",
+  "Last 24 Hours": "Ostatnie 24 godziny",
+  "Last 10 Days": "Ostatnie 10 dni",
+  "Battery Level": "Poziom baterii",
+  "Battery Used": "Zużycie baterii",
+  "Screen On": "Ekran włączony",
+  "Last charged to": "Ostatnio naładowano do",
+  "Charging": "Ładowanie",
+  "No battery history yet": "Brak historii baterii"
 }
 
 def main():
