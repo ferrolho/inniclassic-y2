@@ -72,7 +72,7 @@ Note: Pushing to `main` triggers [release.yml](../../../.github/workflows/releas
    For any commit that only has a one-line subject, inspect its diff so you capture the real user impact:
    ```bash
    git show --stat <COMMIT_SHA>
-   git show <COMMIT_SHA> -- app/src/main/assets/languages/english.json
+   git show <COMMIT_SHA> -- app/src/main/assets/languages/polish.json
    ```
 3. **Draft and audit the release notes**:
    - Write the release body using the template above.
