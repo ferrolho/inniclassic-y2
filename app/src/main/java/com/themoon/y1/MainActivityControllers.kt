@@ -44,6 +44,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.VideoMode
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
+import com.themoon.y1.views.EdgeFadeListView
 import com.themoon.y1.views.ListItemViewFactory
 
 internal fun MainActivity.initControllers() {
@@ -66,7 +67,7 @@ internal fun MainActivity.initControllers() {
         addView(hzIndexScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (40 * resources.displayMetrics.density).toInt()))
     }
 
-    val listVirtualSongs = object : ListView(this) {
+    val listVirtualSongs = object : EdgeFadeListView(this) {
         override fun setVisibility(visibility: Int) {
             super.setVisibility(visibility)
             listContainer.visibility = visibility
@@ -539,7 +540,13 @@ internal fun MainActivity.initControllers() {
         },
         createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
         createTablerListButton = { icon, text, normalColor, focusedColor ->
-            ListItemViewFactory.createTablerListButton(this, icon, text, normalColor, focusedColor)
+            // Settings makes rows with a tick or with no icon only for single-choice lists (Language, Theme...):
+            // keep a tick column on each row, so the text does not move, and the normal colours (no green).
+            if (icon == null || icon === com.themoon.y1.views.TablerIcons.CHECK) {
+                ListItemViewFactory.createCheckListButton(this, text, icon != null)
+            } else {
+                ListItemViewFactory.createTablerListButton(this, icon, text, normalColor, focusedColor)
+            }
         },
         clickFeedback = { clickFeedback() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
