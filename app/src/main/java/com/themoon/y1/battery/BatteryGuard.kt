@@ -49,6 +49,8 @@ object BatteryGuard {
     private val main = Handler(Looper.getMainLooper())
     private val listeners = ArrayList<Listener>()
     private var app: Context? = null
+    private const val CURVE_FILE = "battery-curve.txt"
+    private var curve = VoltageCurve.DEFAULT
     private var logic = BatteryGuardLogic()
     private var fast = false
     private var lastIntent: Intent? = null
@@ -59,6 +61,8 @@ object BatteryGuard {
         if (app != null) return
         val c = context.applicationContext
         app = c
+        curve = loadCurve(c)
+        logic = BatteryGuardLogic(curve)
         restore(c)
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
@@ -137,8 +141,8 @@ object BatteryGuard {
         if (wantFast != fast) {
             fast = wantFast
             val shown = logic.shown
-            logic = if (fast) BatteryGuardLogic(windowMs = 20_000, holdMs = 10_000, stepMs = 1_000, settleMs = 0, shutdownHoldMs = 10_000)
-            else BatteryGuardLogic()
+            logic = if (fast) BatteryGuardLogic(curve, windowMs = 20_000, holdMs = 10_000, stepMs = 1_000, settleMs = 0, shutdownHoldMs = 10_000)
+            else BatteryGuardLogic(curve)
             logic.restore(shown)
         }
         val charging = isCharging(intent)
@@ -212,6 +216,19 @@ object BatteryGuard {
             }
             PowerMenu.run(c, PowerMenu.Action.POWER_OFF) { Log.w(TAG, "Power Off failed") }
         }, NOTICE_MS)
+    }
+
+    /** The curve of `files/battery-curve.txt` when it is there and valid, else the default curve. */
+    private fun loadCurve(c: Context): VoltageCurve {
+        val f = File(c.filesDir, CURVE_FILE)
+        if (!f.exists()) return VoltageCurve.DEFAULT
+        val parsed = try {
+            VoltageCurve.parse(f.readText())
+        } catch (t: Throwable) {
+            null
+        }
+        if (parsed == null) Log.w(TAG, "$CURVE_FILE is not valid: the default curve is used")
+        return parsed ?: VoltageCurve.DEFAULT
     }
 
     private fun save(c: Context) {

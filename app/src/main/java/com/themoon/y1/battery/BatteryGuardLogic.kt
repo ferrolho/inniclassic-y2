@@ -9,7 +9,7 @@ import kotlin.math.roundToInt
  * battery empties: on 2026-10-31 it showed 89 % at 3.78 V, and 69 % 20 min before the Y2 turned off. So:
  *
  * - Charging: the shown level is the gauge (the charger raises the voltage).
- * - Discharging: the shown level comes from the voltage ([percentAt], measured on this Y2's cell, see
+ * - Discharging: the shown level comes from the voltage ([curve], measured on this Y2's cell, see
  *   `records/battery-voltage-guard-2026-10-31.md`). The voltage of each sample gets a load allowance ([equivalentMv]),
  *   the median of the last [windowMs] gives the estimate, and a lower estimate counts only when it stays lower for
  *   [holdMs]. The shown level never goes up while discharging, and it falls by at most 1 % each [stepMs] (more only
@@ -21,6 +21,7 @@ import kotlin.math.roundToInt
  * Times are elapsed real time in ms (with the time in deep sleep).
  */
 class BatteryGuardLogic(
+    val curve: VoltageCurve = VoltageCurve.DEFAULT,
     val windowMs: Long = WINDOW_MS,
     val holdMs: Long = HOLD_MS,
     val stepMs: Long = STEP_MS,
@@ -99,7 +100,7 @@ class BatteryGuardLogic(
 
         add(equivalent, t, equivalentMv(mV, load).toFloat())
         add(raw, t, mV.toFloat())
-        estimate = percentAt(median(equivalent))
+        estimate = curve.percentAt(median(equivalent))
         add(estimates, t, estimate, keepBefore = holdMs)
 
         // The estimate that was in effect for all of the hold time: a short sag does not count.
@@ -177,34 +178,11 @@ class BatteryGuardLogic(
         private const val MAX_VALID_MV = 4500
         private const val NONE = Long.MIN_VALUE
 
-        /**
-         * Voltage (mV, with the screen on, light use) to the real charge in %. From the 2026-10-29 charge (coulombs
-         * from the off point to full), set at the end with the time to off of 2026-10-31; see the record.
-         */
-        private val TABLE = intArrayOf(
-            3400, 0, 3440, 3, 3457, 5, 3510, 10, 3575, 15, 3620, 20, 3660, 25, 3690, 30, 3720, 35, 3770, 40,
-            3810, 45, 3835, 50, 3860, 55, 3890, 60, 3910, 65, 3940, 70, 3970, 75, 4030, 80, 4090, 85, 4140, 90,
-            4180, 95, 4200, 100
-        )
-
-        /** The load of the table: the screen on, Wi-Fi on, the CPU at 25 %. */
+        /** The load of the curve: the screen on, Wi-Fi on, the CPU at 25 %. */
         const val REFERENCE_SAG_MV = 35
 
-        fun percentAt(mV: Float): Float {
-            if (mV <= TABLE[0]) return 0f
-            var i = 2
-            while (i < TABLE.size) {
-                if (mV <= TABLE[i]) {
-                    val v0 = TABLE[i - 2]
-                    val p0 = TABLE[i - 1]
-                    val v1 = TABLE[i]
-                    val p1 = TABLE[i + 1]
-                    return p0 + (p1 - p0) * (mV - v0) / (v1 - v0)
-                }
-                i += 2
-            }
-            return 100f
-        }
+        /** The real charge in % at [mV] on the default curve. */
+        fun percentAt(mV: Float): Float = VoltageCurve.DEFAULT.percentAt(mV)
 
         /**
          * The voltage drop of a load, in mV (estimated from screen on/off changes in the logs: ~25 mV for the screen).
@@ -214,7 +192,7 @@ class BatteryGuardLogic(
             (if (load.screenOn) 25 else 0) + (if (load.playing) 5 else 0) +
                 load.cpuPct.coerceIn(0, 100) / 5 + (if (load.wifi) 5 else 0)
 
-        /** The voltage at the load of the table: a heavy load lowers the voltage, so its sag is added back. */
+        /** The voltage at the load of the curve: a heavy load lowers the voltage, so its sag is added back. */
         fun equivalentMv(mV: Int, load: Load): Int = mV + sagMv(load) - REFERENCE_SAG_MV
     }
 }
