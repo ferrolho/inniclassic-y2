@@ -47,8 +47,7 @@ sealed interface ScreenState {
  */
 sealed interface BrowserMode {
     data object Root : BrowserMode
-    /** A folder; [pickImage] = the background picker of Settings (images, no audio). */
-    data class Folder(val dir: File, val pickImage: Boolean = false) : BrowserMode
+    data class Folder(val dir: File) : BrowserMode
     data object Artists : BrowserMode
     data object TrackArtists : BrowserMode
     data class Albums(val artistFilter: String? = null, val byTrackArtist: Boolean = false) : BrowserMode

@@ -142,12 +142,6 @@ class NavigationManager private constructor() {
     /** The state of the top back-stack entry (where Back goes), or null. */
     fun previousState(): ScreenState? = backStack.peek()?.state
 
-    /** Back to the nearest entry that [where] accepts; the entries above it go. Without one: to the main menu. */
-    fun popBackStackTo(where: (ScreenState) -> Boolean): Boolean {
-        while (backStack.isNotEmpty() && !where(backStack.peek().state)) backStack.pop()
-        return popBackStack()
-    }
-
     fun navigateBack(): Boolean {
         if (activeController?.onBackPressed() == true) {
             return true
