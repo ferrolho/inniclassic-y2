@@ -1,5 +1,6 @@
 package com.themoon.y1.testhooks
 
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.media.AudioManager
 import android.os.SystemClock
@@ -78,7 +79,7 @@ internal class TestState(private val main: MainActivity, private val options: Op
         }
         val auto = try { Class.forName("com.themoon.y1.managers.AutoThemeManager") } catch (_: Throwable) { null }
         if (auto != null) {
-            out.put("auto", main.prefs.getBoolean("auto_theme_enabled", false))
+            out.put("auto", Prefs.AUTO_THEME.get(main.prefs))
             Reflect.getStaticField(auto, "nextSwitchMs")?.let { out.put("autoNextSwitchMs", it) }
         }
         return out
@@ -311,8 +312,8 @@ internal class TestState(private val main: MainActivity, private val options: Op
         // Stored shuffle/repeat in AppPrefs (in our build, Now Playing also keeps them there)
         val p = main.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
         val s = JSONObject()
-        if (p.contains("shuffle")) s.put("shuffle", p.getBoolean("shuffle", false))
-        if (p.contains("repeat_mode")) s.put("repeat_mode", p.getInt("repeat_mode", 0))
+        if (p.contains(Prefs.SHUFFLE.key)) s.put(Prefs.SHUFFLE.key, Prefs.SHUFFLE.get(p))
+        if (p.contains(Prefs.REPEAT_MODE.key)) s.put(Prefs.REPEAT_MODE.key, Prefs.REPEAT_MODE.get(p))
         out.put("stored", JSONObject().put("AppPrefs", s))
         return out
     }

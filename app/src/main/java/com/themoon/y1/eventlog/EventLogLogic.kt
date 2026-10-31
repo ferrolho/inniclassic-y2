@@ -1,5 +1,6 @@
 package com.themoon.y1.eventlog
 
+import com.themoon.y1.Prefs
 import com.themoon.y1.navigation.ScreenState
 import org.json.JSONArray
 import org.json.JSONObject
@@ -36,11 +37,8 @@ object EventLogLogic {
         return SECRET_PARTS.any { k.contains(it) }
     }
 
-    // Playback state that the app saves every few seconds; the playback events show it already.
-    private val QUIET_PREFIXES = listOf("last_played_", "book_pos_", "book_dur_")
-    private val QUIET_KEYS = setOf("has_saved_playback_state")
-
-    fun isQuietKey(key: String): Boolean = key in QUIET_KEYS || QUIET_PREFIXES.any { key.startsWith(it) }
+    /** Playback state that the app saves every few seconds (quietInLog in [Prefs]); the playback events show it already. */
+    fun isQuietKey(key: String): Boolean = Prefs.isQuietInLog(key)
 
     /** A setting value as a JSON value: scalars as they are, long text cut, sets as a sorted (cut) array. */
     fun jsonValue(value: Any?): Any = when (value) {

@@ -1,5 +1,6 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -217,7 +218,7 @@ class AudioPlayerManager private constructor() {
         exoPlayer = SimpleExoPlayer.Builder(context.applicationContext, renderersFactory).build().apply {
             // Partial wake lock while it plays: music continues when Android turns the screen off.
             setWakeMode(C.WAKE_MODE_LOCAL)
-            val initialRepeatMode = MainActivity.instance?.prefs?.getInt("repeat_mode", 0) ?: 0
+            val initialRepeatMode = MainActivity.instance?.prefs?.let { Prefs.REPEAT_MODE.get(it) } ?: 0
             repeatMode = when (initialRepeatMode) {
                 1 -> Player.REPEAT_MODE_ONE
                 2 -> Player.REPEAT_MODE_ALL
@@ -334,7 +335,7 @@ class AudioPlayerManager private constructor() {
         val main = MainActivity.instance ?: return
         main.runOnUiThread {
             try {
-                val repeatMode = main.prefs.getInt("repeat_mode", 0)
+                val repeatMode = Prefs.REPEAT_MODE.get(main.prefs)
                 if (repeatMode == 1) {
                     if (isUsingLegacyPlayer && legacyPlayer != null) {
                         legacyPlayer?.seekTo(0)
@@ -405,8 +406,8 @@ class AudioPlayerManager private constructor() {
         main.currentPlaylist.clear()
         main.currentPlaylist.addAll(newList)
 
-        val isShuffle = main.prefs.getBoolean("shuffle", false)
-        val repeatPref = main.prefs.getInt("repeat_mode", 0)
+        val isShuffle = Prefs.SHUFFLE.get(main.prefs)
+        val repeatPref = Prefs.REPEAT_MODE.get(main.prefs)
         if (isShuffle) {
             shuffleWithFirst(main.currentPlaylist, targetSong)
             main.currentIndex = 0
@@ -984,7 +985,7 @@ class AudioPlayerManager private constructor() {
                 exoPlayer?.setMediaSource(mediaSource)
                 exoPlayer?.prepare()
 
-                val isShuffle = main.prefs.getBoolean("shuffle", false)
+                val isShuffle = Prefs.SHUFFLE.get(main.prefs)
                 exoPlayer?.shuffleModeEnabled = isShuffle
 
                 if (effectiveSeekMs > 0) {
@@ -1947,8 +1948,8 @@ class AudioPlayerManager private constructor() {
             main.isPausedByHand = true
             main.isAudiobookLibraryMode = isAudiobook
 
-            val isShuffle = main.prefs.getBoolean("shuffle", false)
-            val repeatPref = main.prefs.getInt("repeat_mode", 0)
+            val isShuffle = Prefs.SHUFFLE.get(main.prefs)
+            val repeatPref = Prefs.REPEAT_MODE.get(main.prefs)
             if (!isUsingLegacyPlayer && exoPlayer != null) {
                 exoPlayer?.shuffleModeEnabled = isShuffle
                 setRepeatMode(repeatPref)
