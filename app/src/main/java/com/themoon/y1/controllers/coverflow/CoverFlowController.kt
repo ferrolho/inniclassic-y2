@@ -41,6 +41,8 @@ class CoverFlowController(
     private val clickFeedback: () -> Unit,
     private val onAlbumSelected: (albumItem: SongItem) -> Unit,
     private val onRebuildUniqueAlbumList: (() -> Unit)? = null,
+    /** The library song in Now Playing (playing or paused), or null: Cover Flow opens at its album (see [CoverFlowStart]). */
+    private val nowPlayingSong: () -> SongItem? = { null },
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -86,8 +88,38 @@ class CoverFlowController(
     private val slotScale = FloatArray(visibleCoversCount)
     private val slotAlpha = FloatArray(visibleCoversCount)
 
+    /** An album was opened from Cover Flow, when [songAtAlbumOpen] was in Now Playing. */
+    private var backFromAlbum = false
+    private var songAtAlbumOpen: SongItem? = null
+    /** The random start album that [prepareCovers] chose and prepared, or -1. */
+    private var preparedRandomStart = -1
+
     override fun onEnter(state: ScreenState) {
+        if (uniqueAlbumList.isEmpty()) onRebuildUniqueAlbumList?.invoke()
+        // Back from the songs of an album shows that album again, unless another song started since.
+        val keep = backFromAlbum && nowPlayingSong() === songAtAlbumOpen
+        backFromAlbum = false
+        songAtAlbumOpen = null
+        if (!keep) currentCoverFlowIndex = startIndex()
         buildCoverFlowUI()
+    }
+
+    /** The album of the Now Playing song; without one, a random album (the one that was prepared, if any). */
+    private fun startIndex(): Int {
+        val random = preparedRandomStart
+        preparedRandomStart = -1
+        val playing = CoverFlowStart.albumIndex(uniqueAlbumList, nowPlayingSong())
+        return when {
+            playing >= 0 -> playing
+            random in uniqueAlbumList.indices -> random
+            else -> CoverFlowStart.startIndex(uniqueAlbumList, null)
+        }
+    }
+
+    private fun openAlbum(album: SongItem) {
+        backFromAlbum = true
+        songAtAlbumOpen = nowPlayingSong()
+        onAlbumSelected(album)
     }
 
     override fun onRefreshUI() {
@@ -235,6 +267,12 @@ class CoverFlowController(
 
     private fun prepareCovers() {
         if (uniqueAlbumList.isEmpty() || isOpen()) return
+        if (!backFromAlbum) {
+            // The album that the next entry opens at.
+            val playing = CoverFlowStart.albumIndex(uniqueAlbumList, nowPlayingSong())
+            preparedRandomStart = if (playing >= 0) -1 else CoverFlowStart.startIndex(uniqueAlbumList, null)
+            currentCoverFlowIndex = if (playing >= 0) playing else preparedRandomStart
+        }
         if (currentCoverFlowIndex >= uniqueAlbumList.size) currentCoverFlowIndex = 0
         val manager = AlbumCoverManager.getInstance()
         manager.pregenerateThumbnailsIfChanged(uniqueAlbumList)
@@ -466,7 +504,7 @@ class CoverFlowController(
             if (views != null && v == views[centerIdx] && currentCoverFlowIndex in uniqueAlbumList.indices) {
                 clickFeedback()
                 val chosen = uniqueAlbumList[currentCoverFlowIndex]
-                onAlbumSelected(chosen)
+                openAlbum(chosen)
             }
         }
 
@@ -825,7 +863,7 @@ class CoverFlowController(
             if (currentCoverFlowIndex in uniqueAlbumList.indices) {
                 clickFeedback()
                 val chosen = uniqueAlbumList[currentCoverFlowIndex]
-                onAlbumSelected(chosen)
+                openAlbum(chosen)
             }
             return true
         }

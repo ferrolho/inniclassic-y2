@@ -172,6 +172,11 @@ internal fun MainActivity.initControllers() {
             changeScreen(ScreenState.Browser(BrowserMode.Songs("COVER_FLOW_ALBUM", album.album, AlbumKey.artistOf(album))))
         },
         onRebuildUniqueAlbumList = { rebuildUniqueAlbumListInternal() },
+        nowPlayingSong = {
+            // While the FM radio is on, the radio plays, not the song of the queue.
+            if (com.themoon.y1.managers.FmRadioManager.getInstance()?.isPowerUp == true) null
+            else currentPlaylist.getOrNull(currentIndex)?.let { file -> MainActivity.customLibrary.firstOrNull { it.file == file } }
+        },
         localize = { t(it) }
     )
 
