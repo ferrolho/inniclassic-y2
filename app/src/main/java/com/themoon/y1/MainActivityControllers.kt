@@ -210,7 +210,7 @@ internal fun MainActivity.initControllers() {
         rootView = layoutPlayerMode as ViewGroup,
         clickFeedback = { clickFeedback() },
         onAdjustVolume = { adjustVolume(it) },
-        onTogglePlayback = { AudioPlayerManager.getInstance().playOrPauseMusic() },
+        onTogglePlayback = { com.themoon.y1.managers.AudioSources.app.playPauseKey() },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onBrowseAlbum = { album ->
             changeScreen(MainActivity.STATE_BROWSER)
@@ -235,11 +235,9 @@ internal fun MainActivity.initControllers() {
         localize = { t(it) }
     )
 
-    val customBandLevels = IntArray(10)
     equalizerController = EqualizerController(
         activity = this,
         rootView = layoutSettingsMode as ViewGroup,
-        customBandLevels = customBandLevels,
         eqPresetNames = eqPresetNames,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         createCategoryHeader = { title ->
