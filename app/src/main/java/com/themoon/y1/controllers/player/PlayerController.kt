@@ -252,11 +252,11 @@ class PlayerController(
             if (path != displayedPlayerPath) {
                 displayedPlayerPath = path
                 val wasShowingLyrics = nowPlayingBottomState == LYRICS_STATE
-                lyricsOverlayController.loadLyrics(file)
+                // The lyrics load on their own thread: an open Lyrics view stays open (empty) until they are in place
+                lyricsOverlayController.loadLyrics(file) { onLyricsLoaded() }
                 updateRatingDisplay()
                 pendingSeekChanged = false
-                nowPlayingBottomState = if (wasShowingLyrics && lyricsOverlayController.hasLyrics) LYRICS_STATE else 0
-                if (wasShowingLyrics) setLyricsShowing(nowPlayingBottomState == LYRICS_STATE)
+                nowPlayingBottomState = if (wasShowingLyrics) LYRICS_STATE else 0
                 updateNowPlayingBottomBarState()
             }
 
@@ -292,6 +292,18 @@ class PlayerController(
         }
 
         updateShuffleRepeatStatusIcons()
+    }
+
+    /** The lyrics of the new track are in place: an open Lyrics view shows them, or closes if the track has none. */
+    private fun onLyricsLoaded() {
+        if (nowPlayingBottomState != LYRICS_STATE) return
+        if (lyricsOverlayController.hasLyrics) {
+            setLyricsShowing(true)
+        } else {
+            nowPlayingBottomState = 0
+            setLyricsShowing(false)
+            updateNowPlayingBottomBarState()
+        }
     }
 
     private fun startProgressUpdates() {

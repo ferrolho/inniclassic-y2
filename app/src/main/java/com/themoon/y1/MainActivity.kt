@@ -702,7 +702,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun sendBluetoothMetaToCar() {
         if (currentPlaylist.isNotEmpty() && currentIndex in currentPlaylist.indices) {
             val file = currentPlaylist[currentIndex]
-            val song = customLibrary.firstOrNull { it.file.absolutePath == file.absolutePath }
+            val song = com.themoon.y1.managers.LibrarySongs.songByPath(file.absolutePath)
             val title = song?.title ?: file.nameWithoutExtension
             val artist = song?.artist ?: t("Unknown Artist")
             val album = song?.album ?: t("Unknown Album")
