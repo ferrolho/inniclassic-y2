@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
@@ -34,6 +35,7 @@ import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Controller for Settings screens:
@@ -96,6 +98,34 @@ class SettingsController(
         val TIMEOUT_VALUES = intArrayOf(15000, 30000, 60000, 300000)
         val TIMEOUT_NAMES = arrayOf("15 Sec", "30 Sec", "1 Min", "5 Min")
         val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
+
+        // Common IANA zones covering the main UTC offsets, short enough to scroll with the wheel
+        val TIME_ZONE_IDS = arrayOf(
+            "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles", "America/Denver",
+            "America/Chicago", "America/Mexico_City", "America/New_York", "America/Bogota",
+            "America/Halifax", "America/St_Johns", "America/Sao_Paulo", "America/Argentina/Buenos_Aires",
+            "Atlantic/South_Georgia", "Atlantic/Azores", "GMT", "Europe/London", "Europe/Lisbon",
+            "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "Europe/Warsaw",
+            "Africa/Lagos", "Europe/Athens", "Europe/Helsinki", "Africa/Cairo", "Africa/Johannesburg",
+            "Europe/Moscow", "Europe/Istanbul", "Asia/Riyadh", "Asia/Tehran", "Asia/Dubai",
+            "Asia/Karachi", "Asia/Kolkata", "Asia/Kathmandu", "Asia/Dhaka", "Asia/Bangkok",
+            "Asia/Jakarta", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore", "Australia/Perth",
+            "Asia/Tokyo", "Asia/Seoul", "Australia/Adelaide", "Australia/Brisbane", "Australia/Sydney",
+            "Pacific/Auckland"
+        )
+
+        fun timeZoneCityName(zoneId: String): String = zoneId.substringAfterLast('/').replace('_', ' ')
+
+        // e.g. "UTC+01:00 London" (offset at the given time, so it includes summer time)
+        fun timeZoneLabel(zoneId: String, nowMs: Long): String {
+            val offsetMin = TimeZone.getTimeZone(zoneId).getOffset(nowMs) / 60000
+            val sign = if (offsetMin < 0) "-" else "+"
+            val absMin = Math.abs(offsetMin)
+            return String.format(
+                Locale.US, "UTC%s%02d:%02d %s",
+                sign, absMin / 60, absMin % 60, timeZoneCityName(zoneId)
+            )
+        }
 
         val MUSIC_MENU_ITEMS = arrayOf(
             arrayOf("coverflow", "Cover Flow"),
@@ -1033,19 +1063,20 @@ class SettingsController(
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
-        var is24HourFormat = prefs.getBoolean("is_24h_format", true)
+        var is24HourFormat = prefs.getBoolean(ClockSettings.KEY_24_HOUR_FORMAT, ClockSettings.DEFAULT_24_HOUR_FORMAT)
         val formatRightText = if (is24HourFormat) localize("24 Hour") else localize("12 Hour")
         val rowFormat = createSettingRow(localize("Time Format"), formatRightText)
         rowFormat.setOnClickListener {
             clickFeedback()
             is24HourFormat = !is24HourFormat
             mainActivity?.is24HourFormat = is24HourFormat
-            prefs.edit().putBoolean("is_24h_format", is24HourFormat).commit()
+            prefs.edit().putBoolean(ClockSettings.KEY_24_HOUR_FORMAT, is24HourFormat).commit()
+            mainActivity?.onClockSettingsChanged()
             buildDateTimeUI()
         }
         containerSettingsItems.addView(rowFormat)
 
-        var isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", true)
+        var isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
             if (isTimeInTitleBar) localize("ON") else localize("OFF")
@@ -1054,11 +1085,19 @@ class SettingsController(
             clickFeedback()
             isTimeInTitleBar = !isTimeInTitleBar
             mainActivity?.isTimeInTitleBar = isTimeInTitleBar
-            prefs.edit().putBoolean("time_in_title_bar", isTimeInTitleBar).commit()
+            prefs.edit().putBoolean(ClockSettings.KEY_TIME_IN_TITLE, isTimeInTitleBar).commit()
+            mainActivity?.onClockSettingsChanged()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
             tvStatus?.text = if (isTimeInTitleBar) localize("ON") else localize("OFF")
         }
         containerSettingsItems.addView(rowTitleClock)
+
+        val rowTimeZone = createSettingRow(localize("Time Zone"), timeZoneCityName(TimeZone.getDefault().id))
+        rowTimeZone.setOnClickListener {
+            clickFeedback()
+            buildTimeZoneSelectorUI()
+        }
+        containerSettingsItems.addView(rowTimeZone)
 
         val rowYear = createSettingRow(localize("Year"), dtYear.toString())
         rowYear.setOnClickListener {
@@ -1095,56 +1134,165 @@ class SettingsController(
         }
         containerSettingsItems.addView(rowMinute)
 
-        createCategoryHeader("━━━━━━━━━━━━━━")
-
-        val btnApply = createListButton(localize("APPLY DATE & TIME"))
-        btnApply.setTextColor(0xFFFFFFFF.toInt())
-        btnApply.typeface = ThemeManager.getCustomFontBold()
-        btnApply.setOnClickListener {
-            clickFeedback()
-            applySystemDateTime()
-            buildSettingsUI()
-        }
-        containerSettingsItems.addView(btnApply)
+        // A new value applies at once (setClockField): no Apply button.
+        addSyncTimeRow()
 
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
     }
 
-    private fun applySystemDateTime() {
-        try {
-            val cmd = "settings put global auto_time 0; settings put system auto_time 0; "
-            val targetYMD = String.format(Locale.US, "%04d%02d%02d", dtYear, dtMonth, dtDay)
-            val dateToolbox = String.format(
-                Locale.US, "%04d%02d%02d.%02d%02d%02d",
-                dtYear, dtMonth, dtDay, dtHour, dtMinute, 0
-            )
-            val datePosix = String.format(
-                Locale.US, "%02d%02d%02d%02d%04d.00",
-                dtMonth, dtDay, dtHour, dtMinute, dtYear
-            )
-            val dateString = String.format(
-                Locale.US, "%04d-%02d-%02d %02d:%02d:%02d",
-                dtYear, dtMonth, dtDay, dtHour, dtMinute, 0
-            )
-            val executeCmd = cmd +
-                "date -s $dateToolbox; " +
-                "if [ \"$(date +%Y%m%d)\" != \"$targetYMD\" ]; then " +
-                "  date $datePosix; " +
-                "  if [ \"$(date +%Y%m%d)\" != \"$targetYMD\" ]; then " +
-                "    date -s \"$dateString\"; " +
-                "  fi; " +
-                "fi; " +
-                "hwclock -w; sync"
+    // Date & Time → Sync Time Now: the last result (shown as the row value for SYNC_RESULT_MS), and the row itself
+    private var syncResult: String? = null
+    private var syncResultAt = 0L
+    private var syncRunning = false
+    private var syncRow: View? = null
+    private val SYNC_RESULT_MS = 120000L
 
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", executeCmd))
-            proc.waitFor()
-            activity.sendBroadcast(Intent(Intent.ACTION_TIME_CHANGED))
-            Toast.makeText(activity, localize("Time applied successfully!"), Toast.LENGTH_SHORT).show()
-        } catch (_: Exception) {
-            Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+    /** Date & Time → Sync Time Now: sets the clock from the internet now (DateTimeSync). Only with Wi-Fi, else grey. */
+    private fun addSyncTimeRow() {
+        val online = DateTimeSync.isWifiConnected(activity)
+        val recent = syncResult?.takeIf { android.os.SystemClock.elapsedRealtime() - syncResultAt < SYNC_RESULT_MS }
+        val value = when {
+            !online -> localize("Requires Wi-Fi")
+            syncRunning -> localize("Syncing…")
+            else -> recent ?: ""
         }
+        val row = createSettingRow(localize("Sync Time Now"), value)
+        if (!online) {
+            // Grey, and the wheel does not stop on it (onWheel skips rows that are not focusable)
+            row.isFocusable = false
+            for (i in 0 until row.childCount) row.getChildAt(i).alpha = 0.4f
+        }
+        row.setOnClickListener {
+            if (syncRunning) return@setOnClickListener
+            clickFeedback()
+            syncRunning = true
+            (row.getChildAt(1) as? TextView)?.text = localize("Syncing…")
+            Thread {
+                var error: String? = "No answer from the time server."
+                for (host in DateTimeSync.servers(activity)) {
+                    val time = DateTimeSync.query(host) ?: continue
+                    error = DateTimeSync.setSystemTime(time.now(), manual = false)
+                    break
+                }
+                activity.runOnUiThread { onSyncDone(error) }
+            }.start()
+        }
+        containerSettingsItems.addView(row)
+        syncRow = row
+    }
+
+    private fun onSyncDone(error: String?) {
+        syncRunning = false
+        val is24Hour = prefs.getBoolean("is_24h_format", true)
+        val time = java.text.SimpleDateFormat(if (is24Hour) "HH:mm:ss" else "h:mm:ss a", Locale.US).format(java.util.Date())
+        syncResult = if (error == null) localize("Set to") + " " + time else localize("Failed")
+        syncResultAt = android.os.SystemClock.elapsedRealtime()
+        val message = if (error == null) localize("Time set from the internet:") + " " + time else localize(error)
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        refreshDateTimeScreen()
+    }
+
+    /** A value from the Year...Minute list: the clock changes at once, the other values stay (DateTimeSync.withField). */
+    private fun setClockField(field: String, value: Int) {
+        val target = DateTimeSync.withField(System.currentTimeMillis(), TimeZone.getDefault(), field, value)
+        Thread {
+            val error = DateTimeSync.setSystemTime(target, manual = true)
+            activity.runOnUiThread {
+                if (error != null) Toast.makeText(activity, localize(error), Toast.LENGTH_SHORT).show()
+                refreshDateTimeScreen()
+            }
+        }.start()
+    }
+
+    /** Back from a value list: the focus on the row of that value (Year...Minute), not on the first row. */
+    private fun focusDateTimeRow(label: String) {
+        val title = localize(label)
+        for (i in 0 until containerSettingsItems.childCount) {
+            val row = containerSettingsItems.getChildAt(i) as? ViewGroup ?: continue
+            if ((row.getChildAt(0) as? TextView)?.text?.toString() == title) {
+                row.requestFocus()
+                return
+            }
+        }
+    }
+
+    /** Takes Year...Minute from the clock again, and shows them if the Date & Time list shows (the focus stays). */
+    private fun refreshDateTimeScreen() {
+        val c = Calendar.getInstance()
+        dtYear = c.get(Calendar.YEAR)
+        dtMonth = c.get(Calendar.MONTH) + 1
+        dtDay = c.get(Calendar.DAY_OF_MONTH)
+        dtHour = c.get(Calendar.HOUR_OF_DAY)
+        dtMinute = c.get(Calendar.MINUTE)
+        val row = syncRow ?: return
+        if (currentSettingsDepth != 1 || containerSettingsItems.indexOfChild(row) < 0) return
+        val focus = containerSettingsItems.findFocus()
+        val index = if (focus != null) containerSettingsItems.indexOfChild(focus) else -1
+        buildDateTimeUI()
+        if (index >= 0) containerSettingsItems.getChildAt(index)?.requestFocus()
+    }
+
+    // Time Zone list: su runs, so a second click waits
+    private var timeZoneRunning = false
+
+    /** Sets the zone through su on a background thread, then calls [onDone] on the main thread. */
+    private fun applySystemTimeZone(zoneId: String, onDone: () -> Unit) {
+        timeZoneRunning = true
+        Thread {
+            val ok = try {
+                // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
+                // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
+                // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
+                val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
+                proc.waitFor()
+                true
+            } catch (_: Exception) {
+                false
+            }
+            activity.runOnUiThread {
+                timeZoneRunning = false
+                TimeZone.setDefault(null)
+                if (!ok || TimeZone.getDefault().id != zoneId) {
+                    Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+                }
+                onDone()
+            }
+        }.start()
+    }
+
+    private fun buildTimeZoneSelectorUI() {
+        currentSettingsDepth = 2
+        containerSettingsItems.removeAllViews()
+
+        val currentId = TimeZone.getDefault().id
+        val now = System.currentTimeMillis()
+        val ids = if (currentId in TIME_ZONE_IDS) TIME_ZONE_IDS else arrayOf(currentId) + TIME_ZONE_IDS
+        var focusBtn: View? = null
+        for (id in ids.sortedBy { TimeZone.getTimeZone(it).getOffset(now) }) {
+            val isSelected = id == currentId
+            val btn = createTablerListButton(
+                if (isSelected) TablerIcons.CHECK else null,
+                timeZoneLabel(id, now),
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
+            )
+            btn.setOnClickListener {
+                if (timeZoneRunning) return@setOnClickListener
+                clickFeedback()
+                applySystemTimeZone(id) {
+                    // The clock itself is unchanged, but its local time moved, so reload the picker values
+                    refreshDateTimeScreen()
+                    // Back to Date & Time, if the user did not leave this list meanwhile
+                    if (containerSettingsItems.indexOfChild(btn) >= 0) buildDateTimeUI()
+                }
+            }
+            containerSettingsItems.addView(btn)
+            if (isSelected) focusBtn = btn
+        }
+
+        focusBtn?.requestFocus() ?: containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun buildDateTimeSelectorUI(type: String, min: Int, max: Int, currentValue: Int) {
@@ -1170,7 +1318,9 @@ class SettingsController(
                     "Hour" -> dtHour = valNum
                     "Minute" -> dtMinute = valNum
                 }
+                setClockField(type, valNum)
                 buildDateTimeUI()
+                focusDateTimeRow(if (type == "Hour") "Hour (24H)" else type)
             }
             containerSettingsItems.addView(btn)
             if (valNum == currentValue) focusBtn = btn
@@ -1464,8 +1614,8 @@ class SettingsController(
     private fun resetAllAppSettings() {
         try {
             prefs.edit()
-                .remove("is_24h_format")
-                .remove("time_in_title_bar")
+                .remove(ClockSettings.KEY_24_HOUR_FORMAT)
+                .remove(ClockSettings.KEY_TIME_IN_TITLE)
                 .remove("show_battery_percentage")
                 .remove("volume_limit_max")
                 .remove("sound_check_enabled")
@@ -1492,8 +1642,9 @@ class SettingsController(
 
         mainActivity?.isScreenOffControlEnabled = false
         mainActivity?.isShowBatteryPercentage = false
-        mainActivity?.isTimeInTitleBar = false
-        mainActivity?.is24HourFormat = false
+        mainActivity?.isTimeInTitleBar = ClockSettings.DEFAULT_TIME_IN_TITLE
+        mainActivity?.is24HourFormat = ClockSettings.DEFAULT_24_HOUR_FORMAT
+        mainActivity?.onClockSettingsChanged()
         mainActivity?.batteryIconView?.setShowPercentage(false)
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
