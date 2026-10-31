@@ -888,6 +888,7 @@ class AudioPlayerManager private constructor() {
         // The cover is read and decoded on the art thread, and shows here if the track is still the same
         loadTrackArt(main, artRequests.start(track.absolutePath), track) { art, later ->
             main.lastAlbumArtBytes = art.bytes
+            offerWidgetArt(main, art)
             var artApplied = false
             if (main.lastAlbumArtBytes != null && (main.lastAlbumArtBytes?.size ?: 0) > 0) {
                 try {
@@ -1256,6 +1257,31 @@ class AudioPlayerManager private constructor() {
             art.folderCover = main.findFolderCover(track.parentFile)
             art.folderCover?.let { if (it.exists()) readCoverFile(art, it) }
         }
+    }
+
+    /**
+     * Main thread: the home-screen widgets get the cover bytes of [art] (the embedded cover or the cover file) with the
+     * bitmap that Now Playing shows, in place of a second decode on the main thread. Their own (larger) bitmap is decoded
+     * on the prefetch thread when the track change settles, and replaces it if the cover is still the same.
+     */
+    private fun offerWidgetArt(main: MainActivity, art: TrackArt) {
+        val hwc = main.homeWidgetsController ?: return
+        val (bytes, shown) = when {
+            art.embedded != null -> art.bytes to art.embedded
+            art.podcastCover == null && art.fileCover != null -> art.fileBytes to art.fileCover
+            else -> return
+        }
+        if (bytes == null || bytes.isEmpty() || shown == null) return
+        hwc.offerDecodedArt(bytes, shown)
+        val run = coverPrefetchRun
+        coverPrefetchHandler.postDelayed({
+            coverPrefetch.execute {
+                // A track change came: the widgets get the cover of the new track
+                if (run != coverPrefetchRun) return@execute
+                val bmp = com.themoon.y1.controllers.home.HomeWidgetsController.decodeAlbumArtSmart(bytes) ?: return@execute
+                main.runOnUiThread { main.homeWidgetsController?.setDecodedArt(bytes, bmp) }
+            }
+        }, NeighbourCovers.PREFETCH_DELAY_MS)
     }
 
     /** Art thread: a cover image file, as MainActivity.applyCachedCoverArt reads it. */
